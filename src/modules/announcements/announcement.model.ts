@@ -5,6 +5,7 @@ export interface AnnouncementDocument extends Document {
   content: string
   authorId: string
   isActive: boolean
+  expiresAt?: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -30,6 +31,11 @@ const announcementSchema = new Schema<AnnouncementDocument>(
       default: true,
       index: true,
     },
+    expiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -45,6 +51,7 @@ export type Announcement = {
   content: string
   authorId: string
   isActive: boolean
+  expiresAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -56,8 +63,8 @@ export function toAnnouncement(doc: AnnouncementDocument): Announcement {
     content: doc.content,
     authorId: doc.authorId,
     isActive: doc.isActive,
+    expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-
