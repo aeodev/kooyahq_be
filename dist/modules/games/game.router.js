@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.gameRouter = void 0;
+const express_1 = require("express");
+const authenticate_1 = require("../../middleware/authenticate");
+const game_controller_1 = require("./game.controller");
+exports.gameRouter = (0, express_1.Router)();
+exports.gameRouter.use(authenticate_1.authenticate);
+exports.gameRouter.get('/types', game_controller_1.getGameTypes);
+exports.gameRouter.get('/active-users', game_controller_1.getActiveUsers);
+exports.gameRouter.get('/matches/me', game_controller_1.getMyMatches);
+exports.gameRouter.get('/matches/me/active', game_controller_1.getMyActiveMatches);
+exports.gameRouter.get('/matches/:id', game_controller_1.getMatch);
+exports.gameRouter.post('/matches', game_controller_1.createMatch);
+exports.gameRouter.put('/matches/:id', game_controller_1.updateMatch);
+exports.gameRouter.patch('/matches/:id', game_controller_1.updateMatch);
+exports.gameRouter.get('/leaderboard/:gameType', game_controller_1.getLeaderboard);
+exports.gameRouter.post('/matches/cleanup', game_controller_1.cleanupOldMatches);
