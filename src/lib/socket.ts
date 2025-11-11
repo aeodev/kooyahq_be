@@ -8,8 +8,10 @@ import { socketHandlerRegistry } from './socket-manager'
 import { userRoom } from '../utils/socket-rooms'
 import { registerTimeEntryHandlers } from '../modules/time-tracker/time-entry.socket'
 import { registerGameHandlers } from '../modules/games/game.socket'
+import { registerPresenceHandlers } from '../modules/presence/presence.socket'
 import { activeUsersManager } from './active-users'
 import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
+import { presenceManager } from '../modules/presence/presence.manager'
 
 export type AuthenticatedSocket = Socket & {
   userId?: string
@@ -55,6 +57,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
   // Register all module handlers (called once at startup)
   socketHandlerRegistry.registerHandler(registerTimeEntryHandlers)
   socketHandlerRegistry.registerHandler(registerGameHandlers)
+  socketHandlerRegistry.registerHandler(registerPresenceHandlers)
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.userId
@@ -70,6 +73,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
 
     // Track active user
     activeUsersManager.addUser(userId, socket)
+    presenceManager.markUserOnline(userId)
 
     // Register all module handlers for this socket connection
     socketHandlerRegistry.registerAllHandlers(socket)
@@ -85,6 +89,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
       
       // If this was the last connection, auto-stop any active timer (fallback for client-side beforeunload)
       if (!hasOtherConnections && userId) {
+        presenceManager.markUserOffline(userId)
         try {
           const timeEntryService = new TimeEntryService()
           const activeTimer = await timeEntryService.getActiveTimer(userId)
@@ -109,4 +114,3 @@ export function getSocketServer(): SocketServer {
   }
   return io
 }
-

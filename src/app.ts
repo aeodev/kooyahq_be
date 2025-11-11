@@ -17,6 +17,7 @@ import { announcementRouter } from './modules/announcements/announcement.router'
 import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
+import { presenceRouter } from './modules/presence/presence.router'
 
 export function createApp() {
   const app = express()
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/ai-news', aiNewsRouter)
   app.use('/api/posts', postRouter)
   app.use('/api/notifications', notificationRouter)
+  app.use('/api/presence', presenceRouter)
   app.use('/api/games', gameRouter)
   app.use('/api/announcements', announcementRouter)
   // CRITICAL: Register board router BEFORE card router
