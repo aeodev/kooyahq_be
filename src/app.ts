@@ -14,6 +14,7 @@ import { postRouter } from './modules/posts/post.router'
 import { notificationRouter } from './modules/notifications/notification.router'
 import { gameRouter } from './modules/games/game.router'
 import { announcementRouter } from './modules/announcements/announcement.router'
+import { projectRouter } from './modules/projects/project.router'
 import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
@@ -58,6 +59,7 @@ export function createApp() {
   app.use('/api/presence', presenceRouter)
   app.use('/api/games', gameRouter)
   app.use('/api/announcements', announcementRouter)
+  app.use('/api/projects', projectRouter)
   // CRITICAL: Register board router BEFORE card router
   // This ensures /api/boards routes match before the more general /api routes
   app.use('/api/boards', boardRouter)
