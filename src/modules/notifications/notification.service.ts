@@ -1,6 +1,7 @@
 import { notificationRepository, type CreateNotificationInput } from './notification.repository'
 import { userService } from '../users/user.service'
 import type { Notification } from './notification.model'
+import { SocketEmitter } from '../../utils/socket-emitter'
 
 export type NotificationWithData = Notification & {
   actor?: {
@@ -27,11 +28,17 @@ export const notificationService = {
       return
     }
 
-    await notificationRepository.create({
+    const notification = await notificationRepository.create({
       userId: postAuthorId,
       type: 'comment',
       postId,
       commentId,
+    })
+
+    const unreadCount = await notificationRepository.getUnreadCount(postAuthorId)
+    SocketEmitter.emitToUser(postAuthorId, 'notification:new', {
+      notification,
+      unreadCount,
     })
   },
 
@@ -41,11 +48,17 @@ export const notificationService = {
       return
     }
 
-    await notificationRepository.create({
+    const notification = await notificationRepository.create({
       userId: postAuthorId,
       type: 'reaction',
       postId,
       reactionId,
+    })
+
+    const unreadCount = await notificationRepository.getUnreadCount(postAuthorId)
+    SocketEmitter.emitToUser(postAuthorId, 'notification:new', {
+      notification,
+      unreadCount,
     })
   },
 
@@ -53,7 +66,7 @@ export const notificationService = {
     // Don't notify if user mentioned themselves
     const filteredUserIds = mentionedUserIds.filter((id) => id !== mentionerId)
 
-    await Promise.all(
+    const notifications = await Promise.all(
       filteredUserIds.map((userId) =>
         notificationRepository.create({
           userId,
@@ -63,6 +76,17 @@ export const notificationService = {
           mentionId: mentionerId,
         })
       )
+    )
+
+    // Emit socket events for each notification
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
     )
   },
 
@@ -121,7 +145,7 @@ export const notificationService = {
   async createSystemNotificationBroadcast(title: string, message?: string): Promise<void> {
     const users = await userService.findAll()
     
-    await Promise.all(
+    const notifications = await Promise.all(
       users.map((user) =>
         notificationRepository.create({
           userId: user.id,
@@ -129,6 +153,17 @@ export const notificationService = {
           title,
         })
       )
+    )
+
+    // Emit socket events for each notification
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
     )
   },
 
@@ -138,20 +173,26 @@ export const notificationService = {
       return
     }
 
-    await notificationRepository.create({
+    const notification = await notificationRepository.create({
       userId: assigneeId,
       type: 'card_assigned',
       cardId,
       mentionId: assignedById, // Use mentionId to track who assigned
     })
+
+    const unreadCount = await notificationRepository.getUnreadCount(assigneeId)
+    SocketEmitter.emitToUser(assigneeId, 'notification:new', {
+      notification,
+      unreadCount,
+    })
   },
 
   async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardBoardOwnerId?: string): Promise<void> {
-    const notifications: Promise<Notification>[] = []
+    const notificationPromises: Promise<Notification>[] = []
 
     // Notify card assignee if exists and not the commenter
     if (cardAssigneeId && cardAssigneeId !== commenterId) {
-      notifications.push(
+      notificationPromises.push(
         notificationRepository.create({
           userId: cardAssigneeId,
           type: 'card_comment',
@@ -164,7 +205,7 @@ export const notificationService = {
 
     // Notify board owner (card creator) if exists and not the commenter
     if (cardBoardOwnerId && cardBoardOwnerId !== commenterId && cardBoardOwnerId !== cardAssigneeId) {
-      notifications.push(
+      notificationPromises.push(
         notificationRepository.create({
           userId: cardBoardOwnerId,
           type: 'card_comment',
@@ -175,7 +216,18 @@ export const notificationService = {
       )
     }
 
-    await Promise.all(notifications)
+    const notifications = await Promise.all(notificationPromises)
+
+    // Emit socket events for each notification
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
+    )
   },
 
   async createBoardMemberNotification(userId: string, boardId: string, addedById: string): Promise<void> {
@@ -184,11 +236,17 @@ export const notificationService = {
       return
     }
 
-    await notificationRepository.create({
+    const notification = await notificationRepository.create({
       userId,
       type: 'board_member_added',
       boardId,
       mentionId: addedById, // Use mentionId to track who added them
+    })
+
+    const unreadCount = await notificationRepository.getUnreadCount(userId)
+    SocketEmitter.emitToUser(userId, 'notification:new', {
+      notification,
+      unreadCount,
     })
   },
 
@@ -198,11 +256,17 @@ export const notificationService = {
       return
     }
 
-    await notificationRepository.create({
+    const notification = await notificationRepository.create({
       userId: invitedUserId,
       type: 'game_invitation',
       title: `Game invitation: ${gameType}`,
       mentionId: inviterId, // Use mentionId to track who invited
+    })
+
+    const unreadCount = await notificationRepository.getUnreadCount(invitedUserId)
+    SocketEmitter.emitToUser(invitedUserId, 'notification:new', {
+      notification,
+      unreadCount,
     })
   },
 }

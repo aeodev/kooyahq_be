@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { notificationService } from './notification.service'
 import { createHttpError } from '../../utils/http-error'
+import { SocketEmitter } from '../../utils/socket-emitter'
 
 export async function getNotifications(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -39,6 +40,13 @@ export async function markNotificationAsRead(req: Request, res: Response, next: 
     if (!notification) {
       return next(createHttpError(404, 'Notification not found'))
     }
+    
+    const unreadCount = await notificationService.getUnreadCount(userId)
+    SocketEmitter.emitToUser(userId, 'notification:read', {
+      notificationId: id,
+      unreadCount,
+    })
+    
     res.json({
       status: 'success',
       data: notification,
@@ -57,6 +65,12 @@ export async function markAllNotificationsAsRead(req: Request, res: Response, ne
 
   try {
     const count = await notificationService.markAllAsRead(userId)
+    const unreadCount = await notificationService.getUnreadCount(userId)
+    
+    SocketEmitter.emitToUser(userId, 'notification:all-read', {
+      unreadCount,
+    })
+    
     res.json({
       status: 'success',
       data: { count },
