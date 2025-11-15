@@ -4,7 +4,6 @@ export type CreateTimeEntryInput = {
   userId: string
   projects: string[]
   task: string
-  status?: 'Billable' | 'Internal'
 }
 
 export class TimeEntryRepository {
@@ -84,9 +83,6 @@ export class TimeEntryRepository {
     }
     if (updates.task) {
       doc.task = updates.task
-    }
-    if (updates.status) {
-      doc.status = updates.status as 'Billable' | 'Internal'
     }
 
     await doc.save()

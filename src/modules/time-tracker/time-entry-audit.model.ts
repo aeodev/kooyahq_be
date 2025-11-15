@@ -18,7 +18,6 @@ export interface TimeEntryAuditDocument extends Document {
     projects?: string[]
     task?: string
     duration?: number
-    status?: 'Billable' | 'Internal'
     oldValue?: Record<string, unknown>
     newValue?: Record<string, unknown>
   }

@@ -14,21 +14,18 @@ export type PublicTimeEntry = TimeEntry & {
 export type StartTimerInput = {
   projects: string[]
   task: string
-  status?: 'Billable' | 'Internal'
 }
 
 export type UpdateTimeEntryInput = {
   projects?: string[]
   task?: string
   duration?: number
-  status?: 'Billable' | 'Internal'
 }
 
 export type ManualEntryInput = {
   projects: string[]
   task: string
   duration: number // in minutes
-  status?: 'Billable' | 'Internal'
   startTime?: string
   endTime?: string
 }
@@ -36,8 +33,6 @@ export type ManualEntryInput = {
 export type AnalyticsResult = {
   totalHours: number
   totalEntries: number
-  billableHours: number
-  internalHours: number
   byUser: Array<{
     userId: string
     userName: string
@@ -83,13 +78,11 @@ export class TimeEntryService {
       userId,
       projects: input.projects,
       task: (input.task !== undefined && input.task !== null) ? String(input.task).trim() : '', // Ensure task is always a string, even if empty
-      status: input.status || 'Billable',
     })
 
     await this.logAudit(userId, 'start_timer', entry.id, {
       projects: input.projects,
       task: input.task,
-      status: input.status || 'Billable',
     })
 
     const publicEntry = await this.toPublicTimeEntry(entry, userId)
@@ -263,7 +256,6 @@ export class TimeEntryService {
       userId,
       projects: input.projects,
       task: input.task,
-      status: input.status || 'Billable',
     })
 
     // Immediately update with manual duration
@@ -278,7 +270,6 @@ export class TimeEntryService {
       projects: input.projects,
       task: input.task,
       duration: input.duration,
-      status: input.status || 'Billable',
     })
 
     const publicEntry = await this.toPublicTimeEntry(updated, userId)
@@ -306,8 +297,6 @@ export class TimeEntryService {
 
     // Calculate totals
     const totalHours = entries.reduce((sum, e) => sum + e.duration, 0) / 60
-    const billableHours = entries.filter(e => e.status === 'Billable').reduce((sum, e) => sum + e.duration, 0) / 60
-    const internalHours = entries.filter(e => e.status === 'Internal').reduce((sum, e) => sum + e.duration, 0) / 60
 
     // Group by user
     const userMap2 = new Map<string, { userName: string; userEmail: string; hours: number; entries: number }>()
@@ -349,8 +338,6 @@ export class TimeEntryService {
     return {
       totalHours,
       totalEntries: entries.length,
-      billableHours,
-      internalHours,
       byUser: Array.from(userMap2.entries())
         .map(([userId, u]) => ({ userId, ...u, hours: u.hours / 60 }))
         .sort((a, b) => b.hours - a.hours),

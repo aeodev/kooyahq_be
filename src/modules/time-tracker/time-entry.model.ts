@@ -5,7 +5,6 @@ export interface TimeEntryDocument extends Document {
   projects: string[] // Changed from single project to array for multi-select
   task: string
   duration: number // in minutes
-  status: 'Billable' | 'Internal'
   startTime: Date
   endTime?: Date
   isActive: boolean
@@ -39,12 +38,6 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
       required: true,
       default: 0,
       min: 0,
-    },
-    status: {
-      type: String,
-      enum: ['Billable', 'Internal'],
-      required: true,
-      default: 'Billable',
     },
     startTime: {
       type: Date,
@@ -84,7 +77,6 @@ export type TimeEntry = {
   projects: string[]
   task: string
   duration: number
-  status: 'Billable' | 'Internal'
   startTime: string | null
   endTime: string | null
   isActive: boolean
@@ -102,7 +94,6 @@ export function toTimeEntry(doc: TimeEntryDocument): TimeEntry {
     projects: doc.projects || [],
     task: doc.task,
     duration: doc.duration,
-    status: doc.status as 'Billable' | 'Internal',
     startTime: doc.startTime?.toISOString() || null,
     endTime: doc.endTime?.toISOString() || null,
     isActive: doc.isActive ?? false,

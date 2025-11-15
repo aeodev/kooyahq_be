@@ -140,9 +140,6 @@ timeEntryRouter.get('/timer/active', getActiveTimer)
  *                 type: array
  *                 items:
  *                   type: string
- *               status:
- *                 type: string
- *                 enum: [Billable, Internal]
  *     responses:
  *       200:
  *         description: Timer started
@@ -233,9 +230,6 @@ timeEntryRouter.post('/timer/end-day', endDay)
  *               duration:
  *                 type: number
  *                 description: Duration in minutes
- *               status:
- *                 type: string
- *                 enum: [Billable, Internal]
  *     responses:
  *       201:
  *         description: Time entry logged
