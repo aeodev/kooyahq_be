@@ -9,6 +9,7 @@ import { userRoom } from '../utils/socket-rooms'
 import { registerTimeEntryHandlers } from '../modules/time-tracker/time-entry.socket'
 import { registerGameHandlers } from '../modules/games/game.socket'
 import { registerPresenceHandlers } from '../modules/presence/presence.socket'
+import { registerMeetHandlers } from '../modules/meet/meet.socket'
 import { activeUsersManager } from './active-users'
 import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
 import { presenceManager } from '../modules/presence/presence.manager'
@@ -47,7 +48,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
       }
 
       socket.userId = user.id
-      socket.user = { ...payload, id: user.id }
+      socket.user = { ...payload, id: user.id, name: user.name, profilePic: user.profilePic }
       next()
     } catch (error) {
       next(new Error('Invalid or expired token'))
@@ -58,6 +59,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
   socketHandlerRegistry.registerHandler(registerTimeEntryHandlers)
   socketHandlerRegistry.registerHandler(registerGameHandlers)
   socketHandlerRegistry.registerHandler(registerPresenceHandlers)
+  socketHandlerRegistry.registerHandler(registerMeetHandlers)
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.userId

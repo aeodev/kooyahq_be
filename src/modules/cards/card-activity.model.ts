@@ -32,3 +32,4 @@ const cardActivitySchema = new Schema<CardActivityDocument>(
 
 export const CardActivityModel = models.CardActivity ?? model<CardActivityDocument>('CardActivity', cardActivitySchema)
 
+

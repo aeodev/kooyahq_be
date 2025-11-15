@@ -22,6 +22,10 @@ export function timeEntriesRoom(): string {
   return 'time-entries:all'
 }
 
+export function meetRoom(meetId: string): string {
+  return `meet:${meetId}`
+}
+
 
 
 
