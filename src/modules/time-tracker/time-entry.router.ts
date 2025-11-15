@@ -14,6 +14,7 @@ import {
   deleteEntry,
   getAnalytics,
   getMyEntriesByDateRange,
+  getDayEndedStatus,
 } from './time-entry.controller'
 
 export const timeEntryRouter = Router()
@@ -115,6 +116,20 @@ timeEntryRouter.get('/analytics', getAnalytics)
  *         description: Active timer data
  */
 timeEntryRouter.get('/timer/active', getActiveTimer)
+
+/**
+ * @swagger
+ * /time-entries/timer/day-ended-status:
+ *   get:
+ *     summary: Check if user ended day today
+ *     tags: [Time Entries]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Day ended status
+ */
+timeEntryRouter.get('/timer/day-ended-status', getDayEndedStatus)
 
 /**
  * @swagger

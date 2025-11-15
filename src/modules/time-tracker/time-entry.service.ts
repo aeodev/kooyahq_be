@@ -1,5 +1,6 @@
 import { TimeEntryRepository, type CreateTimeEntryInput } from './time-entry.repository'
 import { TimeEntryAuditRepository } from './time-entry-audit.repository'
+import { DayEndRepository } from './day-end.repository'
 import { userRepository } from '../users/user.repository'
 import { HttpError } from '../../utils/http-error'
 import { SocketEmitter, TimeEntrySocketEvents } from '../../utils/socket-emitter'
@@ -14,6 +15,7 @@ export type PublicTimeEntry = TimeEntry & {
 export type StartTimerInput = {
   projects: string[]
   task: string
+  isOvertime?: boolean
 }
 
 export type UpdateTimeEntryInput = {
@@ -28,17 +30,21 @@ export type ManualEntryInput = {
   duration: number // in minutes
   startTime?: string
   endTime?: string
+  isOvertime?: boolean
 }
 
 export type AnalyticsResult = {
   totalHours: number
   totalEntries: number
+  totalOvertimeEntries: number
   byUser: Array<{
     userId: string
     userName: string
     userEmail: string
     hours: number
     entries: number
+    overtimeEntries: number
+    overtimeHours: number
   }>
   byProject: Array<{
     project: string
@@ -55,6 +61,7 @@ export type AnalyticsResult = {
 export class TimeEntryService {
   private timeEntryRepo = new TimeEntryRepository()
   private auditRepo = new TimeEntryAuditRepository()
+  private dayEndRepo = new DayEndRepository()
 
   private async logAudit(userId: string, action: string, entryId?: string, metadata?: Record<string, unknown>) {
     try {
@@ -78,6 +85,7 @@ export class TimeEntryService {
       userId,
       projects: input.projects,
       task: (input.task !== undefined && input.task !== null) ? String(input.task).trim() : '', // Ensure task is always a string, even if empty
+      isOvertime: input.isOvertime ?? false,
     })
 
     await this.logAudit(userId, 'start_timer', entry.id, {
@@ -153,7 +161,13 @@ export class TimeEntryService {
 
   async endDay(userId: string): Promise<PublicTimeEntry[]> {
     const entries = await this.timeEntryRepo.stopAllActiveTimers(userId)
+    const endedAt = new Date()
+    await this.dayEndRepo.create(userId, endedAt)
     return Promise.all(entries.map(entry => this.toPublicTimeEntry(entry, userId)))
+  }
+
+  async getDayEndedAt(userId: string, date: Date): Promise<Date | null> {
+    return await this.dayEndRepo.getLastDayEndedAt(userId, date)
   }
 
   async getUserEntries(userId: string): Promise<PublicTimeEntry[]> {
@@ -201,7 +215,6 @@ export class TimeEntryService {
       projects: entry.projects,
       task: entry.task,
       duration: entry.duration,
-      status: entry.status,
     }
 
     const updated = await this.timeEntryRepo.update(entryId, userId, updates)
@@ -212,7 +225,6 @@ export class TimeEntryService {
         projects: updated.projects,
         task: updated.task,
         duration: updated.duration,
-        status: updated.status,
         ...updates,
       },
     })
@@ -239,7 +251,6 @@ export class TimeEntryService {
       projects: entry.projects,
       task: entry.task,
       duration: entry.duration,
-      status: entry.status,
     })
 
     await this.timeEntryRepo.delete(entryId, userId)
@@ -256,6 +267,7 @@ export class TimeEntryService {
       userId,
       projects: input.projects,
       task: input.task,
+      isOvertime: input.isOvertime ?? false,
     })
 
     // Immediately update with manual duration
@@ -297,9 +309,10 @@ export class TimeEntryService {
 
     // Calculate totals
     const totalHours = entries.reduce((sum, e) => sum + e.duration, 0) / 60
+    const totalOvertimeEntries = entries.filter((e) => e.isOvertime).length
 
     // Group by user
-    const userMap2 = new Map<string, { userName: string; userEmail: string; hours: number; entries: number }>()
+    const userMap2 = new Map<string, { userName: string; userEmail: string; hours: number; entries: number; overtimeEntries: number; overtimeHours: number }>()
     entries.forEach((entry) => {
       const user = userMap.get(entry.userId)
       const existing = userMap2.get(entry.userId) || {
@@ -308,9 +321,15 @@ export class TimeEntryService {
         userEmail: user?.email || '',
         hours: 0,
         entries: 0,
+        overtimeEntries: 0,
+        overtimeHours: 0,
       }
       existing.hours += entry.duration
       existing.entries += 1
+      if (entry.isOvertime) {
+        existing.overtimeEntries += 1
+        existing.overtimeHours += entry.duration
+      }
       userMap2.set(entry.userId, existing)
     })
 
@@ -338,8 +357,9 @@ export class TimeEntryService {
     return {
       totalHours,
       totalEntries: entries.length,
+      totalOvertimeEntries,
       byUser: Array.from(userMap2.entries())
-        .map(([userId, u]) => ({ userId, ...u, hours: u.hours / 60 }))
+        .map(([userId, u]) => ({ userId, ...u, hours: u.hours / 60, overtimeHours: u.overtimeHours / 60 }))
         .sort((a, b) => b.hours - a.hours),
       byProject: Array.from(projectMap.entries())
         .sort((a, b) => b[1].hours - a[1].hours)

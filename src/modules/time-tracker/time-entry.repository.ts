@@ -4,6 +4,7 @@ export type CreateTimeEntryInput = {
   userId: string
   projects: string[]
   task: string
+  isOvertime?: boolean
 }
 
 export class TimeEntryRepository {
@@ -14,6 +15,7 @@ export class TimeEntryRepository {
       duration: 0,
       startTime,
       isActive: true,
+      isOvertime: input.isOvertime ?? false,
     })
     await doc.save()
     return toTimeEntry(doc)
@@ -83,6 +85,9 @@ export class TimeEntryRepository {
     }
     if (updates.task) {
       doc.task = updates.task
+    }
+    if (updates.isOvertime !== undefined) {
+      doc.isOvertime = updates.isOvertime
     }
 
     await doc.save()

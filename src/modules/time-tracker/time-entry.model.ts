@@ -11,6 +11,7 @@ export interface TimeEntryDocument extends Document {
   isPaused: boolean
   pausedDuration: number // total paused time in minutes
   lastPausedAt?: Date
+  isOvertime: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -63,6 +64,10 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
     lastPausedAt: {
       type: Date,
     },
+    isOvertime: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -83,6 +88,7 @@ export type TimeEntry = {
   isPaused: boolean
   pausedDuration: number
   lastPausedAt: string | null
+  isOvertime: boolean
   createdAt: string
   updatedAt: string
 }
@@ -100,6 +106,7 @@ export function toTimeEntry(doc: TimeEntryDocument): TimeEntry {
     isPaused: doc.isPaused ?? false,
     pausedDuration: doc.pausedDuration ?? 0,
     lastPausedAt: doc.lastPausedAt?.toISOString() || null,
+    isOvertime: doc.isOvertime ?? false,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }

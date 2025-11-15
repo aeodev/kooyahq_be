@@ -44,6 +44,20 @@ export async function startTimer(req: Request, res: Response) {
   res.json({ status: 'success', data: entry })
 }
 
+export async function getDayEndedStatus(req: Request, res: Response) {
+  const userId = req.user!.id
+  const today = new Date()
+  const dayEndedAt = await service.getDayEndedAt(userId, today)
+  
+  res.json({ 
+    status: 'success', 
+    data: { 
+      dayEnded: dayEndedAt !== null,
+      endedAt: dayEndedAt?.toISOString() || null
+    } 
+  })
+}
+
 export async function pauseTimer(req: Request, res: Response) {
   const userId = req.user!.id
   const entry = await service.pauseTimer(userId)
@@ -123,15 +137,22 @@ export async function deleteEntry(req: Request, res: Response) {
 
 export async function getAnalytics(req: Request, res: Response) {
   const userId = req.query.userId === 'me' ? req.user!.id : (req.query.userId as string | undefined) || null
-  const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date()
-  const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date()
+  let startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date()
+  let endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date()
 
-  // Default to last 30 days if no dates provided
+  // Default to last 15 days if no dates provided
   if (!req.query.startDate) {
-    startDate.setDate(startDate.getDate() - 30)
+    startDate.setDate(startDate.getDate() - 15)
+    startDate.setHours(0, 0, 0, 0)
+  } else {
+    // Normalize provided startDate to beginning of day
     startDate.setHours(0, 0, 0, 0)
   }
+  
   if (!req.query.endDate) {
+    endDate.setHours(23, 59, 59, 999)
+  } else {
+    // Normalize provided endDate to end of day
     endDate.setHours(23, 59, 59, 999)
   }
 
