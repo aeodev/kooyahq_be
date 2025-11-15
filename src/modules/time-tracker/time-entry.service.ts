@@ -82,7 +82,7 @@ export class TimeEntryService {
     const entry = await this.timeEntryRepo.create({
       userId,
       projects: input.projects,
-      task: input.task,
+      task: (input.task !== undefined && input.task !== null) ? String(input.task).trim() : '', // Ensure task is always a string, even if empty
       status: input.status || 'Billable',
     })
 

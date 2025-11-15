@@ -39,10 +39,7 @@ export async function startTimer(req: Request, res: Response) {
     return res.status(400).json({ status: 'error', message: 'Projects array is required' })
   }
 
-  if (!input.task || !input.task.trim()) {
-    return res.status(400).json({ status: 'error', message: 'Task description is required' })
-  }
-
+  // Task is optional - allow empty string
   const entry = await service.startTimer(userId, input)
   res.json({ status: 'success', data: entry })
 }

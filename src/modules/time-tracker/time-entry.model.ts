@@ -30,8 +30,9 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
     },
     task: {
       type: String,
-      required: true,
+      required: false, // Allow empty strings - we'll always provide a value (even if empty)
       trim: true,
+      default: '', // Default to empty string
     },
     duration: {
       type: Number,
