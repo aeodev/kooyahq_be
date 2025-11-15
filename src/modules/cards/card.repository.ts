@@ -11,6 +11,9 @@ export type CreateCardInput = {
   labels?: string[]
   dueDate?: Date
   storyPoints?: number
+  epicId?: string
+  rank?: number
+  flagged?: boolean
 }
 
 export type UpdateCardInput = {
@@ -25,6 +28,9 @@ export type UpdateCardInput = {
   storyPoints?: number | null
   attachments?: any[]
   completed?: boolean
+  epicId?: string | null
+  rank?: number | null
+  flagged?: boolean
 }
 
 export const cardRepository = {
@@ -40,13 +46,19 @@ export const cardRepository = {
       labels: input.labels || [],
       dueDate: input.dueDate,
       storyPoints: input.storyPoints,
+      epicId: input.epicId,
+      rank: input.rank,
+      flagged: input.flagged ?? false,
     })
 
     return toCard(doc)
   },
 
-  async findByBoardId(boardId: string): Promise<Card[]> {
-    const docs = await CardModel.find({ boardId }).sort({ createdAt: -1 }).exec()
+  async findByBoardId(boardId: string, sortByRank?: boolean): Promise<Card[]> {
+    const sort = sortByRank 
+      ? { rank: 1, createdAt: -1 } // Sort by rank first (ascending), then by creation date
+      : { createdAt: -1 }
+    const docs = await CardModel.find({ boardId }).sort(sort).exec()
     return docs.map((doc) => toCard(doc))
   },
 
@@ -63,8 +75,32 @@ export const cardRepository = {
     if (updates.storyPoints === null) {
       updateData.$unset = { ...updateData.$unset, storyPoints: '' }
     }
+    if (updates.epicId === null) {
+      updateData.$unset = { ...updateData.$unset, epicId: '' }
+    }
+    if (updates.rank === null) {
+      updateData.$unset = { ...updateData.$unset, rank: '' }
+    }
     const doc = await CardModel.findByIdAndUpdate(id, updateData, { new: true }).exec()
     return doc ? toCard(doc) : undefined
+  },
+
+  async bulkUpdateRanks(boardId: string, rankUpdates: Array<{ id: string; rank: number }>): Promise<Card[]> {
+    const bulkOps = rankUpdates.map(({ id, rank }) => ({
+      updateOne: {
+        filter: { _id: id, boardId },
+        update: { $set: { rank } },
+      },
+    }))
+
+    if (bulkOps.length > 0) {
+      await CardModel.bulkWrite(bulkOps)
+    }
+
+    // Return updated cards
+    const updatedIds = rankUpdates.map((u) => u.id)
+    const docs = await CardModel.find({ _id: { $in: updatedIds }, boardId }).exec()
+    return docs.map((doc) => toCard(doc))
   },
 
   async delete(id: string): Promise<boolean> {

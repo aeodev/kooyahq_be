@@ -10,6 +10,8 @@ import {
   uploadAttachment,
   deleteAttachment,
   serveCardFile,
+  bulkUpdateRanks,
+  getCardActivities,
 } from './card.controller'
 import { createComment, deleteComment, getCommentsByCard, updateComment } from './comment.controller'
 
@@ -143,6 +145,67 @@ cardRouter.put('/cards/:id/move', authenticate, moveCard)
  *         description: Card updated
  */
 cardRouter.put('/cards/:id', authenticate, updateCard)
+
+/**
+ * @swagger
+ * /cards/{id}/activities:
+ *   get:
+ *     summary: Get activity log for a card
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of activities
+ */
+cardRouter.get('/cards/:cardId/activities', authenticate, getCardActivities)
+
+/**
+ * @swagger
+ * /boards/{boardId}/cards/bulk-rank:
+ *   post:
+ *     summary: Bulk update card ranks
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: boardId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rankUpdates
+ *             properties:
+ *               rankUpdates:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - id
+ *                     - rank
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     rank:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Ranks updated successfully
+ */
+cardRouter.post('/boards/:boardId/cards/bulk-rank', authenticate, bulkUpdateRanks)
 
 /**
  * @swagger

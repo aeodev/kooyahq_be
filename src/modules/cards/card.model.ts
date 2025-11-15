@@ -23,6 +23,9 @@ export interface CardDocument extends Document {
   storyPoints?: number
   attachments?: CardAttachment[]
   completed: boolean
+  epicId?: string
+  rank?: number
+  flagged?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -74,6 +77,16 @@ const cardSchema = new Schema<CardDocument>(
       type: Boolean,
       default: false,
     },
+    epicId: {
+      type: String,
+    },
+    rank: {
+      type: Number,
+    },
+    flagged: {
+      type: Boolean,
+      default: false,
+    },
     attachments: {
       type: [
         {
@@ -110,6 +123,9 @@ export type Card = {
   storyPoints?: number
   attachments?: CardAttachment[]
   completed: boolean
+  epicId?: string
+  rank?: number
+  flagged?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -139,6 +155,9 @@ export function toCard(doc: CardDocument): Card {
         : new Date().toISOString(),
     })),
     completed: doc.completed ?? false,
+    epicId: doc.epicId,
+    rank: doc.rank,
+    flagged: doc.flagged ?? false,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }

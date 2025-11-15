@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { boardService } from '../boards/board.service'
 import { cardService } from './card.service'
+import { cardActivityRepository } from './card-activity.repository'
 import { notificationService } from '../notifications/notification.service'
 import { createHttpError } from '../../utils/http-error'
 import { env } from '../../config/env'
@@ -17,6 +18,9 @@ export async function createCard(req: Request, res: Response, next: NextFunction
     labels,
     dueDate,
     storyPoints,
+    epicId,
+    rank,
+    flagged,
   } = req.body
   const userId = req.user?.id
 
@@ -52,7 +56,10 @@ export async function createCard(req: Request, res: Response, next: NextFunction
       labels: Array.isArray(labels) ? labels : undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       storyPoints: typeof storyPoints === 'number' ? storyPoints : undefined,
-    })
+      epicId: typeof epicId === 'string' ? epicId : undefined,
+      rank: typeof rank === 'number' ? rank : undefined,
+      flagged: typeof flagged === 'boolean' ? flagged : undefined,
+    }, userId)
 
     // Notify if card was assigned on creation
     if (assigneeId && assigneeId !== userId) {
@@ -130,7 +137,7 @@ export async function moveCard(req: Request, res: Response, next: NextFunction) 
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const card = await cardService.moveCard(id, columnId, boardId)
+    const card = await cardService.moveCard(id, columnId, boardId, userId)
 
     if (!card) {
       return next(createHttpError(404, 'Card not found'))
@@ -158,6 +165,9 @@ export async function updateCard(req: Request, res: Response, next: NextFunction
     dueDate,
     storyPoints,
     completed,
+    epicId,
+    rank,
+    flagged,
   } = req.body
   const userId = req.user?.id
 
@@ -217,8 +227,17 @@ export async function updateCard(req: Request, res: Response, next: NextFunction
     if (completed !== undefined) {
       updates.completed = Boolean(completed)
     }
+    if (epicId !== undefined) {
+      updates.epicId = epicId || null
+    }
+    if (rank !== undefined) {
+      updates.rank = rank !== null && rank !== undefined ? Number(rank) : null
+    }
+    if (flagged !== undefined) {
+      updates.flagged = Boolean(flagged)
+    }
 
-    const updated = await cardService.updateCard(id, updates)
+    const updated = await cardService.updateCard(id, updates, userId)
 
     if (!updated) {
       return next(createHttpError(404, 'Card not found'))
@@ -238,6 +257,40 @@ export async function updateCard(req: Request, res: Response, next: NextFunction
     res.json({
       status: 'success',
       data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getCardActivities(req: Request, res: Response, next: NextFunction) {
+  const { cardId } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const activities = await cardActivityRepository.findByCardId(cardId)
+
+    res.json({
+      status: 'success',
+      data: activities,
     })
   } catch (error) {
     next(error)
@@ -376,6 +429,46 @@ export async function serveCardFile(req: Request, res: Response, next: NextFunct
   
   const file = createReadStream(filePath)
   file.pipe(res)
+}
+
+export async function bulkUpdateRanks(req: Request, res: Response, next: NextFunction) {
+  const { boardId } = req.params
+  const { rankUpdates } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (!Array.isArray(rankUpdates)) {
+    return next(createHttpError(400, 'rankUpdates must be an array'))
+  }
+
+  try {
+    const board = await boardService.findById(boardId)
+
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updates = rankUpdates.map((update: any) => ({
+      id: update.id,
+      rank: Number(update.rank),
+    }))
+
+    const updatedCards = await cardService.bulkUpdateRanks(boardId, updates)
+
+    res.json({
+      status: 'success',
+      data: updatedCards,
+    })
+  } catch (error) {
+    next(error)
+  }
 }
 
 export async function deleteCard(req: Request, res: Response, next: NextFunction) {
