@@ -34,7 +34,7 @@ function parseJwtExpiresIn(value: string | undefined): StringValue | number {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? DEFAULT_PORT),
-  clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
+  clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173, https://kooyahq-fe.vercel.app/',
   jwtSecret,
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
   mongoUri: process.env.MONGO_URI ?? DEFAULT_MONGO_URI,
