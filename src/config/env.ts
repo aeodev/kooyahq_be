@@ -31,10 +31,17 @@ function parseJwtExpiresIn(value: string | undefined): StringValue | number {
   return value as StringValue
 }
 
+function parseClientUrls(value: string | undefined): string[] {
+  if (!value) {
+    return ['http://localhost:5173']
+  }
+  return value.split(',').map(url => url.trim()).filter(Boolean)
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? DEFAULT_PORT),
-  clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173, https://kooyahq-fe.vercel.app/',
+  clientUrls: parseClientUrls(process.env.CLIENT_URL),
   jwtSecret,
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
   mongoUri: process.env.MONGO_URI ?? DEFAULT_MONGO_URI,

@@ -24,10 +24,16 @@ function parseJwtExpiresIn(value) {
     }
     return value;
 }
+function parseClientUrls(value) {
+    if (!value) {
+        return ['http://localhost:5173'];
+    }
+    return value.split(',').map(url => url.trim()).filter(Boolean);
+}
 exports.env = {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: Number(process.env.PORT ?? DEFAULT_PORT),
-    clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
+    clientUrls: parseClientUrls(process.env.CLIENT_URL),
     jwtSecret,
     jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
     mongoUri: process.env.MONGO_URI ?? DEFAULT_MONGO_URI,

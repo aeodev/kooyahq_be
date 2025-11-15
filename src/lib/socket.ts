@@ -28,7 +28,22 @@ let io: SocketServer | null = null
 export function initializeSocket(server: HttpServer): SocketServer {
   io = new SocketServer(server, {
     cors: {
-      origin: env.clientUrl,
+      origin: (origin, callback) => {
+        // Allow requests with no origin
+        if (!origin) return callback(null, true)
+        
+        // Check if origin is in allowed list
+        if (env.clientUrls.includes(origin)) {
+          return callback(null, true)
+        }
+        
+        // In development, allow localhost with any port
+        if (env.nodeEnv === 'development' && origin.startsWith('http://localhost:')) {
+          return callback(null, true)
+        }
+        
+        callback(new Error('Not allowed by CORS'))
+      },
       credentials: true,
       methods: ['GET', 'POST'],
     },

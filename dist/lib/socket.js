@@ -19,7 +19,20 @@ let io = null;
 function initializeSocket(server) {
     io = new socket_io_1.Server(server, {
         cors: {
-            origin: env_1.env.clientUrl,
+            origin: (origin, callback) => {
+                // Allow requests with no origin
+                if (!origin)
+                    return callback(null, true);
+                // Check if origin is in allowed list
+                if (env_1.env.clientUrls.includes(origin)) {
+                    return callback(null, true);
+                }
+                // In development, allow localhost with any port
+                if (env_1.env.nodeEnv === 'development' && origin.startsWith('http://localhost:')) {
+                    return callback(null, true);
+                }
+                callback(new Error('Not allowed by CORS'));
+            },
             credentials: true,
             methods: ['GET', 'POST'],
         },

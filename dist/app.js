@@ -34,7 +34,20 @@ function createApp() {
         crossOriginResourcePolicy: { policy: 'cross-origin' },
     }));
     app.use((0, cors_1.default)({
-        origin: env_1.env.clientUrl,
+        origin: (origin, callback) => {
+            // Allow requests with no origin (like mobile apps or curl requests)
+            if (!origin)
+                return callback(null, true);
+            // Check if origin is in allowed list
+            if (env_1.env.clientUrls.includes(origin)) {
+                return callback(null, true);
+            }
+            // In development, allow localhost with any port
+            if (env_1.env.nodeEnv === 'development' && origin.startsWith('http://localhost:')) {
+                return callback(null, true);
+            }
+            callback(new Error('Not allowed by CORS'));
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
