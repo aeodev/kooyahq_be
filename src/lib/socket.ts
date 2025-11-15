@@ -16,7 +16,11 @@ import { presenceManager } from '../modules/presence/presence.manager'
 
 export type AuthenticatedSocket = Socket & {
   userId?: string
-  user?: AccessTokenPayload & { id: string }
+  user?: AccessTokenPayload & { 
+    id: string
+    name: string
+    profilePic?: string
+  }
 }
 
 let io: SocketServer | null = null

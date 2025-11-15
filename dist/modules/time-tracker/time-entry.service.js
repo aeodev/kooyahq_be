@@ -3,12 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeEntryService = void 0;
 const time_entry_repository_1 = require("./time-entry.repository");
 const time_entry_audit_repository_1 = require("./time-entry-audit.repository");
+const day_end_repository_1 = require("./day-end.repository");
 const user_repository_1 = require("../users/user.repository");
 const http_error_1 = require("../../utils/http-error");
 const socket_emitter_1 = require("../../utils/socket-emitter");
 class TimeEntryService {
     timeEntryRepo = new time_entry_repository_1.TimeEntryRepository();
     auditRepo = new time_entry_audit_repository_1.TimeEntryAuditRepository();
+    dayEndRepo = new day_end_repository_1.DayEndRepository();
     async logAudit(userId, action, entryId, metadata) {
         try {
             await this.auditRepo.create({
@@ -29,13 +31,12 @@ class TimeEntryService {
         const entry = await this.timeEntryRepo.create({
             userId,
             projects: input.projects,
-            task: input.task,
-            status: input.status || 'Billable',
+            task: (input.task !== undefined && input.task !== null) ? String(input.task).trim() : '', // Ensure task is always a string, even if empty
+            isOvertime: input.isOvertime ?? false,
         });
         await this.logAudit(userId, 'start_timer', entry.id, {
             projects: input.projects,
             task: input.task,
-            status: input.status || 'Billable',
         });
         const publicEntry = await this.toPublicTimeEntry(entry, userId);
         // Emit socket event for real-time updates
@@ -87,7 +88,12 @@ class TimeEntryService {
     }
     async endDay(userId) {
         const entries = await this.timeEntryRepo.stopAllActiveTimers(userId);
+        const endedAt = new Date();
+        await this.dayEndRepo.create(userId, endedAt);
         return Promise.all(entries.map(entry => this.toPublicTimeEntry(entry, userId)));
+    }
+    async getDayEndedAt(userId, date) {
+        return await this.dayEndRepo.getLastDayEndedAt(userId, date);
     }
     async getUserEntries(userId) {
         const entries = await this.timeEntryRepo.findByUserId(userId);
@@ -126,7 +132,6 @@ class TimeEntryService {
             projects: entry.projects,
             task: entry.task,
             duration: entry.duration,
-            status: entry.status,
         };
         const updated = await this.timeEntryRepo.update(entryId, userId, updates);
         await this.logAudit(userId, 'update_entry', entryId, {
@@ -135,7 +140,6 @@ class TimeEntryService {
                 projects: updated.projects,
                 task: updated.task,
                 duration: updated.duration,
-                status: updated.status,
                 ...updates,
             },
         });
@@ -156,7 +160,6 @@ class TimeEntryService {
             projects: entry.projects,
             task: entry.task,
             duration: entry.duration,
-            status: entry.status,
         });
         await this.timeEntryRepo.delete(entryId, userId);
         // Emit socket event for real-time updates
@@ -169,7 +172,7 @@ class TimeEntryService {
             userId,
             projects: input.projects,
             task: input.task,
-            status: input.status || 'Billable',
+            isOvertime: input.isOvertime ?? false,
         });
         // Immediately update with manual duration
         const updated = await this.timeEntryRepo.update(entry.id, userId, {
@@ -182,7 +185,6 @@ class TimeEntryService {
             projects: input.projects,
             task: input.task,
             duration: input.duration,
-            status: input.status || 'Billable',
         });
         const publicEntry = await this.toPublicTimeEntry(updated, userId);
         // Emit socket event for real-time updates
@@ -203,8 +205,7 @@ class TimeEntryService {
         const userMap = new Map(users.filter(Boolean).map(u => [u.id, u]));
         // Calculate totals
         const totalHours = entries.reduce((sum, e) => sum + e.duration, 0) / 60;
-        const billableHours = entries.filter(e => e.status === 'Billable').reduce((sum, e) => sum + e.duration, 0) / 60;
-        const internalHours = entries.filter(e => e.status === 'Internal').reduce((sum, e) => sum + e.duration, 0) / 60;
+        const totalOvertimeEntries = entries.filter((e) => e.isOvertime).length;
         // Group by user
         const userMap2 = new Map();
         entries.forEach((entry) => {
@@ -215,9 +216,15 @@ class TimeEntryService {
                 userEmail: user?.email || '',
                 hours: 0,
                 entries: 0,
+                overtimeEntries: 0,
+                overtimeHours: 0,
             };
             existing.hours += entry.duration;
             existing.entries += 1;
+            if (entry.isOvertime) {
+                existing.overtimeEntries += 1;
+                existing.overtimeHours += entry.duration;
+            }
             userMap2.set(entry.userId, existing);
         });
         // Group by project
@@ -242,10 +249,9 @@ class TimeEntryService {
         return {
             totalHours,
             totalEntries: entries.length,
-            billableHours,
-            internalHours,
+            totalOvertimeEntries,
             byUser: Array.from(userMap2.entries())
-                .map(([userId, u]) => ({ userId, ...u, hours: u.hours / 60 }))
+                .map(([userId, u]) => ({ userId, ...u, hours: u.hours / 60, overtimeHours: u.overtimeHours / 60 }))
                 .sort((a, b) => b.hours - a.hours),
             byProject: Array.from(projectMap.entries())
                 .sort((a, b) => b[1].hours - a[1].hours)
@@ -275,8 +281,28 @@ class TimeEntryService {
     }
     async toPublicTimeEntry(entry, requestingUserId) {
         const user = await user_repository_1.userRepository.findById(entry.userId);
+        // Calculate current duration for active timers using server time
+        let calculatedEntry = { ...entry };
+        if (entry.isActive && entry.startTime) {
+            const now = new Date();
+            const start = new Date(entry.startTime);
+            // Calculate elapsed time
+            let elapsedMs = now.getTime() - start.getTime();
+            // Subtract paused duration if any
+            const pausedMs = (entry.pausedDuration || 0) * 60000;
+            // If currently paused, add current pause time
+            if (entry.isPaused && entry.lastPausedAt) {
+                const currentPauseMs = now.getTime() - new Date(entry.lastPausedAt).getTime();
+                elapsedMs -= (pausedMs + currentPauseMs);
+            }
+            else {
+                elapsedMs -= pausedMs;
+            }
+            // Update duration in minutes (for display consistency)
+            calculatedEntry.duration = Math.max(0, Math.floor(elapsedMs / 60000));
+        }
         return {
-            ...entry,
+            ...calculatedEntry,
             userName: user?.name || 'Unknown',
             userEmail: user?.email || '',
             canEdit: entry.userId === requestingUserId,

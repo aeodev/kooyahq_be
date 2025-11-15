@@ -18,4 +18,7 @@ exports.userService = {
     async updateProfile(id, updates) {
         return user_repository_1.userRepository.updateProfile(id, updates);
     },
+    async updateEmployee(id, updates) {
+        return user_repository_1.userRepository.updateEmployee(id, updates);
+    },
 };

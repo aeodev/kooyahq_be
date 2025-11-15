@@ -99,6 +99,19 @@ exports.timeEntryRouter.get('/analytics', time_entry_controller_1.getAnalytics);
 exports.timeEntryRouter.get('/timer/active', time_entry_controller_1.getActiveTimer);
 /**
  * @swagger
+ * /time-entries/timer/day-ended-status:
+ *   get:
+ *     summary: Check if user ended day today
+ *     tags: [Time Entries]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Day ended status
+ */
+exports.timeEntryRouter.get('/timer/day-ended-status', time_entry_controller_1.getDayEndedStatus);
+/**
+ * @swagger
  * /time-entries/timer/start:
  *   post:
  *     summary: Start timer
@@ -121,9 +134,6 @@ exports.timeEntryRouter.get('/timer/active', time_entry_controller_1.getActiveTi
  *                 type: array
  *                 items:
  *                   type: string
- *               status:
- *                 type: string
- *                 enum: [Billable, Internal]
  *     responses:
  *       200:
  *         description: Timer started
@@ -209,9 +219,6 @@ exports.timeEntryRouter.post('/timer/end-day', time_entry_controller_1.endDay);
  *               duration:
  *                 type: number
  *                 description: Duration in minutes
- *               status:
- *                 type: string
- *                 enum: [Billable, Internal]
  *     responses:
  *       201:
  *         description: Time entry logged

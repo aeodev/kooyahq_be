@@ -5,6 +5,7 @@ const app_1 = require("./app");
 const env_1 = require("./config/env");
 const mongo_1 = require("./lib/mongo");
 const socket_1 = require("./lib/socket");
+const time_entry_heartbeat_1 = require("./modules/time-tracker/time-entry-heartbeat");
 async function start() {
     try {
         await (0, mongo_1.connectToDatabase)();
@@ -12,6 +13,8 @@ async function start() {
         const server = (0, node_http_1.createServer)(app);
         // Initialize Socket.IO
         (0, socket_1.initializeSocket)(server);
+        // Start timer heartbeat service for synchronization
+        (0, time_entry_heartbeat_1.startTimerHeartbeat)();
         server.listen(env_1.env.port, () => {
             console.log(`🚀 API ready at http://localhost:${env_1.env.port}`);
         });

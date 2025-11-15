@@ -76,7 +76,7 @@ class PresenceManager {
   async getSnapshot(): Promise<PresenceUser[]> {
     const entries = Array.from(this.states.entries())
     const users = await Promise.all(
-      entries.map(async ([userId, state]) => {
+      entries.map(async ([userId, state]): Promise<PresenceUser | null> => {
         if (!state.coords) return null
         const profile = await userService.getPublicProfile(userId)
         if (!profile) return null
@@ -95,7 +95,7 @@ class PresenceManager {
       }),
     )
 
-    return users.filter((user): user is PresenceUser => Boolean(user))
+    return users.filter((user): user is PresenceUser => user !== null)
   }
 
   private getOrCreateState(userId: string): PresenceState {

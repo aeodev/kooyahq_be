@@ -4,11 +4,16 @@ exports.announcementRepository = void 0;
 const announcement_model_1 = require("./announcement.model");
 exports.announcementRepository = {
     async create(input) {
+        const isActive = input.isActive !== false;
+        if (isActive) {
+            await announcement_model_1.AnnouncementModel.updateMany({ isActive: true }, { $set: { isActive: false } }).exec();
+        }
         const doc = await announcement_model_1.AnnouncementModel.create({
             title: input.title,
             content: input.content,
             authorId: input.authorId,
-            isActive: input.isActive ?? true,
+            isActive,
+            expiresAt: input.expiresAt ?? null,
         });
         return (0, announcement_model_1.toAnnouncement)(doc);
     },
@@ -16,11 +21,16 @@ exports.announcementRepository = {
         const filter = {};
         if (onlyActive) {
             filter.isActive = true;
+            filter.$or = [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }];
         }
-        const docs = await announcement_model_1.AnnouncementModel.find(filter)
-            .sort({ createdAt: -1 })
-            .limit(50)
-            .exec();
+        const query = announcement_model_1.AnnouncementModel.find(filter).sort({ createdAt: -1 });
+        if (onlyActive) {
+            query.limit(1);
+        }
+        else {
+            query.limit(50);
+        }
+        const docs = await query.exec();
         return docs.map(announcement_model_1.toAnnouncement);
     },
     async findById(id) {

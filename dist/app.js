@@ -20,9 +20,11 @@ const post_router_1 = require("./modules/posts/post.router");
 const notification_router_1 = require("./modules/notifications/notification.router");
 const game_router_1 = require("./modules/games/game.router");
 const announcement_router_1 = require("./modules/announcements/announcement.router");
+const project_router_1 = require("./modules/projects/project.router");
 const health_1 = require("./routes/health");
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_1 = require("./config/swagger");
+const presence_router_1 = require("./modules/presence/presence.router");
 function createApp() {
     const app = (0, express_1.default)();
     app.set('trust proxy', env_1.env.nodeEnv === 'production');
@@ -51,8 +53,10 @@ function createApp() {
     app.use('/api/ai-news', ai_news_router_1.aiNewsRouter);
     app.use('/api/posts', post_router_1.postRouter);
     app.use('/api/notifications', notification_router_1.notificationRouter);
+    app.use('/api/presence', presence_router_1.presenceRouter);
     app.use('/api/games', game_router_1.gameRouter);
     app.use('/api/announcements', announcement_router_1.announcementRouter);
+    app.use('/api/projects', project_router_1.projectRouter);
     // CRITICAL: Register board router BEFORE card router
     // This ensures /api/boards routes match before the more general /api routes
     app.use('/api/boards', board_router_1.boardRouter);

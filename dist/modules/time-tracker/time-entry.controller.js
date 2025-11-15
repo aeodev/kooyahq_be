@@ -4,6 +4,7 @@ exports.getAllTodayEntries = getAllTodayEntries;
 exports.getMyEntries = getMyEntries;
 exports.getActiveTimer = getActiveTimer;
 exports.startTimer = startTimer;
+exports.getDayEndedStatus = getDayEndedStatus;
 exports.pauseTimer = pauseTimer;
 exports.resumeTimer = resumeTimer;
 exports.stopTimer = stopTimer;
@@ -44,11 +45,21 @@ async function startTimer(req, res) {
     if (!input.projects || !Array.isArray(input.projects) || input.projects.length === 0) {
         return res.status(400).json({ status: 'error', message: 'Projects array is required' });
     }
-    if (!input.task || !input.task.trim()) {
-        return res.status(400).json({ status: 'error', message: 'Task description is required' });
-    }
+    // Task is optional - allow empty string
     const entry = await service.startTimer(userId, input);
     res.json({ status: 'success', data: entry });
+}
+async function getDayEndedStatus(req, res) {
+    const userId = req.user.id;
+    const today = new Date();
+    const dayEndedAt = await service.getDayEndedAt(userId, today);
+    res.json({
+        status: 'success',
+        data: {
+            dayEnded: dayEndedAt !== null,
+            endedAt: dayEndedAt?.toISOString() || null
+        }
+    });
 }
 async function pauseTimer(req, res) {
     const userId = req.user.id;
@@ -109,14 +120,22 @@ async function deleteEntry(req, res) {
 }
 async function getAnalytics(req, res) {
     const userId = req.query.userId === 'me' ? req.user.id : req.query.userId || null;
-    const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date();
-    const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date();
-    // Default to last 30 days if no dates provided
+    let startDate = req.query.startDate ? new Date(req.query.startDate) : new Date();
+    let endDate = req.query.endDate ? new Date(req.query.endDate) : new Date();
+    // Default to last 15 days if no dates provided
     if (!req.query.startDate) {
-        startDate.setDate(startDate.getDate() - 30);
+        startDate.setDate(startDate.getDate() - 15);
+        startDate.setHours(0, 0, 0, 0);
+    }
+    else {
+        // Normalize provided startDate to beginning of day
         startDate.setHours(0, 0, 0, 0);
     }
     if (!req.query.endDate) {
+        endDate.setHours(23, 59, 59, 999);
+    }
+    else {
+        // Normalize provided endDate to end of day
         endDate.setHours(23, 59, 59, 999);
     }
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {

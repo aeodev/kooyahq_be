@@ -11,7 +11,7 @@ const notificationSchema = new mongoose_1.Schema({
     },
     type: {
         type: String,
-        enum: ['post_created', 'comment', 'reaction', 'mention', 'system', 'card_assigned', 'card_comment', 'board_member_added'],
+        enum: ['post_created', 'comment', 'reaction', 'mention', 'system', 'card_assigned', 'card_comment', 'board_member_added', 'game_invitation'],
         required: true,
     },
     postId: {

@@ -134,6 +134,65 @@ exports.cardRouter.put('/cards/:id/move', authenticate_1.authenticate, card_cont
 exports.cardRouter.put('/cards/:id', authenticate_1.authenticate, card_controller_1.updateCard);
 /**
  * @swagger
+ * /cards/{id}/activities:
+ *   get:
+ *     summary: Get activity log for a card
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of activities
+ */
+exports.cardRouter.get('/cards/:cardId/activities', authenticate_1.authenticate, card_controller_1.getCardActivities);
+/**
+ * @swagger
+ * /boards/{boardId}/cards/bulk-rank:
+ *   post:
+ *     summary: Bulk update card ranks
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: boardId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rankUpdates
+ *             properties:
+ *               rankUpdates:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - id
+ *                     - rank
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     rank:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Ranks updated successfully
+ */
+exports.cardRouter.post('/boards/:boardId/cards/bulk-rank', authenticate_1.authenticate, card_controller_1.bulkUpdateRanks);
+/**
+ * @swagger
  * /cards/{id}:
  *   delete:
  *     summary: Delete card

@@ -5,6 +5,7 @@ exports.getUserById = getUserById;
 exports.getAllUsers = getAllUsers;
 exports.getProfile = getProfile;
 exports.updateProfile = updateProfile;
+exports.updateEmployee = updateEmployee;
 const user_service_1 = require("./user.service");
 const http_error_1 = require("../../utils/http-error");
 const path_1 = require("path");
@@ -117,6 +118,48 @@ async function updateProfile(req, res, next) {
             return next((0, http_error_1.createHttpError)(400, 'No updates provided'));
         }
         const updated = await user_service_1.userService.updateProfile(userId, updates);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'User not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function updateEmployee(req, res, next) {
+    const { id } = req.params;
+    const { name, email, position, birthday, isAdmin } = req.body;
+    try {
+        const updates = {};
+        if (name !== undefined) {
+            if (!name.trim()) {
+                return next((0, http_error_1.createHttpError)(400, 'Name cannot be empty'));
+            }
+            updates.name = name.trim();
+        }
+        if (email !== undefined) {
+            if (!email.trim()) {
+                return next((0, http_error_1.createHttpError)(400, 'Email cannot be empty'));
+            }
+            updates.email = email.trim();
+        }
+        if (position !== undefined) {
+            updates.position = position.trim() || undefined;
+        }
+        if (birthday !== undefined) {
+            updates.birthday = birthday?.trim() || undefined;
+        }
+        if (isAdmin !== undefined) {
+            updates.isAdmin = Boolean(isAdmin);
+        }
+        if (Object.keys(updates).length === 0) {
+            return next((0, http_error_1.createHttpError)(400, 'No updates provided'));
+        }
+        const updated = await user_service_1.userService.updateEmployee(id, updates);
         if (!updated) {
             return next((0, http_error_1.createHttpError)(404, 'User not found'));
         }

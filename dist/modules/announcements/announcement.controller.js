@@ -10,7 +10,7 @@ const announcement_service_1 = require("./announcement.service");
 const notification_service_1 = require("../notifications/notification.service");
 async function createAnnouncement(req, res, next) {
     const userId = req.user?.id;
-    const { title, content, isActive } = req.body;
+    const { title, content, isActive, expiresAt } = req.body;
     if (!userId) {
         return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
     }
@@ -20,12 +20,27 @@ async function createAnnouncement(req, res, next) {
     if (!content || !content.trim()) {
         return next((0, http_error_1.createHttpError)(400, 'Content is required'));
     }
+    let parsedExpiresAt;
+    if (expiresAt !== undefined && expiresAt !== null && expiresAt !== '') {
+        const parsed = new Date(expiresAt);
+        if (Number.isNaN(parsed.getTime())) {
+            return next((0, http_error_1.createHttpError)(400, 'Invalid expiration date'));
+        }
+        if (parsed.getTime() <= Date.now()) {
+            return next((0, http_error_1.createHttpError)(400, 'Expiration date must be in the future'));
+        }
+        parsedExpiresAt = parsed;
+    }
+    else if (expiresAt === null || expiresAt === '') {
+        parsedExpiresAt = null;
+    }
     try {
         const announcement = await announcement_service_1.announcementService.create({
             title: title.trim(),
             content: content.trim(),
             authorId: userId,
             isActive: isActive !== false,
+            expiresAt: parsedExpiresAt ?? null,
         });
         // Broadcast system notification if announcement is active
         if (announcement.isActive) {
@@ -76,7 +91,7 @@ async function getAnnouncement(req, res, next) {
 }
 async function updateAnnouncement(req, res, next) {
     const id = req.params.id;
-    const { title, content, isActive } = req.body;
+    const { title, content, isActive, expiresAt } = req.body;
     try {
         const updates = {};
         if (title !== undefined)
@@ -85,6 +100,21 @@ async function updateAnnouncement(req, res, next) {
             updates.content = content.trim();
         if (isActive !== undefined)
             updates.isActive = isActive;
+        if (expiresAt !== undefined) {
+            if (expiresAt === null || expiresAt === '') {
+                updates.expiresAt = null;
+            }
+            else {
+                const parsed = new Date(expiresAt);
+                if (Number.isNaN(parsed.getTime())) {
+                    return next((0, http_error_1.createHttpError)(400, 'Invalid expiration date'));
+                }
+                if (parsed.getTime() <= Date.now()) {
+                    return next((0, http_error_1.createHttpError)(400, 'Expiration date must be in the future'));
+                }
+                updates.expiresAt = parsed;
+            }
+        }
         const announcement = await announcement_service_1.announcementService.update(id, updates);
         if (!announcement) {
             return next((0, http_error_1.createHttpError)(404, 'Announcement not found'));

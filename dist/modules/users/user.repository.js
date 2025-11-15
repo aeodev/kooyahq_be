@@ -26,4 +26,24 @@ exports.userRepository = {
         const doc = await user_model_1.UserModel.findByIdAndUpdate(id, { $set: updates }, { new: true }).exec();
         return doc ? (0, user_model_1.toPublicUser)((0, user_model_1.toUser)(doc)) : undefined;
     },
+    async updateEmployee(id, updates) {
+        const updateData = {};
+        if (updates.name !== undefined) {
+            updateData.name = updates.name.trim();
+        }
+        if (updates.email !== undefined) {
+            updateData.email = updates.email.toLowerCase().trim();
+        }
+        if (updates.position !== undefined) {
+            updateData.position = updates.position.trim() || undefined;
+        }
+        if (updates.birthday !== undefined) {
+            updateData.birthday = updates.birthday ? new Date(updates.birthday) : undefined;
+        }
+        if (updates.isAdmin !== undefined) {
+            updateData.isAdmin = updates.isAdmin;
+        }
+        const doc = await user_model_1.UserModel.findByIdAndUpdate(id, { $set: updateData }, { new: true }).exec();
+        return doc ? (0, user_model_1.toPublicUser)((0, user_model_1.toUser)(doc)) : undefined;
+    },
 };

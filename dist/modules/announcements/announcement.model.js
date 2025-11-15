@@ -23,6 +23,11 @@ const announcementSchema = new mongoose_1.Schema({
         default: true,
         index: true,
     },
+    expiresAt: {
+        type: Date,
+        default: null,
+        index: true,
+    },
 }, {
     timestamps: true,
 });
@@ -34,6 +39,7 @@ function toAnnouncement(doc) {
         content: doc.content,
         authorId: doc.authorId,
         isActive: doc.isActive,
+        expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };

@@ -36,6 +36,18 @@ class ActiveUsersManager {
         return this.getActiveUserIds().length;
     }
     /**
+     * Check if a user has any active socket connections
+     */
+    hasActiveConnection(userId) {
+        return Array.from(this.activeUsers.values()).some((u) => u.userId === userId);
+    }
+    /**
+     * Check if a user has other active socket connections (excluding a specific socket)
+     */
+    hasOtherActiveConnections(userId, excludeSocketId) {
+        return Array.from(this.activeUsers.values()).some((u) => u.userId === userId && u.socket.id !== excludeSocketId);
+    }
+    /**
      * Broadcast active users list to all connected clients
      */
     async broadcastActiveUsers() {

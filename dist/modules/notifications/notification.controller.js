@@ -6,6 +6,7 @@ exports.markAllNotificationsAsRead = markAllNotificationsAsRead;
 exports.getUnreadCount = getUnreadCount;
 const notification_service_1 = require("./notification.service");
 const http_error_1 = require("../../utils/http-error");
+const socket_emitter_1 = require("../../utils/socket-emitter");
 async function getNotifications(req, res, next) {
     const userId = req.user?.id;
     const { unreadOnly } = req.query;
@@ -38,6 +39,11 @@ async function markNotificationAsRead(req, res, next) {
         if (!notification) {
             return next((0, http_error_1.createHttpError)(404, 'Notification not found'));
         }
+        const unreadCount = await notification_service_1.notificationService.getUnreadCount(userId);
+        socket_emitter_1.SocketEmitter.emitToUser(userId, 'notification:read', {
+            notificationId: id,
+            unreadCount,
+        });
         res.json({
             status: 'success',
             data: notification,
@@ -54,6 +60,10 @@ async function markAllNotificationsAsRead(req, res, next) {
     }
     try {
         const count = await notification_service_1.notificationService.markAllAsRead(userId);
+        const unreadCount = await notification_service_1.notificationService.getUnreadCount(userId);
+        socket_emitter_1.SocketEmitter.emitToUser(userId, 'notification:all-read', {
+            unreadCount,
+        });
         res.json({
             status: 'success',
             data: { count },

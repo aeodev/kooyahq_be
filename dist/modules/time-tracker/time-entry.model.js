@@ -16,20 +16,15 @@ const timeEntrySchema = new mongoose_1.Schema({
     },
     task: {
         type: String,
-        required: true,
+        required: false, // Allow empty strings - we'll always provide a value (even if empty)
         trim: true,
+        default: '', // Default to empty string
     },
     duration: {
         type: Number,
         required: true,
         default: 0,
         min: 0,
-    },
-    status: {
-        type: String,
-        enum: ['Billable', 'Internal'],
-        required: true,
-        default: 'Billable',
     },
     startTime: {
         type: Date,
@@ -55,6 +50,10 @@ const timeEntrySchema = new mongoose_1.Schema({
     lastPausedAt: {
         type: Date,
     },
+    isOvertime: {
+        type: Boolean,
+        default: false,
+    },
 }, {
     timestamps: true,
 });
@@ -66,13 +65,13 @@ function toTimeEntry(doc) {
         projects: doc.projects || [],
         task: doc.task,
         duration: doc.duration,
-        status: doc.status,
         startTime: doc.startTime?.toISOString() || null,
         endTime: doc.endTime?.toISOString() || null,
         isActive: doc.isActive ?? false,
         isPaused: doc.isPaused ?? false,
         pausedDuration: doc.pausedDuration ?? 0,
         lastPausedAt: doc.lastPausedAt?.toISOString() || null,
+        isOvertime: doc.isOvertime ?? false,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };

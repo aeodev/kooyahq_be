@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerGameHandlers = registerGameHandlers;
 const socket_rooms_1 = require("../../utils/socket-rooms");
 const socket_emitter_1 = require("../../utils/socket-emitter");
+const notification_service_1 = require("../notifications/notification.service");
 /**
  * Register socket handlers for games module
  * Handles game invitations, room joining, and real-time game updates
@@ -31,8 +32,15 @@ function registerGameHandlers(socket) {
         });
     });
     // Handle game invitations
-    socket.on('game:invite', (data) => {
+    socket.on('game:invite', async (data) => {
         const { gameType, invitedUserId } = data;
+        // Create notification for the invited user
+        try {
+            await notification_service_1.notificationService.createGameInvitationNotification(invitedUserId, userId, gameType);
+        }
+        catch (error) {
+            console.error('Failed to create game invitation notification:', error);
+        }
         // Emit invitation to the invited user
         socket_emitter_1.SocketEmitter.emitToUser(invitedUserId, 'game:invitation', {
             fromUserId: userId,

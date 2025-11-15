@@ -31,6 +31,13 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         trim: true,
     },
+    position: {
+        type: String,
+        trim: true,
+    },
+    birthday: {
+        type: Date,
+    },
 }, {
     timestamps: true,
 });
@@ -41,6 +48,8 @@ function toUser(doc) {
         email: doc.email,
         name: doc.name,
         isAdmin: doc.isAdmin ?? false,
+        position: doc.position,
+        birthday: doc.birthday?.toISOString(),
         profilePic: doc.profilePic,
         banner: doc.banner,
         bio: doc.bio,

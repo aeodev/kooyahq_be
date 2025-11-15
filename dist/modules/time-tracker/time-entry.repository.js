@@ -10,6 +10,7 @@ class TimeEntryRepository {
             duration: 0,
             startTime,
             isActive: true,
+            isOvertime: input.isOvertime ?? false,
         });
         await doc.save();
         return (0, time_entry_model_1.toTimeEntry)(doc);
@@ -72,8 +73,8 @@ class TimeEntryRepository {
         if (updates.task) {
             doc.task = updates.task;
         }
-        if (updates.status) {
-            doc.status = updates.status;
+        if (updates.isOvertime !== undefined) {
+            doc.isOvertime = updates.isOvertime;
         }
         await doc.save();
         return (0, time_entry_model_1.toTimeEntry)(doc);

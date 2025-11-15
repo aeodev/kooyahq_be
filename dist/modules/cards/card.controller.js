@@ -37,18 +37,21 @@ exports.createCard = createCard;
 exports.getCardsByBoard = getCardsByBoard;
 exports.moveCard = moveCard;
 exports.updateCard = updateCard;
+exports.getCardActivities = getCardActivities;
 exports.uploadAttachment = uploadAttachment;
 exports.deleteAttachment = deleteAttachment;
 exports.serveCardFile = serveCardFile;
+exports.bulkUpdateRanks = bulkUpdateRanks;
 exports.deleteCard = deleteCard;
 const board_service_1 = require("../boards/board.service");
 const card_service_1 = require("./card.service");
+const card_activity_repository_1 = require("./card-activity.repository");
 const notification_service_1 = require("../notifications/notification.service");
 const http_error_1 = require("../../utils/http-error");
 const env_1 = require("../../config/env");
 async function createCard(req, res, next) {
     const { boardId } = req.params;
-    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, } = req.body;
+    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, epicId, rank, flagged, } = req.body;
     const userId = req.user?.id;
     if (!userId) {
         return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
@@ -76,7 +79,10 @@ async function createCard(req, res, next) {
             labels: Array.isArray(labels) ? labels : undefined,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             storyPoints: typeof storyPoints === 'number' ? storyPoints : undefined,
-        });
+            epicId: typeof epicId === 'string' ? epicId : undefined,
+            rank: typeof rank === 'number' ? rank : undefined,
+            flagged: typeof flagged === 'boolean' ? flagged : undefined,
+        }, userId);
         // Notify if card was assigned on creation
         if (assigneeId && assigneeId !== userId) {
             try {
@@ -140,7 +146,7 @@ async function moveCard(req, res, next) {
         if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
             return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
         }
-        const card = await card_service_1.cardService.moveCard(id, columnId, boardId);
+        const card = await card_service_1.cardService.moveCard(id, columnId, boardId, userId);
         if (!card) {
             return next((0, http_error_1.createHttpError)(404, 'Card not found'));
         }
@@ -155,7 +161,7 @@ async function moveCard(req, res, next) {
 }
 async function updateCard(req, res, next) {
     const { id } = req.params;
-    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, completed, } = req.body;
+    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, completed, epicId, rank, flagged, } = req.body;
     const userId = req.user?.id;
     if (!userId) {
         return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
@@ -207,7 +213,16 @@ async function updateCard(req, res, next) {
         if (completed !== undefined) {
             updates.completed = Boolean(completed);
         }
-        const updated = await card_service_1.cardService.updateCard(id, updates);
+        if (epicId !== undefined) {
+            updates.epicId = epicId || null;
+        }
+        if (rank !== undefined) {
+            updates.rank = rank !== null && rank !== undefined ? Number(rank) : null;
+        }
+        if (flagged !== undefined) {
+            updates.flagged = Boolean(flagged);
+        }
+        const updated = await card_service_1.cardService.updateCard(id, updates, userId);
         if (!updated) {
             return next((0, http_error_1.createHttpError)(404, 'Card not found'));
         }
@@ -225,6 +240,34 @@ async function updateCard(req, res, next) {
         res.json({
             status: 'success',
             data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function getCardActivities(req, res, next) {
+    const { cardId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const activities = await card_activity_repository_1.cardActivityRepository.findByCardId(cardId);
+        res.json({
+            status: 'success',
+            data: activities,
         });
     }
     catch (error) {
@@ -335,6 +378,38 @@ async function serveCardFile(req, res, next) {
     res.setHeader('Cache-Control', 'public, max-age=31536000');
     const file = createReadStream(filePath);
     file.pipe(res);
+}
+async function bulkUpdateRanks(req, res, next) {
+    const { boardId } = req.params;
+    const { rankUpdates } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    if (!Array.isArray(rankUpdates)) {
+        return next((0, http_error_1.createHttpError)(400, 'rankUpdates must be an array'));
+    }
+    try {
+        const board = await board_service_1.boardService.findById(boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updates = rankUpdates.map((update) => ({
+            id: update.id,
+            rank: Number(update.rank),
+        }));
+        const updatedCards = await card_service_1.cardService.bulkUpdateRanks(boardId, updates);
+        res.json({
+            status: 'success',
+            data: updatedCards,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
 }
 async function deleteCard(req, res, next) {
     const { id } = req.params;

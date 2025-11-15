@@ -55,7 +55,7 @@ export const cardRepository = {
   },
 
   async findByBoardId(boardId: string, sortByRank?: boolean): Promise<Card[]> {
-    const sort = sortByRank 
+    const sort: Record<string, 1 | -1> = sortByRank 
       ? { rank: 1, createdAt: -1 } // Sort by rank first (ascending), then by creation date
       : { createdAt: -1 }
     const docs = await CardModel.find({ boardId }).sort(sort).exec()

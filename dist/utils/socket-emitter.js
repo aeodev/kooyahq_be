@@ -15,6 +15,7 @@ exports.TimeEntrySocketEvents = {
     CREATED: 'time-entry:created',
     UPDATED: 'time-entry:updated',
     DELETED: 'time-entry:deleted',
+    TIMER_HEARTBEAT: 'time-entry:timer-heartbeat',
 };
 /**
  * Generic socket emitter - works with any event type

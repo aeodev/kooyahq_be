@@ -8,6 +8,7 @@ exports.gameRoom = gameRoom;
 exports.gameTypeRoom = gameTypeRoom;
 exports.featureRoom = featureRoom;
 exports.timeEntriesRoom = timeEntriesRoom;
+exports.meetRoom = meetRoom;
 function userRoom(userId) {
     return `user:${userId}`;
 }
@@ -22,4 +23,7 @@ function featureRoom(feature, id) {
 }
 function timeEntriesRoom() {
     return 'time-entries:all';
+}
+function meetRoom(meetId) {
+    return `meet:${meetId}`;
 }

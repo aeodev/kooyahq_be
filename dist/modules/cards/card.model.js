@@ -49,6 +49,16 @@ const cardSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    epicId: {
+        type: String,
+    },
+    rank: {
+        type: Number,
+    },
+    flagged: {
+        type: Boolean,
+        default: false,
+    },
     attachments: {
         type: [
             {
@@ -92,6 +102,9 @@ function toCard(doc) {
                 : new Date().toISOString(),
         })),
         completed: doc.completed ?? false,
+        epicId: doc.epicId,
+        rank: doc.rank,
+        flagged: doc.flagged ?? false,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };

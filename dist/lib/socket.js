@@ -10,7 +10,11 @@ const socket_manager_1 = require("./socket-manager");
 const socket_rooms_1 = require("../utils/socket-rooms");
 const time_entry_socket_1 = require("../modules/time-tracker/time-entry.socket");
 const game_socket_1 = require("../modules/games/game.socket");
+const presence_socket_1 = require("../modules/presence/presence.socket");
+const meet_socket_1 = require("../modules/meet/meet.socket");
 const active_users_1 = require("./active-users");
+const time_entry_service_1 = require("../modules/time-tracker/time-entry.service");
+const presence_manager_1 = require("../modules/presence/presence.manager");
 let io = null;
 function initializeSocket(server) {
     io = new socket_io_1.Server(server, {
@@ -34,7 +38,7 @@ function initializeSocket(server) {
                 return next(new Error('User not found'));
             }
             socket.userId = user.id;
-            socket.user = { ...payload, id: user.id };
+            socket.user = { ...payload, id: user.id, name: user.name, profilePic: user.profilePic };
             next();
         }
         catch (error) {
@@ -44,6 +48,8 @@ function initializeSocket(server) {
     // Register all module handlers (called once at startup)
     socket_manager_1.socketHandlerRegistry.registerHandler(time_entry_socket_1.registerTimeEntryHandlers);
     socket_manager_1.socketHandlerRegistry.registerHandler(game_socket_1.registerGameHandlers);
+    socket_manager_1.socketHandlerRegistry.registerHandler(presence_socket_1.registerPresenceHandlers);
+    socket_manager_1.socketHandlerRegistry.registerHandler(meet_socket_1.registerMeetHandlers);
     io.on('connection', (socket) => {
         const userId = socket.userId;
         if (!userId) {
@@ -55,11 +61,31 @@ function initializeSocket(server) {
         socket.join((0, socket_rooms_1.userRoom)(userId));
         // Track active user
         active_users_1.activeUsersManager.addUser(userId, socket);
+        presence_manager_1.presenceManager.markUserOnline(userId);
         // Register all module handlers for this socket connection
         socket_manager_1.socketHandlerRegistry.registerAllHandlers(socket);
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             console.log(`Socket disconnected: ${userId}`);
+            // Check if this is the user's last socket connection before removing
+            const hasOtherConnections = active_users_1.activeUsersManager.hasOtherActiveConnections(userId, socket.id);
+            // Remove the socket from active users
             active_users_1.activeUsersManager.removeUser(socket.id);
+            // If this was the last connection, auto-stop any active timer (fallback for client-side beforeunload)
+            if (!hasOtherConnections && userId) {
+                presence_manager_1.presenceManager.markUserOffline(userId);
+                try {
+                    const timeEntryService = new time_entry_service_1.TimeEntryService();
+                    const activeTimer = await timeEntryService.getActiveTimer(userId);
+                    if (activeTimer) {
+                        console.log(`Auto-stopping timer for user ${userId} (last socket connection closed)`);
+                        await timeEntryService.stopTimer(userId);
+                    }
+                }
+                catch (error) {
+                    // Log error but don't throw - socket disconnect shouldn't fail
+                    console.error(`Error auto-stopping timer for user ${userId}:`, error);
+                }
+            }
         });
     });
     return io;
