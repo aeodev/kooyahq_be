@@ -1,46 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { userService } from './user.service'
 import { createHttpError } from '../../utils/http-error'
-import { resolve } from 'path'
-import { existsSync, statSync } from 'fs'
-import { env } from '../../config/env'
-
-function getBaseUrl(req: Request): string {
-  const protocol = req.protocol
-  const host = req.get('host')
-  return `${protocol}://${host}/api`
-}
-
-export function serveProfileFile(req: Request, res: Response, next: NextFunction) {
-  const { filename } = req.params
-  const filePath = resolve(env.uploadDir, filename)
-
-  if (!existsSync(filePath)) {
-    return res.status(404).json({ status: 'error', message: 'File not found' })
-  }
-
-  try {
-    const stats = statSync(filePath)
-    
-    // Get mimetype from filename
-    const ext = filename.split('.').pop()?.toLowerCase()
-    const mimeTypes: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      gif: 'image/gif',
-      webp: 'image/webp',
-    }
-    
-    const contentType = mimeTypes[ext || ''] || 'application/octet-stream'
-    
-    res.setHeader('Content-Type', contentType)
-    res.setHeader('Content-Length', stats.size)
-    res.sendFile(filePath)
-  } catch (error) {
-    return next(createHttpError(500, 'Error serving file'))
-  }
-}
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -112,14 +72,12 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     const profilePicFile = profilePicFiles && profilePicFiles.length > 0 ? profilePicFiles[0] : undefined
     const bannerFile = bannerFiles && bannerFiles.length > 0 ? bannerFiles[0] : undefined
 
-    if (profilePicFile && profilePicFile.filename) {
-      const baseUrl = getBaseUrl(req)
-      updates.profilePic = `${baseUrl}/users/files/${profilePicFile.filename}`
+    if (profilePicFile && (profilePicFile as any).cloudinaryUrl) {
+      updates.profilePic = (profilePicFile as any).cloudinaryUrl
     }
 
-    if (bannerFile && bannerFile.filename) {
-      const baseUrl = getBaseUrl(req)
-      updates.banner = `${baseUrl}/users/files/${bannerFile.filename}`
+    if (bannerFile && (bannerFile as any).cloudinaryUrl) {
+      updates.banner = (bannerFile as any).cloudinaryUrl
     }
 
     if (bio !== undefined) {

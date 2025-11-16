@@ -9,7 +9,6 @@ import {
   updateCard,
   uploadAttachment,
   deleteAttachment,
-  serveCardFile,
   bulkUpdateRanks,
   getCardActivities,
 } from './card.controller'
@@ -226,24 +225,6 @@ cardRouter.post('/boards/:boardId/cards/bulk-rank', authenticate, bulkUpdateRank
  *         description: Card deleted
  */
 cardRouter.delete('/cards/:id', authenticate, deleteCard)
-
-/**
- * @swagger
- * /cards/files/{filename}:
- *   get:
- *     summary: Serve card attachment file
- *     tags: [Cards]
- *     parameters:
- *       - in: path
- *         name: filename
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: File content
- */
-cardRouter.get('/cards/files/:filename', serveCardFile)
 
 /**
  * @swagger

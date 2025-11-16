@@ -1,13 +1,12 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
 import { uploadPost } from '../../middleware/upload-post'
-import { createPost, updatePost, getPosts, getMyPosts, deletePost, servePostFile } from './post.controller'
+import { createPost, updatePost, getPosts, getMyPosts, deletePost } from './post.controller'
 import { createPostComment, getPostComments, updatePostComment, deletePostComment } from './post-comment.controller'
 import { togglePostReaction, getPostReactions, deletePostReaction } from './post-reaction.controller'
 
 export const postRouter = Router()
 
-postRouter.get('/files/:filename', servePostFile)
 postRouter.use(authenticate)
 postRouter.get('/', getPosts)
 postRouter.get('/me', getMyPosts)

@@ -4,7 +4,6 @@ import { cardService } from './card.service'
 import { cardActivityRepository } from './card-activity.repository'
 import { notificationService } from '../notifications/notification.service'
 import { createHttpError } from '../../utils/http-error'
-import { env } from '../../config/env'
 
 export async function createCard(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
@@ -297,12 +296,6 @@ export async function getCardActivities(req: Request, res: Response, next: NextF
   }
 }
 
-function getBaseUrl(req: Request): string {
-  const protocol = req.protocol
-  const host = req.get('host') || 'localhost:5001'
-  return `${protocol}://${host}/api`
-}
-
 export async function uploadAttachment(req: Request, res: Response, next: NextFunction) {
   const { cardId } = req.params
   const userId = req.user?.id
@@ -333,11 +326,10 @@ export async function uploadAttachment(req: Request, res: Response, next: NextFu
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const baseUrl = getBaseUrl(req)
-    const url = `${baseUrl}/cards/files/${file.filename}`
+    const url = (file as any).cloudinaryUrl || ''
 
     const attachment = {
-      filename: file.filename,
+      filename: (file as any).cloudinaryPublicId || file.originalname,
       originalName: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
@@ -399,36 +391,6 @@ export async function deleteAttachment(req: Request, res: Response, next: NextFu
   } catch (error) {
     next(error)
   }
-}
-
-export async function serveCardFile(req: Request, res: Response, next: NextFunction) {
-  const { filename } = req.params
-  const { resolve } = await import('path')
-  const { existsSync, createReadStream, statSync } = await import('fs')
-
-  const filePath = resolve(env.uploadDir, filename)
-
-  if (!existsSync(filePath)) {
-    return res.status(404).json({ status: 'error', message: 'File not found' })
-  }
-
-  const stats = statSync(filePath)
-  
-  const ext = filename.split('.').pop()?.toLowerCase()
-  const mimeTypes: Record<string, string> = {
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    webp: 'image/webp',
-  }
-  
-  res.setHeader('Content-Type', mimeTypes[ext || ''] || 'image/jpeg')
-  res.setHeader('Content-Length', stats.size.toString())
-  res.setHeader('Cache-Control', 'public, max-age=31536000')
-  
-  const file = createReadStream(filePath)
-  file.pipe(res)
 }
 
 export async function bulkUpdateRanks(req: Request, res: Response, next: NextFunction) {

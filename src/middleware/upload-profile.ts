@@ -1,23 +1,9 @@
 import multer from 'multer'
-import { env } from '../config/env'
 import { createHttpError } from '../utils/http-error'
-import type { Request } from 'express'
-import { mkdirSync } from 'fs'
-import { join } from 'path'
+import type { Request, Response, NextFunction } from 'express'
+import { uploadToCloudinary } from '../utils/cloudinary'
 
-const uploadDir = env.uploadDir
-mkdirSync(uploadDir, { recursive: true })
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir)
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
-    const ext = file.originalname.split('.').pop()
-    cb(null, `profile-${uniqueSuffix}.${ext}`)
-  },
-})
+const storage = multer.memoryStorage()
 
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -29,13 +15,46 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
   }
 }
 
-export const uploadProfile = multer({
+const multerUpload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
   },
 })
+
+export const uploadProfile = {
+  fields: (fields: Array<{ name: string; maxCount?: number }>) => {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      multerUpload.fields(fields)(req, res, async (err) => {
+        if (err) return next(err)
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
+        if (files) {
+          try {
+            const uploadPromises: Promise<void>[] = []
+            for (const field of fields) {
+              const fieldFiles = files[field.name]
+              if (fieldFiles) {
+                for (const file of fieldFiles) {
+                  uploadPromises.push(
+                    uploadToCloudinary(file.buffer, 'profiles').then((result) => {
+                      ;(file as any).cloudinaryUrl = result.secureUrl
+                      ;(file as any).cloudinaryPublicId = result.publicId
+                    })
+                  )
+                }
+              }
+            }
+            await Promise.all(uploadPromises)
+          } catch (error) {
+            return next(createHttpError(500, 'Failed to upload images to Cloudinary'))
+          }
+        }
+        next()
+      })
+    }
+  },
+}
 
 
 

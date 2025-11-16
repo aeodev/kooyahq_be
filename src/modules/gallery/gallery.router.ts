@@ -9,13 +9,9 @@ import {
   getGalleryItem,
   updateGalleryItem,
   deleteGalleryItem,
-  serveGalleryFile,
 } from './gallery.controller'
 
 export const galleryRouter = Router()
-
-// Public route to serve gallery files (CORS handled by global middleware)
-galleryRouter.get('/files/:filename', serveGalleryFile)
 
 // Viewing routes - require authentication but not admin
 galleryRouter.use(authenticate)

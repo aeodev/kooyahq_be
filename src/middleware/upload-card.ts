@@ -1,23 +1,9 @@
 import multer from 'multer'
-import { env } from '../config/env'
 import { createHttpError } from '../utils/http-error'
-import type { Request } from 'express'
-import { mkdirSync } from 'fs'
-import { join } from 'path'
+import type { Request, Response, NextFunction } from 'express'
+import { uploadToCloudinary } from '../utils/cloudinary'
 
-const uploadDir = env.uploadDir
-mkdirSync(uploadDir, { recursive: true })
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir)
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
-    const ext = file.originalname.split('.').pop()
-    cb(null, `card-${uniqueSuffix}.${ext}`)
-  },
-})
+const storage = multer.memoryStorage()
 
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -29,11 +15,31 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
   }
 }
 
-export const uploadCard = multer({
+const multerUpload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
   },
 })
+
+export const uploadCard = {
+  single: (fieldName: string) => {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      multerUpload.single(fieldName)(req, res, async (err) => {
+        if (err) return next(err)
+        if (req.file) {
+          try {
+            const result = await uploadToCloudinary(req.file.buffer, 'cards')
+            ;(req.file as any).cloudinaryUrl = result.secureUrl
+            ;(req.file as any).cloudinaryPublicId = result.publicId
+          } catch (error) {
+            return next(createHttpError(500, 'Failed to upload image to Cloudinary'))
+          }
+        }
+        next()
+      })
+    }
+  },
+}
 

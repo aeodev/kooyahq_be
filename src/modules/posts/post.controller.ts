@@ -3,15 +3,6 @@ import { postService } from './post.service'
 import { notificationService } from '../notifications/notification.service'
 import { extractMentions } from '../../utils/mentions'
 import { createHttpError } from '../../utils/http-error'
-import { resolve } from 'path'
-import { existsSync, statSync } from 'fs'
-import { env } from '../../config/env'
-
-function getBaseUrl(req: Request): string {
-  const protocol = req.protocol
-  const host = req.get('host')
-  return `${protocol}://${host}/api`
-}
 
 export async function createPost(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -27,11 +18,10 @@ export async function createPost(req: Request, res: Response, next: NextFunction
   }
 
   try {
-    const baseUrl = getBaseUrl(req)
     let imageUrl: string | undefined
     
     if (file) {
-      imageUrl = `${baseUrl}/posts/files/${file.filename}`
+      imageUrl = (file as any).cloudinaryUrl
     }
 
     // Handle tags - could come as tags[] array or tags string from FormData
@@ -87,7 +77,6 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
   }
 
   try {
-    const baseUrl = getBaseUrl(req)
     const updates: any = {}
     
     if (content !== undefined) {
@@ -113,7 +102,7 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
     }
     
     if (file) {
-      updates.imageUrl = `${baseUrl}/posts/files/${file.filename}`
+      updates.imageUrl = (file as any).cloudinaryUrl
     }
 
     const post = await postService.update(id, userId, updates)
@@ -126,36 +115,6 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
       return next(createHttpError(403, error.message))
     }
     next(error)
-  }
-}
-
-export function servePostFile(req: Request, res: Response, next: NextFunction) {
-  const { filename } = req.params
-  const filePath = resolve(env.uploadDir, filename)
-
-  if (!existsSync(filePath)) {
-    return res.status(404).json({ status: 'error', message: 'File not found' })
-  }
-
-  try {
-    const stats = statSync(filePath)
-    
-    const ext = filename.split('.').pop()?.toLowerCase()
-    const mimeTypes: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      gif: 'image/gif',
-      webp: 'image/webp',
-    }
-    
-    const contentType = mimeTypes[ext || ''] || 'application/octet-stream'
-    
-    res.setHeader('Content-Type', contentType)
-    res.setHeader('Content-Length', stats.size)
-    res.sendFile(filePath)
-  } catch (error) {
-    return next(createHttpError(500, 'Error serving file'))
   }
 }
 
