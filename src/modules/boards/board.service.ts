@@ -16,8 +16,8 @@ export const boardService = {
     })
   },
 
-  async findByOwnerId(ownerId: string) {
-    return boardRepository.findByOwnerId(ownerId)
+  async findByOwnerId(ownerId: string, type?: 'kanban' | 'sprint') {
+    return boardRepository.findByOwnerId(ownerId, type)
   },
 
   async findById(id: string) {

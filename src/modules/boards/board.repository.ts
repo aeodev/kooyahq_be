@@ -36,10 +36,16 @@ export const boardRepository = {
     return toBoard(doc)
   },
 
-  async findByOwnerId(ownerId: string): Promise<Board[]> {
-    const docs = await BoardModel.find({
+  async findByOwnerId(ownerId: string, type?: 'kanban' | 'sprint'): Promise<Board[]> {
+    const query: any = {
       $or: [{ ownerId }, { memberIds: ownerId }],
-    })
+    }
+    
+    if (type) {
+      query.type = type
+    }
+    
+    const docs = await BoardModel.find(query)
       .sort({ createdAt: -1 })
       .exec()
     return docs.map((doc) => toBoard(doc))

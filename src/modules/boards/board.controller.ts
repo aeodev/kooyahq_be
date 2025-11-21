@@ -37,13 +37,19 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
 
 export async function getBoards(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
+  const type = req.query.type as 'kanban' | 'sprint' | undefined
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
   }
 
+  // Validate type if provided
+  if (type && type !== 'kanban' && type !== 'sprint') {
+    return next(createHttpError(400, 'Board type must be "kanban" or "sprint"'))
+  }
+
   try {
-    const boards = await boardService.findByOwnerId(userId)
+    const boards = await boardService.findByOwnerId(userId, type)
 
     res.json({
       status: 'success',
