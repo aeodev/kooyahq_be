@@ -2,12 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.boardService = exports.BoardService = void 0;
 const board_repository_1 = require("./board.repository");
+const mongoose_1 = require("mongoose");
 const DEFAULT_KANBAN_COLUMNS = ['To do', 'Doing', 'Done'];
 const DEFAULT_SPRINT_COLUMNS = ['Backlog', 'Sprint', 'Review', 'Done'];
-const mongoose_1 = require("mongoose");
 class BoardService {
     async create(data) {
-        return board_repository_1.boardRepository.create(data);
+        const columns = data.columns ||
+            (data.type === 'kanban' ? DEFAULT_KANBAN_COLUMNS : DEFAULT_SPRINT_COLUMNS);
+        return board_repository_1.boardRepository.create({ ...data, columns });
     }
     async findByOwnerId(ownerId, type) {
         return board_repository_1.boardRepository.findByOwnerId(ownerId, type);

@@ -1,11 +1,7 @@
-import { BoardModel, toBoard, type Board, type Sprint } from './board.model'
+import { BoardModel, toBoard, type Board, type Sprint, type CreateBoardInput } from './board.model'
 
 export class BoardRepository {
-  async create(data: {
-    name: string
-    type: 'kanban' | 'sprint'
-    ownerId: string
-  }): Promise<Board> {
+  async create(data: CreateBoardInput): Promise<Board> {
     const board = await BoardModel.create(data)
     return toBoard(board)
   }

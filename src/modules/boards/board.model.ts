@@ -11,6 +11,13 @@ export interface Sprint {
   updatedAt: Date
 }
 
+export interface CreateBoardInput {
+  name: string
+  type: 'kanban' | 'sprint'
+  ownerId: string
+  columns?: string[]
+}
+
 export interface BoardDocument extends Document {
   name: string
   type: 'kanban' | 'sprint'

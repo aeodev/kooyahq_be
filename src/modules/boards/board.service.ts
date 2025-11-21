@@ -1,14 +1,17 @@
-import { boardRepository, type CreateBoardInput } from './board.repository'
+import { boardRepository } from './board.repository'
+import type { Board, Sprint, CreateBoardInput } from './board.model'
+import { Types } from 'mongoose'
 
 const DEFAULT_KANBAN_COLUMNS = ['To do', 'Doing', 'Done']
 const DEFAULT_SPRINT_COLUMNS = ['Backlog', 'Sprint', 'Review', 'Done']
-import { boardRepository } from './board.repository'
-import type { Board, Sprint } from './board.model'
-import { Types } from 'mongoose'
 
 export class BoardService {
-  async create(data: { name: string; type: 'kanban' | 'sprint'; ownerId: string }): Promise<Board> {
-    return boardRepository.create(data)
+  async create(data: CreateBoardInput): Promise<Board> {
+    const columns =
+      data.columns ||
+      (data.type === 'kanban' ? DEFAULT_KANBAN_COLUMNS : DEFAULT_SPRINT_COLUMNS)
+
+    return boardRepository.create({ ...data, columns })
   }
 
   async findByOwnerId(ownerId: string, type?: 'kanban' | 'sprint'): Promise<Board[]> {
