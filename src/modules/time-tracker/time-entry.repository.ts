@@ -123,10 +123,9 @@ export class TimeEntryRepository {
 
     const now = new Date()
     const pauseDurationMs = now.getTime() - doc.lastPausedAt.getTime()
-    const pauseDurationMinutes = Math.floor(pauseDurationMs / 60000)
     
     doc.isPaused = false
-    doc.pausedDuration = (doc.pausedDuration || 0) + pauseDurationMinutes
+    doc.pausedDuration = (doc.pausedDuration || 0) + pauseDurationMs
     doc.lastPausedAt = undefined
 
     await doc.save()
@@ -148,11 +147,11 @@ export class TimeEntryRepository {
     // If currently paused, add the current pause duration
     if (doc.isPaused && doc.lastPausedAt) {
       const currentPauseMs = endTime.getTime() - doc.lastPausedAt.getTime()
-      doc.pausedDuration = (doc.pausedDuration || 0) + Math.floor(currentPauseMs / 60000)
+      doc.pausedDuration = (doc.pausedDuration || 0) + currentPauseMs
     }
     
     // Subtract total paused time
-    workDurationMs -= (doc.pausedDuration || 0) * 60000
+    workDurationMs -= (doc.pausedDuration || 0)
     const durationMinutes = Math.floor(workDurationMs / 60000)
 
     doc.isActive = false
@@ -177,10 +176,10 @@ export class TimeEntryRepository {
       
       if (doc.isPaused && doc.lastPausedAt) {
         const currentPauseMs = endTime.getTime() - doc.lastPausedAt.getTime()
-        doc.pausedDuration = (doc.pausedDuration || 0) + Math.floor(currentPauseMs / 60000)
+        doc.pausedDuration = (doc.pausedDuration || 0) + currentPauseMs
       }
       
-      workDurationMs -= (doc.pausedDuration || 0) * 60000
+      workDurationMs -= (doc.pausedDuration || 0)
       const durationMinutes = Math.floor(workDurationMs / 60000)
 
       doc.isActive = false

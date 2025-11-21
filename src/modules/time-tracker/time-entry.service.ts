@@ -403,7 +403,7 @@ export class TimeEntryService {
       let elapsedMs = now.getTime() - start.getTime()
       
       // Subtract paused duration if any
-      const pausedMs = (entry.pausedDuration || 0) * 60000
+      const pausedMs = entry.pausedDuration || 0
       
       // If currently paused, add current pause time
       if (entry.isPaused && entry.lastPausedAt) {
