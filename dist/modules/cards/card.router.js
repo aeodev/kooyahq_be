@@ -212,23 +212,6 @@ exports.cardRouter.post('/boards/:boardId/cards/bulk-rank', authenticate_1.authe
 exports.cardRouter.delete('/cards/:id', authenticate_1.authenticate, card_controller_1.deleteCard);
 /**
  * @swagger
- * /cards/files/{filename}:
- *   get:
- *     summary: Serve card attachment file
- *     tags: [Cards]
- *     parameters:
- *       - in: path
- *         name: filename
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: File content
- */
-exports.cardRouter.get('/cards/files/:filename', card_controller_1.serveCardFile);
-/**
- * @swagger
  * /cards/{cardId}/attachments:
  *   post:
  *     summary: Upload attachment to card

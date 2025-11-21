@@ -46,13 +46,15 @@ function toGalleryItem(doc, baseUrl = '') {
     const updatedAt = doc.updatedAt instanceof Date
         ? doc.updatedAt.toISOString()
         : new Date(doc.updatedAt).toISOString();
+    // If path is a Cloudinary URL, use it directly; otherwise fall back to old format for backward compatibility
+    const imageUrl = doc.path.startsWith('http') ? doc.path : `${baseUrl}/gallery/files/${doc.filename}`;
     return {
         id: doc.id,
         title: doc.title,
         description: doc.description,
         filename: doc.filename,
         path: doc.path,
-        imageUrl: `${baseUrl}/gallery/files/${doc.filename}`,
+        imageUrl,
         mimetype: doc.mimetype,
         size: doc.size,
         uploadedBy: doc.uploadedBy,

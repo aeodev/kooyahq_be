@@ -38,4 +38,9 @@ exports.env = {
     jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
     mongoUri: process.env.MONGO_URI ?? DEFAULT_MONGO_URI,
     uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+    cloudinary: {
+        cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
+        apiKey: requireEnv('CLOUDINARY_API_KEY'),
+        apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+    },
 };

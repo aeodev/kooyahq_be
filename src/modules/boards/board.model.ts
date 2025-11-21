@@ -1,4 +1,15 @@
-import { Schema, model, models, type Document } from 'mongoose'
+import { Schema, model, models, type Document, Types } from 'mongoose'
+
+export interface Sprint {
+  _id: Types.ObjectId
+  name: string
+  goal?: string
+  startDate?: Date
+  endDate?: Date
+  state: 'future' | 'active' | 'closed'
+  createdAt: Date
+  updatedAt: Date
+}
 
 export interface BoardDocument extends Document {
   name: string
@@ -7,12 +18,30 @@ export interface BoardDocument extends Document {
   memberIds: string[]
   columns: string[]
   columnLimits?: Record<string, number>
+  sprints: Sprint[]
+  // Deprecated single-sprint fields
   sprintStartDate?: Date
   sprintEndDate?: Date
   sprintGoal?: string
   createdAt: Date
   updatedAt: Date
 }
+
+const sprintSchema = new Schema<Sprint>(
+  {
+    name: { type: String, required: true, trim: true },
+    goal: { type: String, trim: true },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    state: {
+      type: String,
+      enum: ['future', 'active', 'closed'],
+      default: 'future',
+      required: true,
+    },
+  },
+  { timestamps: true },
+)
 
 const boardSchema = new Schema<BoardDocument>(
   {
@@ -43,6 +72,11 @@ const boardSchema = new Schema<BoardDocument>(
       of: Number,
       default: {},
     },
+    sprints: {
+      type: [sprintSchema],
+      default: [],
+    },
+    // Deprecated fields kept for backward compatibility
     sprintStartDate: {
       type: Date,
     },
@@ -61,6 +95,17 @@ const boardSchema = new Schema<BoardDocument>(
 
 export const BoardModel = models.Board ?? model<BoardDocument>('Board', boardSchema)
 
+export type SprintType = {
+  id: string
+  name: string
+  goal?: string
+  startDate?: string
+  endDate?: string
+  state: 'future' | 'active' | 'closed'
+  createdAt: string
+  updatedAt: string
+}
+
 export type Board = {
   id: string
   name: string
@@ -69,6 +114,7 @@ export type Board = {
   memberIds: string[]
   columns: string[]
   columnLimits?: Record<string, number>
+  sprints: SprintType[]
   sprintStartDate?: string
   sprintEndDate?: string
   sprintGoal?: string
@@ -93,6 +139,16 @@ export function toBoard(doc: BoardDocument): Board {
     memberIds: doc.memberIds || [],
     columns: doc.columns,
     columnLimits,
+    sprints: (doc.sprints || []).map((s) => ({
+      id: s._id.toString(),
+      name: s.name,
+      goal: s.goal,
+      startDate: s.startDate?.toISOString(),
+      endDate: s.endDate?.toISOString(),
+      state: s.state,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+    })),
     sprintStartDate: doc.sprintStartDate?.toISOString(),
     sprintEndDate: doc.sprintEndDate?.toISOString(),
     sprintGoal: doc.sprintGoal,

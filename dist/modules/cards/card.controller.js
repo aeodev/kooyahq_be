@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createCard = createCard;
 exports.getCardsByBoard = getCardsByBoard;
@@ -40,7 +7,6 @@ exports.updateCard = updateCard;
 exports.getCardActivities = getCardActivities;
 exports.uploadAttachment = uploadAttachment;
 exports.deleteAttachment = deleteAttachment;
-exports.serveCardFile = serveCardFile;
 exports.bulkUpdateRanks = bulkUpdateRanks;
 exports.deleteCard = deleteCard;
 const board_service_1 = require("../boards/board.service");
@@ -48,7 +14,6 @@ const card_service_1 = require("./card.service");
 const card_activity_repository_1 = require("./card-activity.repository");
 const notification_service_1 = require("../notifications/notification.service");
 const http_error_1 = require("../../utils/http-error");
-const env_1 = require("../../config/env");
 async function createCard(req, res, next) {
     const { boardId } = req.params;
     const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, epicId, rank, flagged, } = req.body;
@@ -274,11 +239,6 @@ async function getCardActivities(req, res, next) {
         next(error);
     }
 }
-function getBaseUrl(req) {
-    const protocol = req.protocol;
-    const host = req.get('host') || 'localhost:5001';
-    return `${protocol}://${host}/api`;
-}
 async function uploadAttachment(req, res, next) {
     const { cardId } = req.params;
     const userId = req.user?.id;
@@ -301,10 +261,9 @@ async function uploadAttachment(req, res, next) {
         if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
             return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
         }
-        const baseUrl = getBaseUrl(req);
-        const url = `${baseUrl}/cards/files/${file.filename}`;
+        const url = file.cloudinaryUrl || '';
         const attachment = {
-            filename: file.filename,
+            filename: file.cloudinaryPublicId || file.originalname,
             originalName: file.originalname,
             mimetype: file.mimetype,
             size: file.size,
@@ -355,29 +314,6 @@ async function deleteAttachment(req, res, next) {
     catch (error) {
         next(error);
     }
-}
-async function serveCardFile(req, res, next) {
-    const { filename } = req.params;
-    const { resolve } = await Promise.resolve().then(() => __importStar(require('path')));
-    const { existsSync, createReadStream, statSync } = await Promise.resolve().then(() => __importStar(require('fs')));
-    const filePath = resolve(env_1.env.uploadDir, filename);
-    if (!existsSync(filePath)) {
-        return res.status(404).json({ status: 'error', message: 'File not found' });
-    }
-    const stats = statSync(filePath);
-    const ext = filename.split('.').pop()?.toLowerCase();
-    const mimeTypes = {
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        png: 'image/png',
-        gif: 'image/gif',
-        webp: 'image/webp',
-    };
-    res.setHeader('Content-Type', mimeTypes[ext || ''] || 'image/jpeg');
-    res.setHeader('Content-Length', stats.size.toString());
-    res.setHeader('Cache-Control', 'public, max-age=31536000');
-    const file = createReadStream(filePath);
-    file.pipe(res);
 }
 async function bulkUpdateRanks(req, res, next) {
     const { boardId } = req.params;

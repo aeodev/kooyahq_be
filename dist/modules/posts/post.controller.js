@@ -2,21 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPost = createPost;
 exports.updatePost = updatePost;
-exports.servePostFile = servePostFile;
 exports.getPosts = getPosts;
 exports.getMyPosts = getMyPosts;
 exports.deletePost = deletePost;
 const post_service_1 = require("./post.service");
 const mentions_1 = require("../../utils/mentions");
 const http_error_1 = require("../../utils/http-error");
-const path_1 = require("path");
-const fs_1 = require("fs");
-const env_1 = require("../../config/env");
-function getBaseUrl(req) {
-    const protocol = req.protocol;
-    const host = req.get('host');
-    return `${protocol}://${host}/api`;
-}
 async function createPost(req, res, next) {
     const userId = req.user?.id;
     const { content, category, tags, draft } = req.body;
@@ -28,10 +19,9 @@ async function createPost(req, res, next) {
         return next((0, http_error_1.createHttpError)(400, 'Content is required'));
     }
     try {
-        const baseUrl = getBaseUrl(req);
         let imageUrl;
         if (file) {
-            imageUrl = `${baseUrl}/posts/files/${file.filename}`;
+            imageUrl = file.cloudinaryUrl;
         }
         // Handle tags - could come as tags[] array or tags string from FormData
         let tagsArray = [];
@@ -83,7 +73,6 @@ async function updatePost(req, res, next) {
         return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
     }
     try {
-        const baseUrl = getBaseUrl(req);
         const updates = {};
         if (content !== undefined) {
             updates.content = content.trim();
@@ -108,7 +97,7 @@ async function updatePost(req, res, next) {
             updates.draft = draft === true || draft === 'true';
         }
         if (file) {
-            updates.imageUrl = `${baseUrl}/posts/files/${file.filename}`;
+            updates.imageUrl = file.cloudinaryUrl;
         }
         const post = await post_service_1.postService.update(id, userId, updates);
         res.json({
@@ -121,31 +110,6 @@ async function updatePost(req, res, next) {
             return next((0, http_error_1.createHttpError)(403, error.message));
         }
         next(error);
-    }
-}
-function servePostFile(req, res, next) {
-    const { filename } = req.params;
-    const filePath = (0, path_1.resolve)(env_1.env.uploadDir, filename);
-    if (!(0, fs_1.existsSync)(filePath)) {
-        return res.status(404).json({ status: 'error', message: 'File not found' });
-    }
-    try {
-        const stats = (0, fs_1.statSync)(filePath);
-        const ext = filename.split('.').pop()?.toLowerCase();
-        const mimeTypes = {
-            jpg: 'image/jpeg',
-            jpeg: 'image/jpeg',
-            png: 'image/png',
-            gif: 'image/gif',
-            webp: 'image/webp',
-        };
-        const contentType = mimeTypes[ext || ''] || 'application/octet-stream';
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Length', stats.size);
-        res.sendFile(filePath);
-    }
-    catch (error) {
-        return next((0, http_error_1.createHttpError)(500, 'Error serving file'));
     }
 }
 async function getPosts(req, res, next) {

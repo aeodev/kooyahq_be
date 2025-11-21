@@ -8,7 +8,6 @@ const post_controller_1 = require("./post.controller");
 const post_comment_controller_1 = require("./post-comment.controller");
 const post_reaction_controller_1 = require("./post-reaction.controller");
 exports.postRouter = (0, express_1.Router)();
-exports.postRouter.get('/files/:filename', post_controller_1.servePostFile);
 exports.postRouter.use(authenticate_1.authenticate);
 exports.postRouter.get('/', post_controller_1.getPosts);
 exports.postRouter.get('/me', post_controller_1.getMyPosts);

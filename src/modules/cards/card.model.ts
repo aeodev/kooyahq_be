@@ -15,6 +15,7 @@ export interface CardDocument extends Document {
   description?: string
   boardId: string
   columnId: string
+  sprintId?: string
   issueType: 'task' | 'bug' | 'story' | 'epic'
   assigneeId?: string
   priority: 'lowest' | 'low' | 'medium' | 'high' | 'highest'
@@ -48,6 +49,9 @@ const cardSchema = new Schema<CardDocument>(
     columnId: {
       type: String,
       required: true,
+    },
+    sprintId: {
+      type: String,
     },
     issueType: {
       type: String,
@@ -115,6 +119,7 @@ export type Card = {
   description?: string
   boardId: string
   columnId: string
+  sprintId?: string
   issueType: 'task' | 'bug' | 'story' | 'epic'
   assigneeId?: string
   priority: 'lowest' | 'low' | 'medium' | 'high' | 'highest'
@@ -137,6 +142,7 @@ export function toCard(doc: CardDocument): Card {
     description: doc.description,
     boardId: doc.boardId,
     columnId: doc.columnId,
+    sprintId: doc.sprintId,
     issueType: (doc.issueType as 'task' | 'bug' | 'story' | 'epic') || 'task',
     assigneeId: doc.assigneeId,
     priority: (doc.priority as 'lowest' | 'low' | 'medium' | 'high' | 'highest') || 'medium',
@@ -150,7 +156,7 @@ export function toCard(doc: CardDocument): Card {
       size: att.size,
       url: att.url,
       uploadedBy: att.uploadedBy,
-      uploadedAt: att.uploadedAt 
+      uploadedAt: att.uploadedAt
         ? (typeof att.uploadedAt === 'string' ? att.uploadedAt : att.uploadedAt.toISOString())
         : new Date().toISOString(),
     })),

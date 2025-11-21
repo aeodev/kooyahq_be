@@ -16,6 +16,9 @@ const active_users_1 = require("./active-users");
 const time_entry_service_1 = require("../modules/time-tracker/time-entry.service");
 const presence_manager_1 = require("../modules/presence/presence.manager");
 let io = null;
+// Track pending timer stops with 15-second grace period
+// Key: userId, Value: timeout ID
+const pendingTimerStops = new Map();
 function initializeSocket(server) {
     io = new socket_io_1.Server(server, {
         cors: {
@@ -70,6 +73,13 @@ function initializeSocket(server) {
             return;
         }
         console.log(`Socket connected: ${userId}`);
+        // Cancel any pending timer stop if user reconnected within grace period
+        const pendingStop = pendingTimerStops.get(userId);
+        if (pendingStop) {
+            clearTimeout(pendingStop);
+            pendingTimerStops.delete(userId);
+            console.log(`Cancelled pending timer stop for user ${userId} (reconnected within grace period)`);
+        }
         // Join user's personal room for targeted updates
         socket.join((0, socket_rooms_1.userRoom)(userId));
         // Track active user
@@ -83,21 +93,41 @@ function initializeSocket(server) {
             const hasOtherConnections = active_users_1.activeUsersManager.hasOtherActiveConnections(userId, socket.id);
             // Remove the socket from active users
             active_users_1.activeUsersManager.removeUser(socket.id);
-            // If this was the last connection, auto-stop any active timer (fallback for client-side beforeunload)
+            // If this was the last connection, schedule timer stop after 15-second grace period
             if (!hasOtherConnections && userId) {
                 presence_manager_1.presenceManager.markUserOffline(userId);
-                try {
-                    const timeEntryService = new time_entry_service_1.TimeEntryService();
-                    const activeTimer = await timeEntryService.getActiveTimer(userId);
-                    if (activeTimer) {
-                        console.log(`Auto-stopping timer for user ${userId} (last socket connection closed)`);
-                        await timeEntryService.stopTimer(userId);
+                // Clear any existing pending stop for this user
+                const existingPending = pendingTimerStops.get(userId);
+                if (existingPending) {
+                    clearTimeout(existingPending);
+                }
+                // Set a 15-second timeout to stop the timer
+                const timeoutId = setTimeout(async () => {
+                    try {
+                        const timeEntryService = new time_entry_service_1.TimeEntryService();
+                        const activeTimer = await timeEntryService.getActiveTimer(userId);
+                        if (activeTimer) {
+                            // Double-check user still has no connections before stopping
+                            if (!active_users_1.activeUsersManager.hasActiveConnection(userId)) {
+                                console.log(`Auto-stopping timer for user ${userId} (15-second grace period expired)`);
+                                await timeEntryService.stopTimer(userId);
+                            }
+                            else {
+                                console.log(`Cancelled timer stop for user ${userId} (reconnected during grace period)`);
+                            }
+                        }
                     }
-                }
-                catch (error) {
-                    // Log error but don't throw - socket disconnect shouldn't fail
-                    console.error(`Error auto-stopping timer for user ${userId}:`, error);
-                }
+                    catch (error) {
+                        // Log error but don't throw - socket disconnect shouldn't fail
+                        console.error(`Error auto-stopping timer for user ${userId}:`, error);
+                    }
+                    finally {
+                        // Clean up the pending stop from the map
+                        pendingTimerStops.delete(userId);
+                    }
+                }, 15000); // 15 seconds grace period
+                pendingTimerStops.set(userId, timeoutId);
+                console.log(`Scheduled timer stop for user ${userId} in 15 seconds (grace period for page refresh)`);
             }
         });
     });

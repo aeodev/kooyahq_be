@@ -7,8 +7,6 @@ const require_admin_1 = require("../../middleware/require-admin");
 const upload_1 = require("../../middleware/upload");
 const gallery_controller_1 = require("./gallery.controller");
 exports.galleryRouter = (0, express_1.Router)();
-// Public route to serve gallery files (CORS handled by global middleware)
-exports.galleryRouter.get('/files/:filename', gallery_controller_1.serveGalleryFile);
 // Viewing routes - require authentication but not admin
 exports.galleryRouter.use(authenticate_1.authenticate);
 exports.galleryRouter.get('/', gallery_controller_1.getGalleryItems);

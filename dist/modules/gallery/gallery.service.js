@@ -4,9 +4,7 @@ exports.GalleryService = void 0;
 const gallery_repository_1 = require("./gallery.repository");
 const http_error_1 = require("../../utils/http-error");
 const gallery_model_1 = require("./gallery.model");
-const env_1 = require("../../config/env");
-const fs_1 = require("fs");
-const path_1 = require("path");
+const cloudinary_1 = require("../../utils/cloudinary");
 class GalleryService {
     galleryRepo = new gallery_repository_1.GalleryRepository();
     async create(userId, input, baseUrl = '') {
@@ -34,14 +32,18 @@ class GalleryService {
     async delete(id) {
         const item = await this.galleryRepo.findById(id);
         if (item) {
-            // Delete the file from filesystem
-            try {
-                const filePath = (0, path_1.join)(env_1.env.uploadDir, item.filename);
-                (0, fs_1.unlinkSync)(filePath);
-            }
-            catch (error) {
-                // File might already be deleted, continue anyway
-                console.warn('Failed to delete file:', error);
+            // Delete from Cloudinary if it's a Cloudinary URL
+            if (item.path && item.path.startsWith('http')) {
+                try {
+                    const publicId = (0, cloudinary_1.extractPublicIdFromUrl)(item.path) || item.filename;
+                    if (publicId) {
+                        await (0, cloudinary_1.deleteFromCloudinary)(publicId);
+                    }
+                }
+                catch (error) {
+                    // File might already be deleted, continue anyway
+                    console.warn('Failed to delete from Cloudinary:', error);
+                }
             }
         }
         await this.galleryRepo.delete(id);

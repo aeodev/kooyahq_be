@@ -69,7 +69,7 @@ class TimerHeartbeatService {
                     // Calculate elapsed time
                     let elapsedMs = now.getTime() - start.getTime();
                     // Subtract paused duration if any
-                    const pausedMs = (entry.pausedDuration || 0) * 60000;
+                    const pausedMs = entry.pausedDuration || 0;
                     // If currently paused, subtract current pause time
                     if (entry.isPaused && entry.lastPausedAt) {
                         const currentPauseMs = now.getTime() - new Date(entry.lastPausedAt).getTime();

@@ -121,3 +121,34 @@ exports.boardRouter.put('/:id', authenticate_1.authenticate, board_controller_1.
  *         description: Board deleted
  */
 exports.boardRouter.delete('/:id', authenticate_1.authenticate, board_controller_1.deleteBoard);
+// Sprint Routes
+/**
+ * @swagger
+ * /boards/{id}/sprints:
+ *   post:
+ *     summary: Add a sprint to a board
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+exports.boardRouter.post('/:id/sprints', authenticate_1.authenticate, board_controller_1.createSprint);
+/**
+ * @swagger
+ * /boards/{id}/sprints/{sprintId}:
+ *   put:
+ *     summary: Update a sprint
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+exports.boardRouter.put('/:id/sprints/:sprintId', authenticate_1.authenticate, board_controller_1.updateSprint);
+/**
+ * @swagger
+ * /boards/{id}/sprints/{sprintId}:
+ *   delete:
+ *     summary: Delete a sprint
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+exports.boardRouter.delete('/:id/sprints/:sprintId', authenticate_1.authenticate, board_controller_1.deleteSprint);

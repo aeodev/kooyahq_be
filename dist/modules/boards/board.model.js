@@ -3,6 +3,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BoardModel = void 0;
 exports.toBoard = toBoard;
 const mongoose_1 = require("mongoose");
+const sprintSchema = new mongoose_1.Schema({
+    name: { type: String, required: true, trim: true },
+    goal: { type: String, trim: true },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    state: {
+        type: String,
+        enum: ['future', 'active', 'closed'],
+        default: 'future',
+        required: true,
+    },
+}, { timestamps: true });
 const boardSchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -31,6 +43,11 @@ const boardSchema = new mongoose_1.Schema({
         of: Number,
         default: {},
     },
+    sprints: {
+        type: [sprintSchema],
+        default: [],
+    },
+    // Deprecated fields kept for backward compatibility
     sprintStartDate: {
         type: Date,
     },
@@ -61,6 +78,16 @@ function toBoard(doc) {
         memberIds: doc.memberIds || [],
         columns: doc.columns,
         columnLimits,
+        sprints: (doc.sprints || []).map((s) => ({
+            id: s._id.toString(),
+            name: s.name,
+            goal: s.goal,
+            startDate: s.startDate?.toISOString(),
+            endDate: s.endDate?.toISOString(),
+            state: s.state,
+            createdAt: s.createdAt.toISOString(),
+            updatedAt: s.updatedAt.toISOString(),
+        })),
         sprintStartDate: doc.sprintStartDate?.toISOString(),
         sprintEndDate: doc.sprintEndDate?.toISOString(),
         sprintGoal: doc.sprintGoal,

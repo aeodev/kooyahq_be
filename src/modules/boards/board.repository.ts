@@ -1,76 +1,91 @@
-import { BoardModel, toBoard, type Board } from './board.model'
+import { BoardModel, toBoard, type Board, type Sprint } from './board.model'
 
-export type CreateBoardInput = {
-  name: string
-  type: 'kanban' | 'sprint'
-  ownerId: string
-  memberIds?: string[]
-  columns: string[]
-  sprintStartDate?: Date
-  sprintEndDate?: Date
-  sprintGoal?: string
-}
-
-export type UpdateBoardInput = {
-  name?: string
-  memberIds?: string[]
-  columns?: string[]
-  sprintStartDate?: Date | null
-  sprintEndDate?: Date | null
-  sprintGoal?: string
-}
-
-export const boardRepository = {
-  async create(input: CreateBoardInput): Promise<Board> {
-    const doc = await BoardModel.create({
-      name: input.name,
-      type: input.type,
-      ownerId: input.ownerId,
-      memberIds: input.memberIds || [],
-      columns: input.columns,
-      sprintStartDate: input.sprintStartDate,
-      sprintEndDate: input.sprintEndDate,
-      sprintGoal: input.sprintGoal,
-    })
-
-    return toBoard(doc)
-  },
+export class BoardRepository {
+  async create(data: {
+    name: string
+    type: 'kanban' | 'sprint'
+    ownerId: string
+  }): Promise<Board> {
+    const board = await BoardModel.create(data)
+    return toBoard(board)
+  }
 
   async findByOwnerId(ownerId: string, type?: 'kanban' | 'sprint'): Promise<Board[]> {
     const query: any = {
       $or: [{ ownerId }, { memberIds: ownerId }],
     }
-    
     if (type) {
       query.type = type
     }
-    
-    const docs = await BoardModel.find(query)
-      .sort({ createdAt: -1 })
-      .exec()
-    return docs.map((doc) => toBoard(doc))
-  },
+    const boards = await BoardModel.find(query).sort({ updatedAt: -1 })
+    return boards.map(toBoard)
+  }
 
-  async findById(id: string): Promise<Board | undefined> {
-    const doc = await BoardModel.findById(id).exec()
-    return doc ? toBoard(doc) : undefined
-  },
+  async findById(id: string): Promise<Board | null> {
+    const board = await BoardModel.findById(id)
+    return board ? toBoard(board) : null
+  }
 
-  async update(id: string, updates: UpdateBoardInput): Promise<Board | undefined> {
-    const updateData: any = { ...updates }
-    if (updates.sprintStartDate === null) {
-      updateData.$unset = { sprintStartDate: '' }
-    }
-    if (updates.sprintEndDate === null) {
-      updateData.$unset = { ...updateData.$unset, sprintEndDate: '' }
-    }
-    const doc = await BoardModel.findByIdAndUpdate(id, updateData, { new: true }).exec()
-    return doc ? toBoard(doc) : undefined
-  },
+  async update(
+    id: string,
+    updates: Partial<{
+      name: string
+      memberIds: string[]
+      columns: string[]
+      columnLimits: Record<string, number>
+      sprintStartDate: Date
+      sprintEndDate: Date
+      sprintGoal: string
+    }>,
+  ): Promise<Board | null> {
+    const board = await BoardModel.findByIdAndUpdate(id, updates, { new: true })
+    return board ? toBoard(board) : null
+  }
 
   async delete(id: string): Promise<boolean> {
-    const result = await BoardModel.findByIdAndDelete(id).exec()
-    return !!result
-  },
+    const result = await BoardModel.deleteOne({ _id: id })
+    return result.deletedCount === 1
+  }
+
+  // Sprint Methods
+
+  async addSprint(boardId: string, sprint: any): Promise<Board | null> {
+    const board = await BoardModel.findByIdAndUpdate(
+      boardId,
+      { $push: { sprints: sprint } },
+      { new: true },
+    )
+    return board ? toBoard(board) : null
+  }
+
+  async updateSprint(
+    boardId: string,
+    sprintId: string,
+    updates: Partial<Sprint>,
+  ): Promise<Board | null> {
+    // Construct the update object dynamically
+    const updateQuery: any = {}
+    for (const [key, value] of Object.entries(updates)) {
+      updateQuery[`sprints.$.${key}`] = value
+    }
+    updateQuery[`sprints.$.updatedAt`] = new Date()
+
+    const board = await BoardModel.findOneAndUpdate(
+      { _id: boardId, 'sprints._id': sprintId },
+      { $set: updateQuery },
+      { new: true },
+    )
+    return board ? toBoard(board) : null
+  }
+
+  async deleteSprint(boardId: string, sprintId: string): Promise<Board | null> {
+    const board = await BoardModel.findByIdAndUpdate(
+      boardId,
+      { $pull: { sprints: { _id: sprintId } } },
+      { new: true },
+    )
+    return board ? toBoard(board) : null
+  }
 }
 
+export const boardRepository = new BoardRepository()

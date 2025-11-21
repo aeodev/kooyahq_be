@@ -1,46 +1,53 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.boardRepository = void 0;
+exports.boardRepository = exports.BoardRepository = void 0;
 const board_model_1 = require("./board.model");
-exports.boardRepository = {
-    async create(input) {
-        const doc = await board_model_1.BoardModel.create({
-            name: input.name,
-            type: input.type,
-            ownerId: input.ownerId,
-            memberIds: input.memberIds || [],
-            columns: input.columns,
-            sprintStartDate: input.sprintStartDate,
-            sprintEndDate: input.sprintEndDate,
-            sprintGoal: input.sprintGoal,
-        });
-        return (0, board_model_1.toBoard)(doc);
-    },
-    async findByOwnerId(ownerId) {
-        const docs = await board_model_1.BoardModel.find({
+class BoardRepository {
+    async create(data) {
+        const board = await board_model_1.BoardModel.create(data);
+        return (0, board_model_1.toBoard)(board);
+    }
+    async findByOwnerId(ownerId, type) {
+        const query = {
             $or: [{ ownerId }, { memberIds: ownerId }],
-        })
-            .sort({ createdAt: -1 })
-            .exec();
-        return docs.map((doc) => (0, board_model_1.toBoard)(doc));
-    },
+        };
+        if (type) {
+            query.type = type;
+        }
+        const boards = await board_model_1.BoardModel.find(query).sort({ updatedAt: -1 });
+        return boards.map(board_model_1.toBoard);
+    }
     async findById(id) {
-        const doc = await board_model_1.BoardModel.findById(id).exec();
-        return doc ? (0, board_model_1.toBoard)(doc) : undefined;
-    },
+        const board = await board_model_1.BoardModel.findById(id);
+        return board ? (0, board_model_1.toBoard)(board) : null;
+    }
     async update(id, updates) {
-        const updateData = { ...updates };
-        if (updates.sprintStartDate === null) {
-            updateData.$unset = { sprintStartDate: '' };
-        }
-        if (updates.sprintEndDate === null) {
-            updateData.$unset = { ...updateData.$unset, sprintEndDate: '' };
-        }
-        const doc = await board_model_1.BoardModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
-        return doc ? (0, board_model_1.toBoard)(doc) : undefined;
-    },
+        const board = await board_model_1.BoardModel.findByIdAndUpdate(id, updates, { new: true });
+        return board ? (0, board_model_1.toBoard)(board) : null;
+    }
     async delete(id) {
-        const result = await board_model_1.BoardModel.findByIdAndDelete(id).exec();
-        return !!result;
-    },
-};
+        const result = await board_model_1.BoardModel.deleteOne({ _id: id });
+        return result.deletedCount === 1;
+    }
+    // Sprint Methods
+    async addSprint(boardId, sprint) {
+        const board = await board_model_1.BoardModel.findByIdAndUpdate(boardId, { $push: { sprints: sprint } }, { new: true });
+        return board ? (0, board_model_1.toBoard)(board) : null;
+    }
+    async updateSprint(boardId, sprintId, updates) {
+        // Construct the update object dynamically
+        const updateQuery = {};
+        for (const [key, value] of Object.entries(updates)) {
+            updateQuery[`sprints.$.${key}`] = value;
+        }
+        updateQuery[`sprints.$.updatedAt`] = new Date();
+        const board = await board_model_1.BoardModel.findOneAndUpdate({ _id: boardId, 'sprints._id': sprintId }, { $set: updateQuery }, { new: true });
+        return board ? (0, board_model_1.toBoard)(board) : null;
+    }
+    async deleteSprint(boardId, sprintId) {
+        const board = await board_model_1.BoardModel.findByIdAndUpdate(boardId, { $pull: { sprints: { _id: sprintId } } }, { new: true });
+        return board ? (0, board_model_1.toBoard)(board) : null;
+    }
+}
+exports.BoardRepository = BoardRepository;
+exports.boardRepository = new BoardRepository();

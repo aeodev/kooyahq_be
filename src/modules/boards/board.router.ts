@@ -1,6 +1,15 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
-import { createBoard, deleteBoard, getBoardById, getBoards, updateBoard } from './board.controller'
+import {
+    createBoard,
+    deleteBoard,
+    getBoardById,
+    getBoards,
+    updateBoard,
+    createSprint,
+    updateSprint,
+    deleteSprint,
+} from './board.controller'
 
 export const boardRouter = Router()
 
@@ -124,4 +133,39 @@ boardRouter.put('/:id', authenticate, updateBoard)
  *         description: Board deleted
  */
 boardRouter.delete('/:id', authenticate, deleteBoard)
+
+// Sprint Routes
+
+/**
+ * @swagger
+ * /boards/{id}/sprints:
+ *   post:
+ *     summary: Add a sprint to a board
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+boardRouter.post('/:id/sprints', authenticate, createSprint)
+
+/**
+ * @swagger
+ * /boards/{id}/sprints/{sprintId}:
+ *   put:
+ *     summary: Update a sprint
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+boardRouter.put('/:id/sprints/:sprintId', authenticate, updateSprint)
+
+/**
+ * @swagger
+ * /boards/{id}/sprints/{sprintId}:
+ *   delete:
+ *     summary: Delete a sprint
+ *     tags: [Boards]
+ *     security:
+ *       - bearerAuth: []
+ */
+boardRouter.delete('/:id/sprints/:sprintId', authenticate, deleteSprint)
 

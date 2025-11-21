@@ -21,6 +21,9 @@ const cardSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    sprintId: {
+        type: String,
+    },
     issueType: {
         type: String,
         enum: ['task', 'bug', 'story', 'epic'],
@@ -84,6 +87,7 @@ function toCard(doc) {
         description: doc.description,
         boardId: doc.boardId,
         columnId: doc.columnId,
+        sprintId: doc.sprintId,
         issueType: doc.issueType || 'task',
         assigneeId: doc.assigneeId,
         priority: doc.priority || 'medium',

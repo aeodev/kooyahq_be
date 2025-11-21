@@ -146,7 +146,7 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       try {
         const newMemberIds = updated.memberIds || []
         const addedMemberIds = newMemberIds.filter((id: string) => !previousMemberIds.includes(id))
-        
+
         await Promise.all(
           addedMemberIds.map((memberId: string) =>
             notificationService.createBoardMemberNotification(memberId, id, userId)
@@ -191,6 +191,85 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
       status: 'success',
       message: 'Board deleted',
     })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Sprint Endpoints
+
+export async function createSprint(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params
+  const { name, goal, startDate, endDate } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const board = await boardService.findById(id)
+    if (!board) return next(createHttpError(404, 'Board not found'))
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updatedBoard = await boardService.addSprint(id, {
+      name,
+      goal,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+    })
+
+    res.status(201).json({ status: 'success', data: updatedBoard })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateSprint(req: Request, res: Response, next: NextFunction) {
+  const { id, sprintId } = req.params
+  const updates = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const board = await boardService.findById(id)
+    if (!board) return next(createHttpError(404, 'Board not found'))
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updatedBoard = await boardService.updateSprint(id, sprintId, updates)
+    res.json({ status: 'success', data: updatedBoard })
+  } catch (error: any) {
+    if (error.message === 'Another sprint is already active on this board') {
+      return next(createHttpError(400, error.message))
+    }
+    next(error)
+  }
+}
+
+export async function deleteSprint(req: Request, res: Response, next: NextFunction) {
+  const { id, sprintId } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const board = await boardService.findById(id)
+    if (!board) return next(createHttpError(404, 'Board not found'))
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updatedBoard = await boardService.deleteSprint(id, sprintId)
+    res.json({ status: 'success', data: updatedBoard })
   } catch (error) {
     next(error)
   }
