@@ -10,6 +10,25 @@ export interface CardAttachment {
   uploadedAt: Date | string
 }
 
+export interface ChecklistItem {
+  id: string
+  text: string
+  completed: boolean
+  order: number
+}
+
+export interface Checklist {
+  id: string
+  title: string
+  items: ChecklistItem[]
+}
+
+export interface CardCoverImage {
+  url?: string
+  color?: string
+  brightness?: 'dark' | 'light'
+}
+
 export interface CardDocument extends Document {
   title: string
   description?: string
@@ -23,6 +42,8 @@ export interface CardDocument extends Document {
   dueDate?: Date
   storyPoints?: number
   attachments?: CardAttachment[]
+  checklists?: Checklist[]
+  coverImage?: CardCoverImage
   completed: boolean
   epicId?: string
   rank?: number
@@ -105,6 +126,33 @@ const cardSchema = new Schema<CardDocument>(
       ],
       default: [],
     },
+    checklists: {
+      type: [
+        {
+          id: { type: String, required: true },
+          title: { type: String, required: true, trim: true },
+          items: {
+            type: [
+              {
+                id: { type: String, required: true },
+                text: { type: String, required: true, trim: true },
+                completed: { type: Boolean, default: false },
+                order: { type: Number, default: 0 },
+              },
+            ],
+            default: [],
+          },
+        },
+      ],
+      default: [],
+    },
+    coverImage: {
+      type: {
+        url: String,
+        color: String,
+        brightness: { type: String, enum: ['dark', 'light'] },
+      },
+    },
   },
   {
     timestamps: true,
@@ -112,6 +160,25 @@ const cardSchema = new Schema<CardDocument>(
 )
 
 export const CardModel = models.Card ?? model<CardDocument>('Card', cardSchema)
+
+export type ChecklistItem = {
+  id: string
+  text: string
+  completed: boolean
+  order: number
+}
+
+export type Checklist = {
+  id: string
+  title: string
+  items: ChecklistItem[]
+}
+
+export type CardCoverImage = {
+  url?: string
+  color?: string
+  brightness?: 'dark' | 'light'
+}
 
 export type Card = {
   id: string
@@ -127,6 +194,8 @@ export type Card = {
   dueDate?: string
   storyPoints?: number
   attachments?: CardAttachment[]
+  checklists?: Checklist[]
+  coverImage?: CardCoverImage
   completed: boolean
   epicId?: string
   rank?: number
@@ -160,6 +229,23 @@ export function toCard(doc: CardDocument): Card {
         ? (typeof att.uploadedAt === 'string' ? att.uploadedAt : att.uploadedAt.toISOString())
         : new Date().toISOString(),
     })),
+    checklists: doc.checklists?.map((checklist) => ({
+      id: checklist.id,
+      title: checklist.title,
+      items: checklist.items?.map((item) => ({
+        id: item.id,
+        text: item.text,
+        completed: item.completed ?? false,
+        order: item.order ?? 0,
+      })) || [],
+    })) || [],
+    coverImage: doc.coverImage
+      ? {
+          url: doc.coverImage.url,
+          color: doc.coverImage.color,
+          brightness: doc.coverImage.brightness,
+        }
+      : undefined,
     completed: doc.completed ?? false,
     epicId: doc.epicId,
     rank: doc.rank,

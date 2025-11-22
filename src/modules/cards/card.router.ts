@@ -11,6 +11,14 @@ import {
   deleteAttachment,
   bulkUpdateRanks,
   getCardActivities,
+  createChecklist,
+  updateChecklist,
+  deleteChecklist,
+  createChecklistItem,
+  updateChecklistItem,
+  deleteChecklistItem,
+  setCardCover,
+  removeCardCover,
 } from './card.controller'
 import { createComment, deleteComment, getCommentsByCard, updateComment } from './comment.controller'
 
@@ -379,4 +387,16 @@ cardRouter.put('/comments/:id', authenticate, updateComment)
  *         description: Comment deleted
  */
 cardRouter.delete('/comments/:id', authenticate, deleteComment)
+
+// Checklist routes
+cardRouter.post('/cards/:cardId/checklists', authenticate, createChecklist)
+cardRouter.put('/cards/:cardId/checklists/:checklistId', authenticate, updateChecklist)
+cardRouter.delete('/cards/:cardId/checklists/:checklistId', authenticate, deleteChecklist)
+cardRouter.post('/cards/:cardId/checklists/:checklistId/items', authenticate, createChecklistItem)
+cardRouter.put('/cards/:cardId/checklists/:checklistId/items/:itemId', authenticate, updateChecklistItem)
+cardRouter.delete('/cards/:cardId/checklists/:checklistId/items/:itemId', authenticate, deleteChecklistItem)
+
+// Cover routes
+cardRouter.post('/cards/:cardId/cover', authenticate, uploadCard.single('image'), setCardCover)
+cardRouter.delete('/cards/:cardId/cover', authenticate, removeCardCover)
 

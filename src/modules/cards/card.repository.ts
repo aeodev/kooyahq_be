@@ -27,8 +27,10 @@ export type UpdateCardInput = {
   dueDate?: Date | null
   storyPoints?: number | null
   attachments?: any[]
+  coverImage?: { url?: string; color?: string; brightness?: 'dark' | 'light' } | null
   completed?: boolean
   epicId?: string | null
+  sprintId?: string | null
   rank?: number | null
   flagged?: boolean
 }
@@ -68,20 +70,69 @@ export const cardRepository = {
   },
 
   async update(id: string, updates: UpdateCardInput): Promise<Card | undefined> {
-    const updateData: any = { ...updates }
+    const updateData: any = {}
+    const unsetFields: any = {}
+    
+    // Handle regular fields
+    if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.description !== undefined) updateData.description = updates.description
+    if (updates.columnId !== undefined) updateData.columnId = updates.columnId
+    if (updates.issueType !== undefined) updateData.issueType = updates.issueType
+    if (updates.assigneeId !== undefined) updateData.assigneeId = updates.assigneeId
+    if (updates.priority !== undefined) updateData.priority = updates.priority
+    if (updates.labels !== undefined) updateData.labels = updates.labels
+    if (updates.attachments !== undefined) updateData.attachments = updates.attachments
+    if (updates.completed !== undefined) updateData.completed = updates.completed
+    if (updates.flagged !== undefined) updateData.flagged = updates.flagged
+    
+    // Handle nullable fields
     if (updates.dueDate === null) {
-      updateData.$unset = { dueDate: '' }
+      unsetFields.dueDate = ''
+    } else if (updates.dueDate !== undefined) {
+      updateData.dueDate = updates.dueDate
     }
+    
     if (updates.storyPoints === null) {
-      updateData.$unset = { ...updateData.$unset, storyPoints: '' }
+      unsetFields.storyPoints = ''
+    } else if (updates.storyPoints !== undefined) {
+      updateData.storyPoints = updates.storyPoints
     }
+    
     if (updates.epicId === null) {
-      updateData.$unset = { ...updateData.$unset, epicId: '' }
+      unsetFields.epicId = ''
+    } else if (updates.epicId !== undefined) {
+      updateData.epicId = updates.epicId
     }
+    
+    if (updates.sprintId === null) {
+      unsetFields.sprintId = ''
+    } else if (updates.sprintId !== undefined) {
+      updateData.sprintId = updates.sprintId
+    }
+    
     if (updates.rank === null) {
-      updateData.$unset = { ...updateData.$unset, rank: '' }
+      unsetFields.rank = ''
+    } else if (updates.rank !== undefined) {
+      updateData.rank = updates.rank
     }
-    const doc = await CardModel.findByIdAndUpdate(id, updateData, { new: true }).exec()
+    
+    // Handle coverImage - must be separate to avoid conflict
+    if (updates.coverImage === null) {
+      unsetFields.coverImage = ''
+    } else if (updates.coverImage !== undefined) {
+      updateData.coverImage = updates.coverImage
+    }
+    
+    // Build final update object
+    const finalUpdate: any = {}
+    if (Object.keys(updateData).length > 0) {
+      finalUpdate.$set = updateData
+    }
+    if (Object.keys(unsetFields).length > 0) {
+      finalUpdate.$unset = unsetFields
+    }
+    
+    const doc = await CardModel.findByIdAndUpdate(id, finalUpdate, { new: true }).exec()
     return doc ? toCard(doc) : undefined
   },
 
@@ -106,6 +157,81 @@ export const cardRepository = {
   async delete(id: string): Promise<boolean> {
     const result = await CardModel.findByIdAndDelete(id).exec()
     return !!result
+  },
+
+  // Checklist methods
+  async addChecklist(cardId: string, checklist: { id: string; title: string; items?: any[] }): Promise<Card | undefined> {
+    const doc = await CardModel.findByIdAndUpdate(
+      cardId,
+      { $push: { checklists: checklist } },
+      { new: true }
+    ).exec()
+    return doc ? toCard(doc) : undefined
+  },
+
+  async updateChecklist(cardId: string, checklistId: string, updates: { title?: string }): Promise<Card | undefined> {
+    const updateData: any = {}
+    if (updates.title !== undefined) {
+      updateData['checklists.$[checklist].title'] = updates.title
+    }
+    const doc = await CardModel.findOneAndUpdate(
+      { _id: cardId },
+      { $set: updateData },
+      {
+        arrayFilters: [{ 'checklist.id': checklistId }],
+        new: true,
+      }
+    ).exec()
+    return doc ? toCard(doc) : undefined
+  },
+
+  async deleteChecklist(cardId: string, checklistId: string): Promise<Card | undefined> {
+    const doc = await CardModel.findByIdAndUpdate(
+      cardId,
+      { $pull: { checklists: { id: checklistId } } },
+      { new: true }
+    ).exec()
+    return doc ? toCard(doc) : undefined
+  },
+
+  async addChecklistItem(cardId: string, checklistId: string, item: { id: string; text: string; completed?: boolean; order?: number }): Promise<Card | undefined> {
+    const doc = await CardModel.findOneAndUpdate(
+      { _id: cardId, 'checklists.id': checklistId },
+      { $push: { 'checklists.$.items': item } },
+      { new: true }
+    ).exec()
+    return doc ? toCard(doc) : undefined
+  },
+
+  async updateChecklistItem(cardId: string, checklistId: string, itemId: string, updates: { text?: string; completed?: boolean; order?: number }): Promise<Card | undefined> {
+    const updateData: any = {}
+    if (updates.text !== undefined) {
+      updateData['checklists.$[checklist].items.$[item].text'] = updates.text
+    }
+    if (updates.completed !== undefined) {
+      updateData['checklists.$[checklist].items.$[item].completed'] = updates.completed
+    }
+    if (updates.order !== undefined) {
+      updateData['checklists.$[checklist].items.$[item].order'] = updates.order
+    }
+    const doc = await CardModel.findOneAndUpdate(
+      { _id: cardId, 'checklists.id': checklistId, 'checklists.items.id': itemId },
+      { $set: updateData },
+      {
+        arrayFilters: [{ 'checklist.id': checklistId }, { 'item.id': itemId }],
+        new: true,
+      }
+    ).exec()
+    return doc ? toCard(doc) : undefined
+  },
+
+  async deleteChecklistItem(cardId: string, checklistId: string, itemId: string): Promise<Card | undefined> {
+    const doc = await CardModel.findOneAndUpdate(
+      { _id: cardId, 'checklists.id': checklistId },
+      { $pull: { 'checklists.$.items': { id: itemId } } },
+      { new: true }
+    ).exec()
+    return doc ? toCard(doc) : undefined
   },
 }
 

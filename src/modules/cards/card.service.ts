@@ -81,6 +81,7 @@ export const cardService = {
     storyPoints?: number | null
     completed?: boolean
     epicId?: string | null
+    sprintId?: string | null
     rank?: number | null
     flagged?: boolean
   }, userId: string) {
@@ -199,6 +200,98 @@ export const cardService = {
       throw new Error('Board not found')
     }
     return cardRepository.bulkUpdateRanks(boardId, rankUpdates)
+  },
+
+  // Checklist methods
+  async addChecklist(cardId: string, title: string) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    const checklistId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    return cardRepository.addChecklist(cardId, {
+      id: checklistId,
+      title: title.trim(),
+      items: [],
+    })
+  },
+
+  async updateChecklist(cardId: string, checklistId: string, updates: { title?: string }) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    if (!card.checklists?.some((c) => c.id === checklistId)) {
+      throw new Error('Checklist not found')
+    }
+    return cardRepository.updateChecklist(cardId, checklistId, updates)
+  },
+
+  async deleteChecklist(cardId: string, checklistId: string) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    return cardRepository.deleteChecklist(cardId, checklistId)
+  },
+
+  async addChecklistItem(cardId: string, checklistId: string, text: string) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    const checklist = card.checklists?.find((c) => c.id === checklistId)
+    if (!checklist) {
+      throw new Error('Checklist not found')
+    }
+    const itemId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const order = (checklist.items?.length || 0) + 1
+    return cardRepository.addChecklistItem(cardId, checklistId, {
+      id: itemId,
+      text: text.trim(),
+      completed: false,
+      order,
+    })
+  },
+
+  async updateChecklistItem(cardId: string, checklistId: string, itemId: string, updates: { text?: string; completed?: boolean; order?: number }) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    const checklist = card.checklists?.find((c) => c.id === checklistId)
+    if (!checklist) {
+      throw new Error('Checklist not found')
+    }
+    if (!checklist.items?.some((i) => i.id === itemId)) {
+      throw new Error('Checklist item not found')
+    }
+    return cardRepository.updateChecklistItem(cardId, checklistId, itemId, updates)
+  },
+
+  async deleteChecklistItem(cardId: string, checklistId: string, itemId: string) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    return cardRepository.deleteChecklistItem(cardId, checklistId, itemId)
+  },
+
+  // Cover methods
+  async setCardCover(cardId: string, cover: { url?: string; color?: string; brightness?: 'dark' | 'light' }) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    return cardRepository.update(cardId, { coverImage: cover })
+  },
+
+  async removeCardCover(cardId: string) {
+    const card = await cardRepository.findById(cardId)
+    if (!card) {
+      throw new Error('Card not found')
+    }
+    return cardRepository.update(cardId, { coverImage: null })
   },
 }
 

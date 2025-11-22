@@ -165,6 +165,7 @@ export async function updateCard(req: Request, res: Response, next: NextFunction
     storyPoints,
     completed,
     epicId,
+    sprintId,
     rank,
     flagged,
   } = req.body
@@ -228,6 +229,9 @@ export async function updateCard(req: Request, res: Response, next: NextFunction
     }
     if (epicId !== undefined) {
       updates.epicId = epicId || null
+    }
+    if (sprintId !== undefined) {
+      updates.sprintId = sprintId || null
     }
     if (rank !== undefined) {
       updates.rank = rank !== null && rank !== undefined ? Number(rank) : null
@@ -463,6 +467,349 @@ export async function deleteCard(req: Request, res: Response, next: NextFunction
     res.json({
       status: 'success',
       message: 'Card deleted',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Checklist controllers
+export async function createChecklist(req: Request, res: Response, next: NextFunction) {
+  const { cardId } = req.params
+  const { title } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return next(createHttpError(400, 'Checklist title is required'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.addChecklist(cardId, title)
+    if (!updated) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateChecklist(req: Request, res: Response, next: NextFunction) {
+  const { cardId, checklistId } = req.params
+  const { title } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (title !== undefined && (!title || typeof title !== 'string' || title.trim().length === 0)) {
+    return next(createHttpError(400, 'Checklist title is required'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.updateChecklist(cardId, checklistId, { title })
+    if (!updated) {
+      return next(createHttpError(404, 'Card or checklist not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function deleteChecklist(req: Request, res: Response, next: NextFunction) {
+  const { cardId, checklistId } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.deleteChecklist(cardId, checklistId)
+    if (!updated) {
+      return next(createHttpError(404, 'Card or checklist not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function createChecklistItem(req: Request, res: Response, next: NextFunction) {
+  const { cardId, checklistId } = req.params
+  const { text } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    return next(createHttpError(400, 'Item text is required'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.addChecklistItem(cardId, checklistId, text)
+    if (!updated) {
+      return next(createHttpError(404, 'Card or checklist not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateChecklistItem(req: Request, res: Response, next: NextFunction) {
+  const { cardId, checklistId, itemId } = req.params
+  const { text, completed, order } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (text !== undefined && (!text || typeof text !== 'string' || text.trim().length === 0)) {
+    return next(createHttpError(400, 'Item text is required'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updates: any = {}
+    if (text !== undefined) updates.text = text
+    if (completed !== undefined) updates.completed = Boolean(completed)
+    if (order !== undefined) updates.order = Number(order)
+
+    const updated = await cardService.updateChecklistItem(cardId, checklistId, itemId, updates)
+    if (!updated) {
+      return next(createHttpError(404, 'Card, checklist, or item not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function deleteChecklistItem(req: Request, res: Response, next: NextFunction) {
+  const { cardId, checklistId, itemId } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.deleteChecklistItem(cardId, checklistId, itemId)
+    if (!updated) {
+      return next(createHttpError(404, 'Card, checklist, or item not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Cover controllers
+export async function setCardCover(req: Request, res: Response, next: NextFunction) {
+  const { cardId } = req.params
+  const { url, color, brightness } = req.body
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    // If file is uploaded, use the file URL
+    const file = (req as any).file
+    const coverUrl = file
+      ? ((file as any).cloudinaryUrl || '')
+      : url
+
+    // Build cover object: if image is uploaded, use URL and clear color. If color is provided, use color and clear URL.
+    const cover: { url?: string; color?: string; brightness?: 'dark' | 'light' } = {}
+    
+    if (coverUrl) {
+      // Image uploaded: set URL, clear color
+      cover.url = coverUrl
+      cover.brightness = brightness
+    } else if (color) {
+      // Color provided: set color, clear URL
+      cover.color = color
+      cover.brightness = brightness
+    }
+
+    const updated = await cardService.setCardCover(cardId, cover)
+    if (!updated) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function removeCardCover(req: Request, res: Response, next: NextFunction) {
+  const { cardId } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const card = await cardService.findById(cardId)
+    if (!card) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    const board = await boardService.findById(card.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const updated = await cardService.removeCardCover(cardId)
+    if (!updated) {
+      return next(createHttpError(404, 'Card not found'))
+    }
+
+    res.json({
+      status: 'success',
+      data: updated,
     })
   } catch (error) {
     next(error)
