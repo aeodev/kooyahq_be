@@ -76,6 +76,33 @@ const cardSchema = new mongoose_1.Schema({
         ],
         default: [],
     },
+    checklists: {
+        type: [
+            {
+                id: { type: String, required: true },
+                title: { type: String, required: true, trim: true },
+                items: {
+                    type: [
+                        {
+                            id: { type: String, required: true },
+                            text: { type: String, required: true, trim: true },
+                            completed: { type: Boolean, default: false },
+                            order: { type: Number, default: 0 },
+                        },
+                    ],
+                    default: [],
+                },
+            },
+        ],
+        default: [],
+    },
+    coverImage: {
+        type: {
+            url: String,
+            color: String,
+            brightness: { type: String, enum: ['dark', 'light'] },
+        },
+    },
 }, {
     timestamps: true,
 });
@@ -105,6 +132,23 @@ function toCard(doc) {
                 ? (typeof att.uploadedAt === 'string' ? att.uploadedAt : att.uploadedAt.toISOString())
                 : new Date().toISOString(),
         })),
+        checklists: doc.checklists?.map((checklist) => ({
+            id: checklist.id,
+            title: checklist.title,
+            items: checklist.items?.map((item) => ({
+                id: item.id,
+                text: item.text,
+                completed: item.completed ?? false,
+                order: item.order ?? 0,
+            })) || [],
+        })) || [],
+        coverImage: doc.coverImage
+            ? {
+                url: doc.coverImage.url,
+                color: doc.coverImage.color,
+                brightness: doc.coverImage.brightness,
+            }
+            : undefined,
         completed: doc.completed ?? false,
         epicId: doc.epicId,
         rank: doc.rank,

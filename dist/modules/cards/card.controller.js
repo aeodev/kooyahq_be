@@ -9,6 +9,14 @@ exports.uploadAttachment = uploadAttachment;
 exports.deleteAttachment = deleteAttachment;
 exports.bulkUpdateRanks = bulkUpdateRanks;
 exports.deleteCard = deleteCard;
+exports.createChecklist = createChecklist;
+exports.updateChecklist = updateChecklist;
+exports.deleteChecklist = deleteChecklist;
+exports.createChecklistItem = createChecklistItem;
+exports.updateChecklistItem = updateChecklistItem;
+exports.deleteChecklistItem = deleteChecklistItem;
+exports.setCardCover = setCardCover;
+exports.removeCardCover = removeCardCover;
 const board_service_1 = require("../boards/board.service");
 const card_service_1 = require("./card.service");
 const card_activity_repository_1 = require("./card-activity.repository");
@@ -126,7 +134,7 @@ async function moveCard(req, res, next) {
 }
 async function updateCard(req, res, next) {
     const { id } = req.params;
-    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, completed, epicId, rank, flagged, } = req.body;
+    const { title, description, columnId, issueType, assigneeId, priority, labels, dueDate, storyPoints, completed, epicId, sprintId, rank, flagged, } = req.body;
     const userId = req.user?.id;
     if (!userId) {
         return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
@@ -180,6 +188,9 @@ async function updateCard(req, res, next) {
         }
         if (epicId !== undefined) {
             updates.epicId = epicId || null;
+        }
+        if (sprintId !== undefined) {
+            updates.sprintId = sprintId || null;
         }
         if (rank !== undefined) {
             updates.rank = rank !== null && rank !== undefined ? Number(rank) : null;
@@ -369,6 +380,297 @@ async function deleteCard(req, res, next) {
         res.json({
             status: 'success',
             message: 'Card deleted',
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+// Checklist controllers
+async function createChecklist(req, res, next) {
+    const { cardId } = req.params;
+    const { title } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return next((0, http_error_1.createHttpError)(400, 'Checklist title is required'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.addChecklist(cardId, title);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function updateChecklist(req, res, next) {
+    const { cardId, checklistId } = req.params;
+    const { title } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    if (title !== undefined && (!title || typeof title !== 'string' || title.trim().length === 0)) {
+        return next((0, http_error_1.createHttpError)(400, 'Checklist title is required'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.updateChecklist(cardId, checklistId, { title });
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card or checklist not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function deleteChecklist(req, res, next) {
+    const { cardId, checklistId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.deleteChecklist(cardId, checklistId);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card or checklist not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function createChecklistItem(req, res, next) {
+    const { cardId, checklistId } = req.params;
+    const { text } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        return next((0, http_error_1.createHttpError)(400, 'Item text is required'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.addChecklistItem(cardId, checklistId, text);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card or checklist not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function updateChecklistItem(req, res, next) {
+    const { cardId, checklistId, itemId } = req.params;
+    const { text, completed, order } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    if (text !== undefined && (!text || typeof text !== 'string' || text.trim().length === 0)) {
+        return next((0, http_error_1.createHttpError)(400, 'Item text is required'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updates = {};
+        if (text !== undefined)
+            updates.text = text;
+        if (completed !== undefined)
+            updates.completed = Boolean(completed);
+        if (order !== undefined)
+            updates.order = Number(order);
+        const updated = await card_service_1.cardService.updateChecklistItem(cardId, checklistId, itemId, updates);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card, checklist, or item not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function deleteChecklistItem(req, res, next) {
+    const { cardId, checklistId, itemId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.deleteChecklistItem(cardId, checklistId, itemId);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card, checklist, or item not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+// Cover controllers
+async function setCardCover(req, res, next) {
+    const { cardId } = req.params;
+    const { url, color, brightness } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        // If file is uploaded, use the file URL
+        const file = req.file;
+        const coverUrl = file
+            ? (file.cloudinaryUrl || '')
+            : url;
+        // Build cover object: if image is uploaded, use URL and clear color. If color is provided, use color and clear URL.
+        const cover = {};
+        if (coverUrl) {
+            // Image uploaded: set URL, clear color
+            cover.url = coverUrl;
+            cover.brightness = brightness;
+        }
+        else if (color) {
+            // Color provided: set color, clear URL
+            cover.color = color;
+            cover.brightness = brightness;
+        }
+        const updated = await card_service_1.cardService.setCardCover(cardId, cover);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function removeCardCover(req, res, next) {
+    const { cardId } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+        return next((0, http_error_1.createHttpError)(401, 'Unauthorized'));
+    }
+    try {
+        const card = await card_service_1.cardService.findById(cardId);
+        if (!card) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        const board = await board_service_1.boardService.findById(card.boardId);
+        if (!board) {
+            return next((0, http_error_1.createHttpError)(404, 'Board not found'));
+        }
+        if (board.ownerId !== userId && !board.memberIds?.includes(userId)) {
+            return next((0, http_error_1.createHttpError)(403, 'Forbidden'));
+        }
+        const updated = await card_service_1.cardService.removeCardCover(cardId);
+        if (!updated) {
+            return next((0, http_error_1.createHttpError)(404, 'Card not found'));
+        }
+        res.json({
+            status: 'success',
+            data: updated,
         });
     }
     catch (error) {

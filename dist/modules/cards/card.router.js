@@ -358,3 +358,13 @@ exports.cardRouter.put('/comments/:id', authenticate_1.authenticate, comment_con
  *         description: Comment deleted
  */
 exports.cardRouter.delete('/comments/:id', authenticate_1.authenticate, comment_controller_1.deleteComment);
+// Checklist routes
+exports.cardRouter.post('/cards/:cardId/checklists', authenticate_1.authenticate, card_controller_1.createChecklist);
+exports.cardRouter.put('/cards/:cardId/checklists/:checklistId', authenticate_1.authenticate, card_controller_1.updateChecklist);
+exports.cardRouter.delete('/cards/:cardId/checklists/:checklistId', authenticate_1.authenticate, card_controller_1.deleteChecklist);
+exports.cardRouter.post('/cards/:cardId/checklists/:checklistId/items', authenticate_1.authenticate, card_controller_1.createChecklistItem);
+exports.cardRouter.put('/cards/:cardId/checklists/:checklistId/items/:itemId', authenticate_1.authenticate, card_controller_1.updateChecklistItem);
+exports.cardRouter.delete('/cards/:cardId/checklists/:checklistId/items/:itemId', authenticate_1.authenticate, card_controller_1.deleteChecklistItem);
+// Cover routes
+exports.cardRouter.post('/cards/:cardId/cover', authenticate_1.authenticate, upload_card_1.uploadCard.single('image'), card_controller_1.setCardCover);
+exports.cardRouter.delete('/cards/:cardId/cover', authenticate_1.authenticate, card_controller_1.removeCardCover);

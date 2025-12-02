@@ -161,25 +161,6 @@ const cardSchema = new Schema<CardDocument>(
 
 export const CardModel = models.Card ?? model<CardDocument>('Card', cardSchema)
 
-export type ChecklistItem = {
-  id: string
-  text: string
-  completed: boolean
-  order: number
-}
-
-export type Checklist = {
-  id: string
-  title: string
-  items: ChecklistItem[]
-}
-
-export type CardCoverImage = {
-  url?: string
-  color?: string
-  brightness?: 'dark' | 'light'
-}
-
 export type Card = {
   id: string
   title: string

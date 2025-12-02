@@ -162,4 +162,88 @@ exports.cardService = {
         }
         return card_repository_1.cardRepository.bulkUpdateRanks(boardId, rankUpdates);
     },
+    // Checklist methods
+    async addChecklist(cardId, title) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        const checklistId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        return card_repository_1.cardRepository.addChecklist(cardId, {
+            id: checklistId,
+            title: title.trim(),
+            items: [],
+        });
+    },
+    async updateChecklist(cardId, checklistId, updates) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        if (!card.checklists?.some((c) => c.id === checklistId)) {
+            throw new Error('Checklist not found');
+        }
+        return card_repository_1.cardRepository.updateChecklist(cardId, checklistId, updates);
+    },
+    async deleteChecklist(cardId, checklistId) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        return card_repository_1.cardRepository.deleteChecklist(cardId, checklistId);
+    },
+    async addChecklistItem(cardId, checklistId, text) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        const checklist = card.checklists?.find((c) => c.id === checklistId);
+        if (!checklist) {
+            throw new Error('Checklist not found');
+        }
+        const itemId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const order = (checklist.items?.length || 0) + 1;
+        return card_repository_1.cardRepository.addChecklistItem(cardId, checklistId, {
+            id: itemId,
+            text: text.trim(),
+            completed: false,
+            order,
+        });
+    },
+    async updateChecklistItem(cardId, checklistId, itemId, updates) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        const checklist = card.checklists?.find((c) => c.id === checklistId);
+        if (!checklist) {
+            throw new Error('Checklist not found');
+        }
+        if (!checklist.items?.some((i) => i.id === itemId)) {
+            throw new Error('Checklist item not found');
+        }
+        return card_repository_1.cardRepository.updateChecklistItem(cardId, checklistId, itemId, updates);
+    },
+    async deleteChecklistItem(cardId, checklistId, itemId) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        return card_repository_1.cardRepository.deleteChecklistItem(cardId, checklistId, itemId);
+    },
+    // Cover methods
+    async setCardCover(cardId, cover) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        return card_repository_1.cardRepository.update(cardId, { coverImage: cover });
+    },
+    async removeCardCover(cardId) {
+        const card = await card_repository_1.cardRepository.findById(cardId);
+        if (!card) {
+            throw new Error('Card not found');
+        }
+        return card_repository_1.cardRepository.update(cardId, { coverImage: null });
+    },
 };
