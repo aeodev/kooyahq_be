@@ -19,6 +19,7 @@ import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
 import { presenceRouter } from './modules/presence/presence.router'
+import { meetRouter } from './modules/meet/meet.router'
 
 export function createApp() {
   const app = express()
@@ -72,6 +73,7 @@ export function createApp() {
   app.use('/api/posts', postRouter)
   app.use('/api/notifications', notificationRouter)
   app.use('/api/presence', presenceRouter)
+  app.use('/api/meet', meetRouter)
   app.use('/api/games', gameRouter)
   app.use('/api/announcements', announcementRouter)
   app.use('/api/projects', projectRouter)
