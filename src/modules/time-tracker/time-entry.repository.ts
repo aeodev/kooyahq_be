@@ -11,12 +11,12 @@ export class TimeEntryRepository {
   async create(input: CreateTimeEntryInput): Promise<TimeEntry> {
     const startTime = new Date()
     const doc = new TimeEntryModel({
-      ...input,
+      userId: input.userId,
+      projects: input.projects,
       duration: 0,
       startTime,
       isActive: true,
       isOvertime: input.isOvertime ?? false,
-      // Initialize tasks array with first task
       tasks: input.task ? [{ text: input.task, addedAt: startTime, duration: 0 }] : [],
     })
     await doc.save()
@@ -50,9 +50,6 @@ export class TimeEntryRepository {
       doc.tasks = []
     }
     doc.tasks.push({ text: taskText, addedAt: now, duration: 0 })
-
-    // Also update legacy task field for backwards compatibility
-    doc.task = doc.tasks.map(t => t.text).join(', ')
 
     await doc.save()
     return toTimeEntry(doc)
@@ -145,9 +142,6 @@ export class TimeEntryRepository {
     if (updates.projects) {
       doc.projects = updates.projects
     }
-    if (updates.task) {
-      doc.task = updates.task
-    }
     if (updates.isOvertime !== undefined) {
       doc.isOvertime = updates.isOvertime
     }
@@ -234,32 +228,58 @@ export class TimeEntryRepository {
 
   async stopAllActiveTimers(userId: string): Promise<TimeEntry[]> {
     const docs = await TimeEntryModel.find({ userId, isActive: true })
+    if (docs.length === 0) {
+      return []
+    }
+
+    const endTime = new Date()
+    const bulkOps: Array<{
+      updateOne: {
+        filter: { _id: unknown }
+        update: { $set: Record<string, unknown>; $unset?: Record<string, 1> }
+      }
+    }> = []
     const stopped: TimeEntry[] = []
 
     for (const doc of docs) {
-      const endTime = new Date()
       const startTime = doc.startTime
-      
-      let workDurationMs = endTime.getTime() - startTime.getTime()
+      let pausedDuration = doc.pausedDuration || 0
       
       if (doc.isPaused && doc.lastPausedAt) {
         const currentPauseMs = endTime.getTime() - doc.lastPausedAt.getTime()
-        doc.pausedDuration = (doc.pausedDuration || 0) + currentPauseMs
+        pausedDuration += currentPauseMs
       }
       
-      workDurationMs -= (doc.pausedDuration || 0)
+      const workDurationMs = endTime.getTime() - startTime.getTime() - pausedDuration
       const durationMinutes = Math.floor(workDurationMs / 60000)
 
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: doc._id },
+          update: {
+            $set: {
+              isActive: false,
+              isPaused: false,
+              endTime,
+              duration: durationMinutes,
+              pausedDuration,
+            },
+            $unset: { lastPausedAt: 1 },
+          },
+        },
+      })
+
+      // Update doc in memory to return correct values
       doc.isActive = false
       doc.isPaused = false
       doc.endTime = endTime
       doc.duration = durationMinutes
+      doc.pausedDuration = pausedDuration
       doc.lastPausedAt = undefined
-
-      await doc.save()
       stopped.push(toTimeEntry(doc))
     }
 
+    await TimeEntryModel.bulkWrite(bulkOps)
     return stopped
   }
 

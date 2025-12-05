@@ -10,8 +10,7 @@ export interface TaskItem {
 export interface TimeEntryDocument extends Document {
   userId: string
   projects: string[]
-  task: string // DEPRECATED - kept for backwards compatibility
-  tasks: TaskItem[] // NEW - array of tasks with timestamps
+  tasks: TaskItem[]
   duration: number // in minutes
   startTime: Date
   endTime?: Date
@@ -56,12 +55,6 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
       type: [String],
       required: true,
       default: [],
-    },
-    task: {
-      type: String,
-      required: false,
-      trim: true,
-      default: '',
     },
     tasks: {
       type: [taskItemSchema],
@@ -120,7 +113,6 @@ export type TimeEntry = {
   id: string
   userId: string
   projects: string[]
-  task: string // DEPRECATED - kept for backwards compatibility
   tasks: TaskItemResponse[]
   duration: number
   startTime: string | null
@@ -135,29 +127,17 @@ export type TimeEntry = {
 }
 
 export function toTimeEntry(doc: TimeEntryDocument): TimeEntry {
-  // Convert tasks array, handling legacy entries
-  let tasks: TaskItemResponse[] = []
-  
-  if (doc.tasks && doc.tasks.length > 0) {
-    tasks = doc.tasks.map(t => ({
-      text: t.text,
-      addedAt: t.addedAt.toISOString(),
-      duration: t.duration || 0,
-    }))
-  } else if (doc.task) {
-    // Legacy entry - convert task string to tasks array
-    tasks = [{
-      text: doc.task,
-      addedAt: doc.startTime?.toISOString() || doc.createdAt.toISOString(),
-      duration: doc.duration || 0,
-    }]
-  }
+  // Convert tasks array
+  const tasks: TaskItemResponse[] = (doc.tasks || []).map(t => ({
+    text: t.text,
+    addedAt: t.addedAt.toISOString(),
+    duration: t.duration || 0,
+  }))
 
   return {
     id: doc.id,
     userId: doc.userId,
     projects: doc.projects || [],
-    task: doc.task || '', // Keep for backwards compatibility
     tasks,
     duration: doc.duration,
     startTime: doc.startTime?.toISOString() || null,

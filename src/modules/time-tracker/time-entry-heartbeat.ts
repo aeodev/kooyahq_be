@@ -1,7 +1,7 @@
 import { TimeEntryRepository } from './time-entry.repository'
 import type { PublicTimeEntry } from './time-entry.service'
 import { SocketEmitter, TimeEntrySocketEvents } from '../../utils/socket-emitter'
-import { timeEntriesRoom } from '../../utils/socket-rooms'
+import { userRoom } from '../../utils/socket-rooms'
 import { userRepository } from '../users/user.repository'
 
 /**
@@ -111,11 +111,10 @@ class TimerHeartbeatService {
         return
       }
 
-      // Broadcast to all clients in timeEntriesRoom
-      // Each timer update includes userId for client-side filtering
+      // Emit to each user's personal room for targeted delivery
       publicTimers.forEach((timer) => {
         SocketEmitter.emitToRoom(
-          timeEntriesRoom(),
+          userRoom(timer.userId),
           TimeEntrySocketEvents.TIMER_HEARTBEAT,
           { entry: timer, userId: timer.userId }
         )
