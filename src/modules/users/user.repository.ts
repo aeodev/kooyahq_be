@@ -30,7 +30,7 @@ export const userRepository = {
     return docs.map((doc) => toPublicUser(toUser(doc)))
   },
 
-  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string }): Promise<PublicUser | undefined> {
+  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string; status?: string }): Promise<PublicUser | undefined> {
     const doc = await UserModel.findByIdAndUpdate(
       id,
       { $set: updates },
@@ -41,7 +41,7 @@ export const userRepository = {
 
   async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; isAdmin?: boolean }): Promise<PublicUser | undefined> {
     const updateData: Record<string, unknown> = {}
-    
+
     if (updates.name !== undefined) {
       updateData.name = updates.name.trim()
     }

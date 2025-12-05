@@ -62,13 +62,13 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
   }
 
   try {
-    const updates: { profilePic?: string; banner?: string; bio?: string } = {}
+    const updates: { profilePic?: string; banner?: string; bio?: string; status?: string } = {}
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
-    const { bio } = req.body
-    
+    const { bio, status } = req.body
+
     const profilePicFiles = files?.['profilePic']
     const bannerFiles = files?.['banner']
-    
+
     const profilePicFile = profilePicFiles && profilePicFiles.length > 0 ? profilePicFiles[0] : undefined
     const bannerFile = bannerFiles && bannerFiles.length > 0 ? bannerFiles[0] : undefined
 
@@ -82,6 +82,12 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
     if (bio !== undefined) {
       updates.bio = bio?.trim() || undefined
+    }
+
+    if (status !== undefined) {
+      if (['online', 'busy', 'away', 'offline'].includes(status)) {
+        updates.status = status
+      }
     }
 
     // Only update if there are actual changes

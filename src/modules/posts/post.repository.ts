@@ -7,6 +7,11 @@ export type CreatePostInput = {
   category?: string
   tags?: string[]
   draft?: boolean
+  poll?: {
+    question: string
+    options: { text: string; votes?: string[] }[]
+    endDate?: Date
+  }
 }
 
 export type UpdatePostInput = {
@@ -26,6 +31,7 @@ export const postRepository = {
       category: input.category,
       tags: input.tags || [],
       draft: input.draft ?? false,
+      poll: input.poll,
     })
     return toPost(doc)
   },
@@ -57,6 +63,29 @@ export const postRepository = {
   async findById(id: string): Promise<Post | undefined> {
     const doc = await PostModel.findById(id).exec()
     return doc ? toPost(doc) : undefined
+  },
+
+  async vote(postId: string, userId: string, optionIndex: number): Promise<Post | undefined> {
+    const post = await PostModel.findById(postId).exec()
+    if (!post || !post.poll) return undefined
+
+    // Remove user vote from all options
+    post.poll.options.forEach((opt: any) => {
+      // Ensure votes is initialized
+      if (!opt.votes) opt.votes = []
+      // Convert to string for comparison safety
+      opt.votes = opt.votes.filter((id: string) => String(id) !== String(userId))
+    })
+
+    // Add vote to selected option
+    if (post.poll.options[optionIndex]) {
+      if (!post.poll.options[optionIndex].votes) post.poll.options[optionIndex].votes = []
+      post.poll.options[optionIndex].votes.push(userId)
+    }
+
+    post.markModified('poll')
+    const saved = await post.save()
+    return toPost(saved)
   },
 
   async delete(id: string, authorId: string): Promise<boolean> {

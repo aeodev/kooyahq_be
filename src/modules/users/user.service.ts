@@ -18,7 +18,7 @@ export const userService = {
     return userRepository.findAll()
   },
 
-  async updateProfile(id: string, updates: { profilePic?: string; banner?: string }) {
+  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string; status?: string }) {
     return userRepository.updateProfile(id, updates)
   },
 

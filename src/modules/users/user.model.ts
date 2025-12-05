@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   profilePic?: string
   banner?: string
   bio?: string
+  status?: 'online' | 'busy' | 'away' | 'offline'
   createdAt: Date
   updatedAt: Date
 }
@@ -33,18 +34,27 @@ const userSchema = new Schema<UserDocument>(
     },
     profilePic: {
       type: String,
+      default: '',
     },
     banner: {
       type: String,
+      default: '',
     },
     bio: {
       type: String,
       trim: true,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['online', 'busy', 'away', 'offline'],
+      default: 'online',
     },
     position: {
       type: String,
       trim: true,
     },
+
     birthday: {
       type: Date,
     },
@@ -66,6 +76,7 @@ export type User = {
   profilePic?: string
   banner?: string
   bio?: string
+  status?: 'online' | 'busy' | 'away' | 'offline'
   createdAt: string
   updatedAt: string
 }
@@ -83,6 +94,7 @@ export function toUser(doc: UserDocument): User {
     profilePic: doc.profilePic,
     banner: doc.banner,
     bio: doc.bio,
+    status: doc.status || 'online',
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }
