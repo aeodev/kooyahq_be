@@ -101,6 +101,24 @@ export class TimeEntryService {
     return publicEntry
   }
 
+  async addTaskToActiveTimer(userId: string, taskText: string): Promise<PublicTimeEntry> {
+    const entry = await this.timeEntryRepo.addTaskToEntry(userId, taskText.trim())
+    if (!entry) {
+      throw new HttpError(404, 'No active timer found')
+    }
+
+    await this.logAudit(userId, 'add_task', entry.id, {
+      task: taskText,
+    })
+
+    const publicEntry = await this.toPublicTimeEntry(entry, userId)
+    
+    // Emit socket event for real-time updates
+    SocketEmitter.emitTimeEntryUpdate(TimeEntrySocketEvents.UPDATED, publicEntry, userId)
+
+    return publicEntry
+  }
+
   async pauseTimer(userId: string): Promise<PublicTimeEntry | null> {
     const entry = await this.timeEntryRepo.pauseActiveTimer(userId)
     if (!entry) {

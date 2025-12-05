@@ -44,6 +44,18 @@ export async function startTimer(req: Request, res: Response) {
   res.json({ status: 'success', data: entry })
 }
 
+export async function addTask(req: Request, res: Response) {
+  const userId = req.user!.id
+  const { task } = req.body
+
+  if (!task || !task.trim()) {
+    return res.status(400).json({ status: 'error', message: 'Task text is required' })
+  }
+
+  const entry = await service.addTaskToActiveTimer(userId, task)
+  res.json({ status: 'success', data: entry })
+}
+
 export async function getDayEndedStatus(req: Request, res: Response) {
   const userId = req.user!.id
   const today = new Date()

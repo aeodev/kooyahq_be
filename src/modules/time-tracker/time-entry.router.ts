@@ -5,6 +5,7 @@ import {
   getMyEntries,
   getActiveTimer,
   startTimer,
+  addTask,
   pauseTimer,
   resumeTimer,
   stopTimer,
@@ -160,6 +161,31 @@ timeEntryRouter.get('/timer/day-ended-status', getDayEndedStatus)
  *         description: Timer started
  */
 timeEntryRouter.post('/timer/start', startTimer)
+
+/**
+ * @swagger
+ * /time-entries/timer/add-task:
+ *   post:
+ *     summary: Add task to active timer
+ *     tags: [Time Entries]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - task
+ *             properties:
+ *               task:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Task added to active timer
+ */
+timeEntryRouter.post('/timer/add-task', addTask)
 
 /**
  * @swagger

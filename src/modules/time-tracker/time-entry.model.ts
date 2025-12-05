@@ -1,20 +1,49 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
+// Task item with timestamp for per-task duration tracking
+export interface TaskItem {
+  text: string
+  addedAt: Date
+  duration: number // in minutes, calculated when task changes or timer stops
+}
+
 export interface TimeEntryDocument extends Document {
   userId: string
-  projects: string[] // Changed from single project to array for multi-select
-  task: string
+  projects: string[]
+  task: string // DEPRECATED - kept for backwards compatibility
+  tasks: TaskItem[] // NEW - array of tasks with timestamps
   duration: number // in minutes
   startTime: Date
   endTime?: Date
   isActive: boolean
   isPaused: boolean
-  pausedDuration: number // total paused time in minutes
+  pausedDuration: number // total paused time in milliseconds
   lastPausedAt?: Date
   isOvertime: boolean
   createdAt: Date
   updatedAt: Date
 }
+
+const taskItemSchema = new Schema<TaskItem>(
+  {
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    addedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    duration: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  { _id: false }
+)
 
 const timeEntrySchema = new Schema<TimeEntryDocument>(
   {
@@ -30,9 +59,13 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
     },
     task: {
       type: String,
-      required: false, // Allow empty strings - we'll always provide a value (even if empty)
+      required: false,
       trim: true,
-      default: '', // Default to empty string
+      default: '',
+    },
+    tasks: {
+      type: [taskItemSchema],
+      default: [],
     },
     duration: {
       type: Number,
@@ -76,11 +109,19 @@ const timeEntrySchema = new Schema<TimeEntryDocument>(
 
 export const TimeEntryModel = models.TimeEntry ?? model<TimeEntryDocument>('TimeEntry', timeEntrySchema)
 
+// API response types
+export type TaskItemResponse = {
+  text: string
+  addedAt: string
+  duration: number
+}
+
 export type TimeEntry = {
   id: string
   userId: string
   projects: string[]
-  task: string
+  task: string // DEPRECATED - kept for backwards compatibility
+  tasks: TaskItemResponse[]
   duration: number
   startTime: string | null
   endTime: string | null
@@ -94,11 +135,30 @@ export type TimeEntry = {
 }
 
 export function toTimeEntry(doc: TimeEntryDocument): TimeEntry {
+  // Convert tasks array, handling legacy entries
+  let tasks: TaskItemResponse[] = []
+  
+  if (doc.tasks && doc.tasks.length > 0) {
+    tasks = doc.tasks.map(t => ({
+      text: t.text,
+      addedAt: t.addedAt.toISOString(),
+      duration: t.duration || 0,
+    }))
+  } else if (doc.task) {
+    // Legacy entry - convert task string to tasks array
+    tasks = [{
+      text: doc.task,
+      addedAt: doc.startTime?.toISOString() || doc.createdAt.toISOString(),
+      duration: doc.duration || 0,
+    }]
+  }
+
   return {
     id: doc.id,
     userId: doc.userId,
     projects: doc.projects || [],
-    task: doc.task,
+    task: doc.task || '', // Keep for backwards compatibility
+    tasks,
     duration: doc.duration,
     startTime: doc.startTime?.toISOString() || null,
     endTime: doc.endTime?.toISOString() || null,
@@ -111,4 +171,3 @@ export function toTimeEntry(doc: TimeEntryDocument): TimeEntry {
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-
