@@ -46,6 +46,8 @@ export const env = {
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
   mongoUri: process.env.MONGO_URI ?? DEFAULT_MONGO_URI,
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+  redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
+  redisTtlSeconds: Number(process.env.REDIS_TTL_SECONDS ?? 1200),
   cloudinary: {
     cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
     apiKey: requireEnv('CLOUDINARY_API_KEY'),
