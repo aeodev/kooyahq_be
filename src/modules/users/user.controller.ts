@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { userService } from './user.service'
 import { createHttpError } from '../../utils/http-error'
+import { adminActivityService } from '../admin-activity/admin-activity.service'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -23,11 +24,30 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 
 export async function getAllUsers(req: Request, res: Response, next: NextFunction) {
   try {
-    const users = await userService.findAll()
-    res.json({
-      status: 'success',
-      data: users,
-    })
+    const { page, limit, search, role } = req.query
+
+    // If pagination/search params provided, use searchUsers
+    if (page || limit || search || role) {
+      const result = await userService.searchUsers({
+        page: page ? parseInt(page as string, 10) : undefined,
+        limit: limit ? parseInt(limit as string, 10) : undefined,
+        search: search as string | undefined,
+        role: role as 'admin' | 'user' | undefined,
+      })
+
+      res.json({
+        status: 'success',
+        data: result.data,
+        pagination: result.pagination,
+      })
+    } else {
+      // Otherwise, return all users (backward compatibility)
+      const users = await userService.findAll()
+      res.json({
+        status: 'success',
+        data: users,
+      })
+    }
   } catch (error) {
     next(error)
   }
@@ -127,6 +147,11 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       if (!email.trim()) {
         return next(createHttpError(400, 'Email cannot be empty'))
       }
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email.trim())) {
+        return next(createHttpError(400, 'Invalid email format'))
+      }
       updates.email = email.trim()
     }
 
@@ -135,6 +160,13 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
     }
 
     if (birthday !== undefined) {
+      if (birthday && birthday.trim()) {
+        const birthdayDate = new Date(birthday)
+        const today = new Date()
+        if (birthdayDate > today) {
+          return next(createHttpError(400, 'Birthday cannot be in the future'))
+        }
+      }
       updates.birthday = birthday?.trim() || undefined
     }
 
@@ -151,9 +183,60 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       return next(createHttpError(404, 'User not found'))
     }
 
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'update_user',
+          targetType: 'user',
+          targetId: id,
+          changes: updates,
+        })
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
+
     res.json({
       status: 'success',
       data: updated,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function deleteEmployee(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params
+  const { hardDelete } = req.query
+
+  try {
+    const deleted = await userService.deleteUser(id, hardDelete !== 'true')
+    if (!deleted) {
+      return next(createHttpError(404, 'User not found'))
+    }
+
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'delete_user',
+          targetType: 'user',
+          targetId: id,
+          changes: { hardDelete: hardDelete === 'true' },
+        })
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
+
+    res.json({
+      status: 'success',
+      message: 'User deleted successfully',
     })
   } catch (error) {
     next(error)

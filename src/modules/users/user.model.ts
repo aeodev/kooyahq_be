@@ -10,6 +10,7 @@ export interface UserDocument extends Document {
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  deletedAt?: Date
   createdAt: Date
   updatedAt: Date
 }
@@ -58,11 +59,21 @@ const userSchema = new Schema<UserDocument>(
     birthday: {
       type: Date,
     },
+    deletedAt: {
+      type: Date,
+      default: undefined,
+      index: true,
+    },
   },
   {
     timestamps: true,
   },
 )
+
+// Indexes for search/filter queries
+userSchema.index({ name: 'text', email: 'text', position: 'text' })
+userSchema.index({ isAdmin: 1, deletedAt: 1 })
+userSchema.index({ createdAt: -1 })
 
 export const UserModel = models.User ?? model<UserDocument>('User', userSchema)
 
@@ -77,6 +88,7 @@ export type User = {
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  deletedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -95,6 +107,7 @@ export function toUser(doc: UserDocument): User {
     banner: doc.banner,
     bio: doc.bio,
     status: doc.status || 'online',
+    deletedAt: doc.deletedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }
