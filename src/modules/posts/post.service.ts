@@ -134,6 +134,7 @@ export const postService = {
   async delete(id: string, authorId: string): Promise<boolean> {
     return postRepository.delete(id, authorId)
   },
+  
   async vote(postId: string, userId: string, optionIndex: number): Promise<PostWithAuthor> {
     const updated = await postRepository.vote(postId, userId, optionIndex)
     if (!updated) {

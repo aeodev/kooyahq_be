@@ -21,6 +21,7 @@ import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
 import { presenceRouter } from './modules/presence/presence.router'
 import { meetRouter } from './modules/meet/meet.router'
+import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 
 export function createApp() {
   const app = express()
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api/time-entries', timeEntryRouter)
   app.use('/api/gallery', galleryRouter)
   app.use('/api/ai-news', aiNewsRouter)
+  app.use('/api/link-preview', linkPreviewRouter)
   app.use('/api/posts', postRouter)
   app.use('/api/notifications', notificationRouter)
   app.use('/api/presence', presenceRouter)

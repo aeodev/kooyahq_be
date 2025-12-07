@@ -30,3 +30,4 @@ export interface NewsResponse {
   total: number
   filter: NewsFilter
 }
+

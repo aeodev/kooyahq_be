@@ -1,10 +1,22 @@
 import Parser from 'rss-parser'
-import { createHash } from 'crypto'
 import type { NewsItem, NewsSource } from './ai-news.types'
+import { fetchImageFromUrl } from '../link-preview/link-preview.service'
+import { isGifUrl, normalizeImageUrl } from '../../utils/image.utils'
+import { cleanHtml, cleanTitle } from '../../utils/text.utils'
+import { generateNewsId } from '../../utils/id.utils'
+import { isSpam } from '../../utils/spam-filter.utils'
 
 const parser = new Parser({
   timeout: 10000,
-  customFields: { item: ['media:content', 'enclosure'] },
+  customFields: { 
+    item: [
+      'media:content', 
+      'enclosure', 
+      'content:encoded',
+      'itunes:image',
+      'media:thumbnail'
+    ] 
+  },
 })
 
 const RSS_FEEDS: Record<NewsSource, string> = {
@@ -31,38 +43,145 @@ const SOURCE_AUTHORS: Record<NewsSource, string> = {
   arxiv: 'ArXiv AI',
 }
 
-const generateId = (url: string, title: string): string =>
-  createHash('md5').update(`${url}:${title}`).digest('hex').slice(0, 16)
+// Extract image URL from RSS item - tries multiple sources
 
-const cleanHtml = (html: string): string =>
-  (html || '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 300)
+const extractImageUrl = (item: any): string | undefined => {
+  const itemLink = item.link || ''
+  // Try media:content first (common in many feeds)
+  if (item['media:content']?.[0]?.$?.url) {
+    const url = item['media:content'][0].$.url
+    if (url && !isGifUrl(url) && (/\.(jpg|jpeg|png|webp|svg)$/i.test(url) || url.includes('image'))) {
+      const normalized = normalizeImageUrl(url, itemLink)
+      return normalized && !isGifUrl(normalized) ? normalized : undefined
+    }
+  }
+  
+  // Try media:thumbnail
+  if (item['media:thumbnail']?.[0]?.$?.url) {
+    const url = item['media:thumbnail'][0].$.url
+    if (!isGifUrl(url)) {
+      const normalized = normalizeImageUrl(url, itemLink)
+      return normalized && !isGifUrl(normalized) ? normalized : undefined
+    }
+  }
+  
+  // Try itunes:image
+  if (item['itunes:image']?.$?.href) {
+    const url = item['itunes:image'].$.href
+    if (!isGifUrl(url)) {
+      const normalized = normalizeImageUrl(url, itemLink)
+      return normalized && !isGifUrl(normalized) ? normalized : undefined
+    }
+  }
+  
+  // Try enclosure (for podcasts/media)
+  if (item.enclosure?.url && /\.(jpg|jpeg|png|webp)$/i.test(item.enclosure.url) && !isGifUrl(item.enclosure.url)) {
+    const normalized = normalizeImageUrl(item.enclosure.url, itemLink)
+    return normalized && !isGifUrl(normalized) ? normalized : undefined
+  }
+  
+  // Extract from content HTML (most RSS feeds embed images here)
+  const content = item.content || item['content:encoded'] || item.contentSnippet || ''
+  if (content && typeof content === 'string') {
+    // Match img tags - get the first substantial image
+    const imgMatches = content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)
+    for (const match of imgMatches) {
+      if (match[1]) {
+        let imgUrl = match[1].trim()
+        // Decode HTML entities
+        imgUrl = imgUrl.replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+        
+        // Skip common non-article images
+        const skipPatterns = ['avatar', 'icon', 'logo', 'badge', 'button', 'spinner', 'loading']
+        const shouldSkip = skipPatterns.some(pattern => 
+          imgUrl.toLowerCase().includes(pattern)
+        )
+        
+        // Prefer larger images (check for size hints in URL or attributes)
+        // Skip GIFs
+        if (!shouldSkip && imgUrl.length > 10 && !isGifUrl(imgUrl)) {
+          // Try to get width/height from the img tag to prefer larger images
+          const imgTag = match[0]
+          const widthMatch = imgTag.match(/width=["']?(\d+)["']?/i)
+          const heightMatch = imgTag.match(/height=["']?(\d+)["']?/i)
+          
+          // If it has size attributes and they're reasonable, use it
+          if (widthMatch && heightMatch) {
+            const width = parseInt(widthMatch[1])
+            const height = parseInt(heightMatch[1])
+            // Prefer images that are at least 200px in one dimension
+            if (width >= 200 || height >= 200) {
+              const normalized = normalizeImageUrl(imgUrl, itemLink)
+              return normalized && !isGifUrl(normalized) ? normalized : undefined
+            }
+          } else {
+            // No size info, but it's a valid image URL - normalize and return
+            const normalized = normalizeImageUrl(imgUrl, itemLink)
+            return normalized && !isGifUrl(normalized) ? normalized : undefined
+          }
+        }
+      }
+    }
+    
+    // Match background-image in style attributes
+    const bgMatch = content.match(/background-image:\s*url\(["']?([^"')]+)["']?\)/i)
+    if (bgMatch && bgMatch[1]) {
+      let bgUrl = bgMatch[1].trim()
+      bgUrl = bgUrl.replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+      if (!isGifUrl(bgUrl)) {
+        const normalized = normalizeImageUrl(bgUrl, itemLink)
+        return normalized && !isGifUrl(normalized) ? normalized : undefined
+      }
+    }
+  }
+  
+  return undefined
+}
 
-const extractImageUrl = (item: any): string | undefined =>
-  item['media:content']?.[0]?.$.url || item.enclosure?.url || undefined
+// Image fetching is now handled by the link-preview module
 
 async function fetchFeed(source: NewsSource, url: string): Promise<NewsItem[]> {
   const feed = await parser.parseURL(url)
 
-  return (feed.items || [])
+  const items = (feed.items || [])
     .filter(item => item.link && item.title)
-    .map(item => ({
-      id: generateId(item.link!, item.title!),
-      type: 'news' as const,
-      title: item.title!,
-      content: cleanHtml(item.contentSnippet || item.content || ''),
-      author: SOURCE_AUTHORS[source],
-      source,
-      url: item.link!,
-      publishedAt: item.pubDate
-        ? new Date(item.pubDate).toISOString()
-        : new Date().toISOString(),
-      imageUrl: extractImageUrl(item),
-    }))
+    .map(item => {
+      const rawTitle = item.title!
+      const cleanedTitle = cleanTitle(rawTitle)
+      
+      // Extract image URL and validate it's not a GIF
+      let imageUrl = undefined
+      if (source !== 'reddit' && source !== 'reddit-artificial') {
+        const extracted = extractImageUrl(item)
+        // Final validation: ensure it's not a GIF
+        if (extracted && !isGifUrl(extracted)) {
+          imageUrl = extracted
+        }
+      }
+      
+      return {
+        id: generateNewsId(item.link!, rawTitle), // Use original title for ID generation
+        type: 'news' as const,
+        title: cleanedTitle,
+        content: cleanHtml(item.contentSnippet || item.content || ''),
+        author: SOURCE_AUTHORS[source],
+        source,
+        url: item.link!,
+        publishedAt: item.pubDate
+          ? new Date(item.pubDate).toISOString()
+          : new Date().toISOString(),
+        imageUrl,
+      }
+    })
+
+  return items
+    .filter(item => {
+      const isSpamContent = isSpam(item.title, item.content, item.url)
+      if (isSpamContent) {
+        console.log(`Filtered spam: ${item.title} (${item.url})`)
+      }
+      return !isSpamContent
+    })
 }
 
 export async function fetchAllNews(): Promise<NewsItem[]> {
@@ -93,6 +212,7 @@ export async function fetchAllNews(): Promise<NewsItem[]> {
     return true
   })
 
+  // Spam filtering already done in fetchFeed, so no need to filter again here
   // Sort newest first
   return unique.sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
