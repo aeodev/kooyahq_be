@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
 import { uploadPost } from '../../middleware/upload-post'
-import { createPost, updatePost, getPosts, getMyPosts, deletePost } from './post.controller'
+import { createPost, updatePost, getPosts, getMyPosts, deletePost, votePoll } from './post.controller'
 import { createPostComment, getPostComments, updatePostComment, deletePostComment } from './post-comment.controller'
 import { togglePostReaction, getPostReactions, deletePostReaction } from './post-reaction.controller'
 
@@ -12,7 +12,7 @@ postRouter.get('/', getPosts)
 postRouter.get('/me', getMyPosts)
 postRouter.post('/', uploadPost.single('image'), createPost)
 postRouter.put('/:id', uploadPost.single('image'), updatePost)
-postRouter.delete('/:id', deletePost)
+postRouter.post('/:id/poll/vote', votePoll)
 
 // Post comments routes
 postRouter.get('/:postId/comments', getPostComments)

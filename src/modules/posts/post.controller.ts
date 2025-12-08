@@ -13,13 +13,13 @@ export async function createPost(req: Request, res: Response, next: NextFunction
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  if (!content || !content.trim()) {
-    return next(createHttpError(400, 'Content is required'))
+  if ((!content || !content.trim()) && !file && !req.body.poll) {
+    return next(createHttpError(400, 'Content, image, or poll is required'))
   }
 
   try {
     let imageUrl: string | undefined
-    
+
     if (file) {
       imageUrl = (file as any).cloudinaryUrl
     }
@@ -35,6 +35,20 @@ export async function createPost(req: Request, res: Response, next: NextFunction
       }
     }
 
+    // Parse poll data if present
+    let pollData
+    if (req.body.poll) {
+      try {
+        pollData = typeof req.body.poll === 'string' ? JSON.parse(req.body.poll) : req.body.poll
+        // Ensure structure
+        if (pollData && (!pollData.question || !Array.isArray(pollData.options) || pollData.options.length < 2)) {
+          pollData = undefined // Invalid poll data
+        }
+      } catch (e) {
+        console.warn('Failed to parse poll data', e)
+      }
+    }
+
     const post = await postService.create({
       content: content.trim(),
       authorId: userId,
@@ -42,8 +56,9 @@ export async function createPost(req: Request, res: Response, next: NextFunction
       category: category?.trim(),
       tags: tagsArray,
       draft: draft === true || draft === 'true',
+      poll: pollData,
     })
-    
+
     // Create notifications for mentions (only if not draft)
     if (!draft && post.id) {
       try {
@@ -56,7 +71,7 @@ export async function createPost(req: Request, res: Response, next: NextFunction
         console.error('Failed to create mention notifications:', notifError)
       }
     }
-    
+
     res.status(201).json({
       status: 'success',
       data: post,
@@ -78,9 +93,10 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
 
   try {
     const updates: any = {}
-    
+
     if (content !== undefined) {
-      updates.content = content.trim()
+      // Allow empty string updates
+      updates.content = content
     }
     if (category !== undefined) {
       updates.category = category?.trim() || undefined
@@ -100,7 +116,7 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
     if (draft !== undefined) {
       updates.draft = draft === true || draft === 'true'
     }
-    
+
     if (file) {
       updates.imageUrl = (file as any).cloudinaryUrl
     }
@@ -171,3 +187,27 @@ export async function deletePost(req: Request, res: Response, next: NextFunction
   }
 }
 
+
+export async function votePoll(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+  const { id } = req.params
+  const { optionIndex } = req.body
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (typeof optionIndex !== 'number') {
+    return next(createHttpError(400, 'Option index required'))
+  }
+
+  try {
+    const post = await postService.vote(id, userId, optionIndex)
+    res.json({
+      status: 'success',
+      data: post,
+    })
+  } catch (error) {
+    next(error)
+  }
+}

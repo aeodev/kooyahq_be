@@ -10,6 +10,14 @@ export interface PostDocument extends Document {
   editedAt?: Date
   createdAt: Date
   updatedAt: Date
+  poll?: {
+    question: string
+    options: {
+      text: string
+      votes: string[]
+    }[]
+    endDate?: Date
+  }
 }
 
 const postSchema = new Schema<PostDocument>(
@@ -40,6 +48,14 @@ const postSchema = new Schema<PostDocument>(
     editedAt: {
       type: Date,
     },
+    poll: {
+      question: { type: String },
+      options: [{
+        text: { type: String, required: true },
+        votes: [{ type: String }] // Array of userIds
+      }],
+      endDate: { type: Date }
+    }
   },
   {
     timestamps: true,
@@ -59,6 +75,14 @@ export type Post = {
   editedAt?: string
   createdAt: string
   updatedAt: string
+  poll?: {
+    question: string
+    options: {
+      text: string
+      votes: string[]
+    }[]
+    endDate?: string
+  }
 }
 
 export function toPost(doc: PostDocument): Post {
@@ -73,6 +97,14 @@ export function toPost(doc: PostDocument): Post {
     editedAt: doc.editedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
+    poll: doc.poll ? {
+      question: doc.poll.question,
+      options: doc.poll.options.map(opt => ({
+        text: opt.text,
+        votes: opt.votes || []
+      })),
+      endDate: doc.poll.endDate?.toISOString()
+    } : undefined
   }
 }
 

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
 import { requireAdmin } from '../../middleware/require-admin'
 import { uploadProfile } from '../../middleware/upload-profile'
-import { getUserById, getAllUsers, getProfile, updateProfile, updateEmployee } from './user.controller'
+import { getUserById, getAllUsers, getProfile, updateProfile, updateEmployee, deleteEmployee } from './user.controller'
 
 export const userRouter = Router()
 
@@ -14,3 +14,4 @@ userRouter.get('/:id', authenticate, getUserById)
 
 // Admin routes - require admin access
 userRouter.put('/:id', authenticate, requireAdmin, updateEmployee)
+userRouter.delete('/:id', authenticate, requireAdmin, deleteEmployee)

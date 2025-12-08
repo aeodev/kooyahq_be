@@ -53,3 +53,5 @@ export const meetRouter = Router()
  */
 meetRouter.post('/token', authenticate, generateToken)
 
+
+

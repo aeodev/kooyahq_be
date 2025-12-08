@@ -15,7 +15,7 @@ export const postService = {
   async create(input: CreatePostInput): Promise<PostWithAuthor> {
     const post = await postRepository.create(input)
     const author = await userService.getPublicProfile(input.authorId)
-    
+
     if (!author) {
       throw new Error('Author not found')
     }
@@ -39,12 +39,12 @@ export const postService = {
     if (post.authorId !== authorId) {
       throw new Error('Forbidden')
     }
-    
+
     const updated = await postRepository.update(id, updates)
     if (!updated) {
       throw new Error('Failed to update post')
     }
-    
+
     const author = await userService.getPublicProfile(authorId)
     if (!author) {
       throw new Error('Author not found')
@@ -66,7 +66,7 @@ export const postService = {
     if (!post) {
       return undefined
     }
-    
+
     const author = await userService.getPublicProfile(post.authorId)
     if (!author) {
       return undefined
@@ -133,6 +133,28 @@ export const postService = {
 
   async delete(id: string, authorId: string): Promise<boolean> {
     return postRepository.delete(id, authorId)
+  },
+  
+  async vote(postId: string, userId: string, optionIndex: number): Promise<PostWithAuthor> {
+    const updated = await postRepository.vote(postId, userId, optionIndex)
+    if (!updated) {
+      throw new Error('Post not found or poll invalid')
+    }
+
+    const author = await userService.getPublicProfile(updated.authorId)
+    if (!author) {
+      throw new Error('Author not found')
+    }
+
+    return {
+      ...updated,
+      author: {
+        id: author.id,
+        name: author.name,
+        email: author.email,
+        profilePic: author.profilePic,
+      },
+    }
   },
 }
 

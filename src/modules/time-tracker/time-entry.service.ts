@@ -1,6 +1,7 @@
 import { TimeEntryRepository, type CreateTimeEntryInput } from './time-entry.repository'
 import { TimeEntryAuditRepository } from './time-entry-audit.repository'
 import { DayEndRepository } from './day-end.repository'
+import type { AuditAction } from './time-entry-audit.model'
 import { userRepository } from '../users/user.repository'
 import { HttpError } from '../../utils/http-error'
 import { SocketEmitter, TimeEntrySocketEvents } from '../../utils/socket-emitter'
@@ -59,16 +60,18 @@ export type AnalyticsResult = {
 }
 
 export class TimeEntryService {
-  private timeEntryRepo = new TimeEntryRepository()
-  private auditRepo = new TimeEntryAuditRepository()
-  private dayEndRepo = new DayEndRepository()
+  constructor(
+    private timeEntryRepo = new TimeEntryRepository(),
+    private auditRepo = new TimeEntryAuditRepository(),
+    private dayEndRepo = new DayEndRepository(),
+  ) {}
 
-  private async logAudit(userId: string, action: string, entryId?: string, metadata?: Record<string, unknown>) {
+  private async logAudit(userId: string, action: AuditAction, entryId?: string, metadata?: Record<string, unknown>) {
     try {
       await this.auditRepo.create({
         userId,
         entryId,
-        action: action as any,
+        action,
         metadata,
       })
     } catch (error) {
@@ -97,6 +100,24 @@ export class TimeEntryService {
     
     // Emit socket event for real-time updates
     SocketEmitter.emitTimeEntryUpdate(TimeEntrySocketEvents.TIMER_STARTED, publicEntry, userId)
+
+    return publicEntry
+  }
+
+  async addTaskToActiveTimer(userId: string, taskText: string): Promise<PublicTimeEntry> {
+    const entry = await this.timeEntryRepo.addTaskToEntry(userId, taskText.trim())
+    if (!entry) {
+      throw new HttpError(404, 'No active timer found')
+    }
+
+    await this.logAudit(userId, 'add_task', entry.id, {
+      task: taskText,
+    })
+
+    const publicEntry = await this.toPublicTimeEntry(entry, userId)
+    
+    // Emit socket event for real-time updates
+    SocketEmitter.emitTimeEntryUpdate(TimeEntrySocketEvents.UPDATED, publicEntry, userId)
 
     return publicEntry
   }
@@ -148,7 +169,7 @@ export class TimeEntryService {
     await this.logAudit(userId, 'stop_timer', entry.id, {
       duration: entry.duration,
       projects: entry.projects,
-      task: entry.task,
+      tasks: entry.tasks,
     })
 
     const publicEntry = await this.toPublicTimeEntry(entry, userId)
@@ -213,7 +234,7 @@ export class TimeEntryService {
 
     const oldValue = {
       projects: entry.projects,
-      task: entry.task,
+      tasks: entry.tasks,
       duration: entry.duration,
     }
 
@@ -223,7 +244,7 @@ export class TimeEntryService {
       oldValue,
       newValue: {
         projects: updated.projects,
-        task: updated.task,
+        tasks: updated.tasks,
         duration: updated.duration,
         ...updates,
       },
@@ -249,7 +270,7 @@ export class TimeEntryService {
 
     await this.logAudit(userId, 'delete_entry', entryId, {
       projects: entry.projects,
-      task: entry.task,
+      tasks: entry.tasks,
       duration: entry.duration,
     })
 

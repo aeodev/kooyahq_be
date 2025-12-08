@@ -5,6 +5,7 @@ export type AuditAction =
   | 'pause_timer'
   | 'resume_timer'
   | 'stop_timer'
+  | 'add_task'
   | 'create_entry'
   | 'update_entry'
   | 'delete_entry'
@@ -37,7 +38,7 @@ const auditSchema = new Schema<TimeEntryAuditDocument>(
     },
     action: {
       type: String,
-      enum: ['start_timer', 'pause_timer', 'resume_timer', 'stop_timer', 'create_entry', 'update_entry', 'delete_entry', 'log_manual'],
+      enum: ['start_timer', 'pause_timer', 'resume_timer', 'stop_timer', 'add_task', 'create_entry', 'update_entry', 'delete_entry', 'log_manual'],
       required: true,
       index: true,
     },

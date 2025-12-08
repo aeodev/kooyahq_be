@@ -17,12 +17,14 @@ import { notificationRouter } from './modules/notifications/notification.router'
 import { gameRouter } from './modules/games/game.router'
 import { announcementRouter } from './modules/announcements/announcement.router'
 import { projectRouter } from './modules/projects/project.router'
+import { adminRouter } from './modules/admin/admin.router'
 import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
 import { presenceRouter } from './modules/presence/presence.router'
 import { meetRouter } from './modules/meet/meet.router'
 import { mediaRouter } from './modules/media/media.router'
+import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 
 export function createApp() {
   const app = express()
@@ -73,6 +75,7 @@ export function createApp() {
   app.use('/api/time-entries', timeEntryRouter)
   app.use('/api/gallery', galleryRouter)
   app.use('/api/ai-news', aiNewsRouter)
+  app.use('/api/link-preview', linkPreviewRouter)
   app.use('/api/posts', postRouter)
   app.use('/api/notifications', notificationRouter)
   app.use('/api/presence', presenceRouter)
@@ -84,6 +87,8 @@ export function createApp() {
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)
   // CRITICAL: Register board router BEFORE ticket router
+  app.use('/api/admin', adminRouter)
+  // CRITICAL: Register board router BEFORE card router
   // This ensures /api/boards routes match before the more general /api routes
   app.use('/api', boardRouter)
   // Ticket router routes (/api/boards/:boardId/tickets and /api/tickets/:id) come after

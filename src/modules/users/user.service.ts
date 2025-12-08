@@ -18,7 +18,20 @@ export const userService = {
     return userRepository.findAll()
   },
 
-  async updateProfile(id: string, updates: { profilePic?: string; banner?: string }) {
+  async searchUsers(params: {
+    page?: number
+    limit?: number
+    search?: string
+    role?: 'admin' | 'user'
+  }) {
+    return userRepository.searchUsers(params)
+  },
+
+  async deleteUser(id: string, softDelete = true) {
+    return userRepository.deleteUser(id, softDelete)
+  },
+
+  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string; status?: string }) {
     return userRepository.updateProfile(id, updates)
   },
 

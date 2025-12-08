@@ -1,4 +1,4 @@
-import { TimeEntryModel, toTimeEntry, type TimeEntry, type TimeEntryDocument } from './time-entry.model'
+import { TimeEntryModel, toTimeEntry, type TimeEntry, type TimeEntryDocument, type TaskItem } from './time-entry.model'
 
 export type CreateTimeEntryInput = {
   userId: string
@@ -11,14 +11,73 @@ export class TimeEntryRepository {
   async create(input: CreateTimeEntryInput): Promise<TimeEntry> {
     const startTime = new Date()
     const doc = new TimeEntryModel({
-      ...input,
+      userId: input.userId,
+      projects: input.projects,
       duration: 0,
       startTime,
       isActive: true,
       isOvertime: input.isOvertime ?? false,
+      tasks: input.task ? [{ text: input.task, addedAt: startTime, duration: 0 }] : [],
     })
     await doc.save()
     return toTimeEntry(doc)
+  }
+
+  async addTaskToEntry(userId: string, taskText: string): Promise<TimeEntry | null> {
+    const doc = await TimeEntryModel.findOne({ userId, isActive: true })
+    if (!doc) {
+      return null
+    }
+
+    const now = new Date()
+
+    // Calculate duration for previous task if exists
+    if (doc.tasks && doc.tasks.length > 0) {
+      const lastTask = doc.tasks[doc.tasks.length - 1]
+      // For intermediate task completion, calculate duration from task start to now
+      let taskDurationMs = now.getTime() - new Date(lastTask.addedAt).getTime()
+      // Proportionally subtract paused time
+      if (doc.pausedDuration && doc.pausedDuration > 0 && doc.startTime) {
+        const entryDurationMs = now.getTime() - new Date(doc.startTime).getTime()
+        const taskRatio = taskDurationMs / entryDurationMs
+        taskDurationMs -= doc.pausedDuration * taskRatio
+      }
+      lastTask.duration = Math.max(0, Math.floor(taskDurationMs / 60000))
+    }
+
+    // Add new task
+    if (!doc.tasks) {
+      doc.tasks = []
+    }
+    doc.tasks.push({ text: taskText, addedAt: now, duration: 0 })
+
+    await doc.save()
+    return toTimeEntry(doc)
+  }
+
+  private calculateTaskDuration(startTime: Date, endTime: Date, doc: TimeEntryDocument, totalDuration: number): number {
+    // If this is the only task and it started at entry start, its duration equals total duration
+    if (doc.tasks && doc.tasks.length === 1 && doc.startTime) {
+      const taskStart = new Date(startTime).getTime()
+      const entryStart = new Date(doc.startTime).getTime()
+      // If task started within 1 second of entry start, use total duration
+      if (Math.abs(taskStart - entryStart) < 1000) {
+        return totalDuration
+      }
+    }
+
+    let durationMs = endTime.getTime() - startTime.getTime()
+
+    // Account for paused time during this task's period
+    // Subtract total paused duration proportionally based on task's time span
+    if (doc.pausedDuration && doc.pausedDuration > 0) {
+      const entryDurationMs = endTime.getTime() - new Date(doc.startTime).getTime()
+      const taskRatio = durationMs / entryDurationMs
+      // Subtract proportional paused time
+      durationMs -= doc.pausedDuration * taskRatio
+    }
+
+    return Math.max(0, Math.floor(durationMs / 60000))
   }
 
   async findById(id: string): Promise<TimeEntry | undefined> {
@@ -82,9 +141,6 @@ export class TimeEntryRepository {
     }
     if (updates.projects) {
       doc.projects = updates.projects
-    }
-    if (updates.task) {
-      doc.task = updates.task
     }
     if (updates.isOvertime !== undefined) {
       doc.isOvertime = updates.isOvertime
@@ -154,6 +210,12 @@ export class TimeEntryRepository {
     workDurationMs -= (doc.pausedDuration || 0)
     const durationMinutes = Math.floor(workDurationMs / 60000)
 
+    // Calculate duration for the last task
+    if (doc.tasks && doc.tasks.length > 0) {
+      const lastTask = doc.tasks[doc.tasks.length - 1]
+      lastTask.duration = this.calculateTaskDuration(lastTask.addedAt, endTime, doc, durationMinutes)
+    }
+
     doc.isActive = false
     doc.isPaused = false
     doc.endTime = endTime
@@ -166,32 +228,58 @@ export class TimeEntryRepository {
 
   async stopAllActiveTimers(userId: string): Promise<TimeEntry[]> {
     const docs = await TimeEntryModel.find({ userId, isActive: true })
+    if (docs.length === 0) {
+      return []
+    }
+
+    const endTime = new Date()
+    const bulkOps: Array<{
+      updateOne: {
+        filter: { _id: unknown }
+        update: { $set: Record<string, unknown>; $unset?: Record<string, 1> }
+      }
+    }> = []
     const stopped: TimeEntry[] = []
 
     for (const doc of docs) {
-      const endTime = new Date()
       const startTime = doc.startTime
-      
-      let workDurationMs = endTime.getTime() - startTime.getTime()
+      let pausedDuration = doc.pausedDuration || 0
       
       if (doc.isPaused && doc.lastPausedAt) {
         const currentPauseMs = endTime.getTime() - doc.lastPausedAt.getTime()
-        doc.pausedDuration = (doc.pausedDuration || 0) + currentPauseMs
+        pausedDuration += currentPauseMs
       }
       
-      workDurationMs -= (doc.pausedDuration || 0)
+      const workDurationMs = endTime.getTime() - startTime.getTime() - pausedDuration
       const durationMinutes = Math.floor(workDurationMs / 60000)
 
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: doc._id },
+          update: {
+            $set: {
+              isActive: false,
+              isPaused: false,
+              endTime,
+              duration: durationMinutes,
+              pausedDuration,
+            },
+            $unset: { lastPausedAt: 1 },
+          },
+        },
+      })
+
+      // Update doc in memory to return correct values
       doc.isActive = false
       doc.isPaused = false
       doc.endTime = endTime
       doc.duration = durationMinutes
+      doc.pausedDuration = pausedDuration
       doc.lastPausedAt = undefined
-
-      await doc.save()
       stopped.push(toTimeEntry(doc))
     }
 
+    await TimeEntryModel.bulkWrite(bulkOps)
     return stopped
   }
 

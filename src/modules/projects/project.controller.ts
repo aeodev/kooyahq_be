@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { createHttpError } from '../../utils/http-error'
 import { projectService } from './project.service'
+import { adminActivityService } from '../admin-activity/admin-activity.service'
 
 export async function createProject(req: Request, res: Response, next: NextFunction) {
   const { name } = req.body
@@ -13,6 +14,22 @@ export async function createProject(req: Request, res: Response, next: NextFunct
     const project = await projectService.create({
       name: name.trim(),
     })
+
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'create_project',
+          targetType: 'project',
+          targetId: project.id,
+          changes: { name: project.name },
+        })
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
 
     res.status(201).json({
       status: 'success',
@@ -78,6 +95,22 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
       return next(createHttpError(404, 'Project not found'))
     }
 
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'update_project',
+          targetType: 'project',
+          targetId: id,
+          changes: updates,
+        })
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
+
     res.json({
       status: 'success',
       data: project,
@@ -98,6 +131,21 @@ export async function deleteProject(req: Request, res: Response, next: NextFunct
 
     if (!deleted) {
       return next(createHttpError(404, 'Project not found'))
+    }
+
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'delete_project',
+          targetType: 'project',
+          targetId: id,
+        })
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log admin activity:', logError)
+      }
     }
 
     res.json({
