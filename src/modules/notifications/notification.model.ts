@@ -1,6 +1,6 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
-export type NotificationType = 'post_created' | 'comment' | 'reaction' | 'mention' | 'system' | 'card_assigned' | 'card_comment' | 'board_member_added' | 'game_invitation'
+export type NotificationType = 'post_created' | 'comment' | 'reaction' | 'mention' | 'system' | 'card_assigned' | 'card_comment' | 'card_moved' | 'board_member_added' | 'game_invitation'
 
 export interface NotificationDocument extends Document {
   userId: string
@@ -26,7 +26,7 @@ const notificationSchema = new Schema<NotificationDocument>(
     },
     type: {
       type: String,
-      enum: ['post_created', 'comment', 'reaction', 'mention', 'system', 'card_assigned', 'card_comment', 'board_member_added', 'game_invitation'],
+      enum: ['post_created', 'comment', 'reaction', 'mention', 'system', 'card_assigned', 'card_comment', 'card_moved', 'board_member_added', 'game_invitation'],
       required: true,
     },
     postId: {

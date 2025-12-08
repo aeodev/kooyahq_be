@@ -1,4 +1,4 @@
-import { boardService } from '../boards/board.service'
+import { boardService } from '../workspace/boards/board.service'
 import { cardRepository, type CreateCardInput } from './card.repository'
 import { cardActivityRepository } from './card-activity.repository'
 

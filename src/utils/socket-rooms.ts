@@ -26,6 +26,10 @@ export function meetRoom(meetId: string): string {
   return `meet:${meetId}`
 }
 
+export function workspaceRoom(workspaceId: string): string {
+  return `workspace:${workspaceId}`
+}
+
 
 
 

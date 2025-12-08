@@ -10,6 +10,7 @@ import { registerTimeEntryHandlers } from '../modules/time-tracker/time-entry.so
 import { registerGameHandlers } from '../modules/games/game.socket'
 import { registerPresenceHandlers } from '../modules/presence/presence.socket'
 import { registerMeetHandlers } from '../modules/meet/meet.socket'
+import { registerBoardHandlers } from '../modules/workspace/boards/board.socket'
 import { activeUsersManager } from './active-users'
 import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
 import { presenceManager } from '../modules/presence/presence.manager'
@@ -83,6 +84,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
   socketHandlerRegistry.registerHandler(registerGameHandlers)
   socketHandlerRegistry.registerHandler(registerPresenceHandlers)
   socketHandlerRegistry.registerHandler(registerMeetHandlers)
+  socketHandlerRegistry.registerHandler(registerBoardHandlers)
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.userId

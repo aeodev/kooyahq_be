@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { boardService } from '../boards/board.service'
+import { boardService } from '../workspace/boards/board.service'
 import { cardService } from './card.service'
 import { cardActivityRepository } from './card-activity.repository'
 import { notificationService } from '../notifications/notification.service'
@@ -14,9 +14,15 @@ export async function createCard(req: Request, res: Response, next: NextFunction
     issueType,
     assigneeId,
     priority,
-    labels,
+    tags, // Changed from labels to tags
     dueDate,
-    storyPoints,
+    startDate,
+    endDate,
+    points, // Changed from storyPoints to points
+    acceptanceCriteria,
+    documents,
+    parentTicketId,
+    rootEpicId,
     epicId,
     rank,
     flagged,
@@ -52,9 +58,15 @@ export async function createCard(req: Request, res: Response, next: NextFunction
       issueType,
       assigneeId,
       priority,
-      labels: Array.isArray(labels) ? labels : undefined,
+      tags: Array.isArray(tags) ? tags : undefined,
+      points: typeof points === 'number' ? points : undefined,
+      acceptanceCriteria: Array.isArray(acceptanceCriteria) ? acceptanceCriteria : undefined,
+      documents: Array.isArray(documents) ? documents : undefined,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      storyPoints: typeof storyPoints === 'number' ? storyPoints : undefined,
+      parentTicketId: typeof parentTicketId === 'string' ? parentTicketId : undefined,
+      rootEpicId: typeof rootEpicId === 'string' ? rootEpicId : undefined,
       epicId: typeof epicId === 'string' ? epicId : undefined,
       rank: typeof rank === 'number' ? rank : undefined,
       flagged: typeof flagged === 'boolean' ? flagged : undefined,

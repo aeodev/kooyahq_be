@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { commentService } from './comment.service'
 import { cardService } from './card.service'
-import { boardService } from '../boards/board.service'
+import { boardService } from '../workspace/boards/board.service'
 import { notificationService } from '../notifications/notification.service'
 import { createHttpError } from '../../utils/http-error'
 

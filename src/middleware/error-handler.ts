@@ -9,8 +9,13 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
 
   const { statusCode = 500, message } = error as HttpError
 
+  // Match the response format used in board controllers (success/error pattern)
   res.status(statusCode).json({
-    status: 'error',
-    message,
+    success: false,
+    error: {
+      code: statusCode === 409 ? 'CONFLICT' : statusCode === 404 ? 'NOT_FOUND' : statusCode === 403 ? 'FORBIDDEN' : statusCode === 401 ? 'UNAUTHORIZED' : 'INTERNAL_ERROR',
+      message,
+    },
+    timestamp: new Date().toISOString(),
   })
 }

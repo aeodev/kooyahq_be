@@ -8,7 +8,7 @@ cloudinary.config({
   api_secret: env.cloudinary.apiSecret,
 })
 
-export type UploadFolder = 'posts' | 'profiles' | 'gallery' | 'cards'
+export type UploadFolder = 'posts' | 'profiles' | 'gallery' | 'cards' | 'rich-text-media'
 
 export interface UploadResult {
   url: string
@@ -19,21 +19,22 @@ export interface UploadResult {
 export async function uploadToCloudinary(
   buffer: Buffer,
   folder: UploadFolder,
-  publicId?: string
+  publicId?: string,
+  resourceType: 'image' | 'video' | 'auto' = 'image'
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: publicId,
-        resource_type: 'image',
+        resource_type: resourceType,
       },
       (error, result) => {
         if (error) {
           reject(error)
         } else if (result) {
           resolve({
-            url: result.url,
+            url: result.url || (result as any).secure_url,
             publicId: result.public_id,
             secureUrl: result.secure_url,
           })

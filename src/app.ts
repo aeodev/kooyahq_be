@@ -4,8 +4,10 @@ import helmet from 'helmet'
 import { env } from './config/env'
 import { errorHandler } from './middleware/error-handler'
 import { authRouter } from './modules/auth/auth.router'
-import { boardRouter } from './modules/boards/board.router'
-import { cardRouter } from './modules/cards/card.router'
+import { workspaceRouter } from './modules/workspace/workspace/workspace.router'
+import { boardRouter } from './modules/workspace/boards/board.router'
+import { ticketRouter } from './modules/workspace/tickets/ticket.router'
+import { activityRouter } from './modules/workspace/activities/activity.router'
 import { userRouter } from './modules/users/user.router'
 import { timeEntryRouter } from './modules/time-tracker/time-entry.router'
 import { galleryRouter } from './modules/gallery/gallery.router'
@@ -20,6 +22,7 @@ import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
 import { presenceRouter } from './modules/presence/presence.router'
 import { meetRouter } from './modules/meet/meet.router'
+import { mediaRouter } from './modules/media/media.router'
 
 export function createApp() {
   const app = express()
@@ -77,14 +80,26 @@ export function createApp() {
   app.use('/api/games', gameRouter)
   app.use('/api/announcements', announcementRouter)
   app.use('/api/projects', projectRouter)
-  // CRITICAL: Register board router BEFORE card router
+  app.use('/api/media', mediaRouter)
+  // Workspace module routes
+  app.use('/api/workspaces', workspaceRouter)
+  // CRITICAL: Register board router BEFORE ticket router
   // This ensures /api/boards routes match before the more general /api routes
-  app.use('/api/boards', boardRouter)
-  // Card router routes (/api/boards/:boardId/cards and /api/cards/:id) come after
-  app.use('/api', cardRouter)
+  app.use('/api', boardRouter)
+  // Ticket router routes (/api/boards/:boardId/tickets and /api/tickets/:id) come after
+  app.use('/api', ticketRouter)
+  // Activity router (read-only GET endpoints)
+  app.use('/api', activityRouter)
 
   app.use((_req, res) => {
-    res.status(404).json({ status: 'error', message: 'Route not found' })
+    res.status(404).json({
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Route not found',
+      },
+      timestamp: new Date().toISOString(),
+    })
   })
 
   app.use(errorHandler)

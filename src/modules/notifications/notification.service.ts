@@ -93,10 +93,10 @@ export const notificationService = {
   async findByUserId(userId: string, unreadOnly?: boolean): Promise<NotificationWithData[]> {
     const notifications = await notificationRepository.findByUserId(userId, unreadOnly)
     
-    // Get actor info for mentions, card_comment, card_assigned, and board_member_added
+    // Get actor info for mentions, card_comment, card_assigned, card_moved, and board_member_added
     const actorIds = [...new Set(
       notifications
-        .filter((n) => n.mentionId && (n.type === 'mention' || n.type === 'card_comment' || n.type === 'card_assigned' || n.type === 'board_member_added' || n.type === 'game_invitation'))
+        .filter((n) => n.mentionId && (n.type === 'mention' || n.type === 'card_comment' || n.type === 'card_assigned' || n.type === 'card_moved' || n.type === 'board_member_added' || n.type === 'game_invitation'))
         .map((n) => n.mentionId!)
     )]
     
@@ -114,7 +114,7 @@ export const notificationService = {
     return notifications.map((notification) => {
       const notificationWithData: NotificationWithData = { ...notification }
       
-      if (notification.mentionId && (notification.type === 'mention' || notification.type === 'card_comment' || notification.type === 'card_assigned' || notification.type === 'board_member_added' || notification.type === 'game_invitation')) {
+      if (notification.mentionId && (notification.type === 'mention' || notification.type === 'card_comment' || notification.type === 'card_assigned' || notification.type === 'card_moved' || notification.type === 'board_member_added' || notification.type === 'game_invitation')) {
         const actor = actorMap.get(notification.mentionId)
         if (actor) {
           notificationWithData.actor = {
@@ -167,27 +167,51 @@ export const notificationService = {
     )
   },
 
-  async createCardAssignmentNotification(assigneeId: string, cardId: string, assignedById: string): Promise<void> {
+  async createCardAssignmentNotification(assigneeId: string, cardId: string, assignedById: string, cardReporterId?: string): Promise<void> {
     // Don't notify if user assigned themselves
     if (assigneeId === assignedById) {
       return
     }
 
-    const notification = await notificationRepository.create({
-      userId: assigneeId,
-      type: 'card_assigned',
-      cardId,
-      mentionId: assignedById, // Use mentionId to track who assigned
-    })
+    const notificationPromises: Promise<Notification>[] = []
 
-    const unreadCount = await notificationRepository.getUnreadCount(assigneeId)
-    SocketEmitter.emitToUser(assigneeId, 'notification:new', {
-      notification,
-      unreadCount,
-    })
+    // Notify new assignee
+    notificationPromises.push(
+      notificationRepository.create({
+        userId: assigneeId,
+        type: 'card_assigned',
+        cardId,
+        mentionId: assignedById, // Use mentionId to track who assigned
+      })
+    )
+
+    // Notify reporter if exists and not the assigner or new assignee
+    if (cardReporterId && cardReporterId !== assignedById && cardReporterId !== assigneeId) {
+      notificationPromises.push(
+        notificationRepository.create({
+          userId: cardReporterId,
+          type: 'card_assigned',
+          cardId,
+          mentionId: assignedById,
+        })
+      )
+    }
+
+    const notifications = await Promise.all(notificationPromises)
+
+    // Emit socket events for each notification
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
+    )
   },
 
-  async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardBoardOwnerId?: string): Promise<void> {
+  async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardReporterId?: string): Promise<void> {
     const notificationPromises: Promise<Notification>[] = []
 
     // Notify card assignee if exists and not the commenter
@@ -203,15 +227,56 @@ export const notificationService = {
       )
     }
 
-    // Notify board owner (card creator) if exists and not the commenter
-    if (cardBoardOwnerId && cardBoardOwnerId !== commenterId && cardBoardOwnerId !== cardAssigneeId) {
+    // Notify reporter if exists and not the commenter
+    if (cardReporterId && cardReporterId !== commenterId && cardReporterId !== cardAssigneeId) {
       notificationPromises.push(
         notificationRepository.create({
-          userId: cardBoardOwnerId,
+          userId: cardReporterId,
           type: 'card_comment',
           cardId,
           commentId,
           mentionId: commenterId,
+        })
+      )
+    }
+
+    const notifications = await Promise.all(notificationPromises)
+
+    // Emit socket events for each notification
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
+    )
+  },
+
+  async createCardMovedNotification(cardId: string, movedById: string, cardAssigneeId?: string, cardReporterId?: string): Promise<void> {
+    const notificationPromises: Promise<Notification>[] = []
+
+    // Notify card assignee if exists and not the mover
+    if (cardAssigneeId && cardAssigneeId !== movedById) {
+      notificationPromises.push(
+        notificationRepository.create({
+          userId: cardAssigneeId,
+          type: 'card_moved',
+          cardId,
+          mentionId: movedById, // Use mentionId to track who moved
+        })
+      )
+    }
+
+    // Notify reporter if exists and not the mover
+    if (cardReporterId && cardReporterId !== movedById && cardReporterId !== cardAssigneeId) {
+      notificationPromises.push(
+        notificationRepository.create({
+          userId: cardReporterId,
+          type: 'card_moved',
+          cardId,
+          mentionId: movedById,
         })
       )
     }
