@@ -10,6 +10,7 @@ export type CreateNotificationInput = {
   cardId?: string
   boardId?: string
   title?: string
+  url?: string
 }
 
 export const notificationRepository = {

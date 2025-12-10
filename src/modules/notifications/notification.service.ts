@@ -167,11 +167,13 @@ export const notificationService = {
     )
   },
 
-  async createCardAssignmentNotification(assigneeId: string, cardId: string, assignedById: string, cardReporterId?: string): Promise<void> {
+  async createCardAssignmentNotification(assigneeId: string, cardId: string, assignedById: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
     // Don't notify if user assigned themselves
     if (assigneeId === assignedById) {
       return
     }
+
+    const url = boardPrefix && ticketKey ? `/workspace/${boardPrefix}/${ticketKey}` : undefined
 
     const notificationPromises: Promise<Notification>[] = []
 
@@ -182,6 +184,7 @@ export const notificationService = {
         type: 'card_assigned',
         cardId,
         mentionId: assignedById, // Use mentionId to track who assigned
+        url,
       })
     )
 
@@ -193,6 +196,7 @@ export const notificationService = {
           type: 'card_assigned',
           cardId,
           mentionId: assignedById,
+          url,
         })
       )
     }
@@ -211,7 +215,9 @@ export const notificationService = {
     )
   },
 
-  async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardReporterId?: string): Promise<void> {
+  async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
+    const url = boardPrefix && ticketKey ? `/workspace/${boardPrefix}/${ticketKey}` : undefined
+
     const notificationPromises: Promise<Notification>[] = []
 
     // Notify card assignee if exists and not the commenter
@@ -223,6 +229,7 @@ export const notificationService = {
           cardId,
           commentId,
           mentionId: commenterId, // Use mentionId to track who commented
+          url,
         })
       )
     }
@@ -236,6 +243,7 @@ export const notificationService = {
           cardId,
           commentId,
           mentionId: commenterId,
+          url,
         })
       )
     }
@@ -254,7 +262,9 @@ export const notificationService = {
     )
   },
 
-  async createCardMovedNotification(cardId: string, movedById: string, cardAssigneeId?: string, cardReporterId?: string): Promise<void> {
+  async createCardMovedNotification(cardId: string, movedById: string, cardAssigneeId?: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
+    const url = boardPrefix && ticketKey ? `/workspace/${boardPrefix}/${ticketKey}` : undefined
+
     const notificationPromises: Promise<Notification>[] = []
 
     // Notify card assignee if exists and not the mover
@@ -265,6 +275,7 @@ export const notificationService = {
           type: 'card_moved',
           cardId,
           mentionId: movedById, // Use mentionId to track who moved
+          url,
         })
       )
     }
@@ -277,6 +288,7 @@ export const notificationService = {
           type: 'card_moved',
           cardId,
           mentionId: movedById,
+          url,
         })
       )
     }

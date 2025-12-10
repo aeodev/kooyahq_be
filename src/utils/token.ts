@@ -5,6 +5,7 @@ export type AccessTokenPayload = {
   sub: string
   email: string
   name: string
+  userType: 'employee' | 'client'
   iat: number
   exp: number
 }
@@ -13,6 +14,7 @@ type SignableUser = {
   id: string
   email: string
   name: string
+  userType: 'employee' | 'client'
 }
 
 export function createAccessToken(user: SignableUser) {
@@ -21,7 +23,7 @@ export function createAccessToken(user: SignableUser) {
   }
 
   return jwt.sign(
-    { sub: user.id, email: user.email, name: user.name },
+    { sub: user.id, email: user.email, name: user.name, userType: user.userType },
     env.jwtSecret as Secret,
     options,
   )
@@ -34,10 +36,11 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
     throw new Error('Invalid token payload')
   }
 
-  const { sub, email, name, iat, exp } = payload as JwtPayload & {
+  const { sub, email, name, userType, iat, exp } = payload as JwtPayload & {
     sub: string
     email: string
     name: string
+    userType?: 'employee' | 'client'
   }
 
   if (!sub || !email) {
@@ -48,6 +51,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
     sub,
     email,
     name: name ?? '',
+    userType: userType ?? 'employee',
     iat: iat ?? 0,
     exp: exp ?? 0,
   }

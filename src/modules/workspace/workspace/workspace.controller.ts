@@ -10,6 +10,11 @@ export async function createWorkspace(req: Request, res: Response, next: NextFun
     return next(createHttpError(401, 'Unauthorized'))
   }
 
+  // Clients cannot create workspaces
+  if (req.user?.userType === 'client') {
+    return next(createHttpError(403, 'Clients cannot create workspaces'))
+  }
+
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return next(createHttpError(400, 'Workspace name is required'))
   }
@@ -102,6 +107,11 @@ export async function updateWorkspace(req: Request, res: Response, next: NextFun
       return next(createHttpError(404, 'Workspace not found'))
     }
 
+    // Clients cannot update workspace settings
+    if (req.user?.userType === 'client') {
+      return next(createHttpError(403, 'Clients cannot update workspace settings'))
+    }
+
     // Check permissions - user must be owner or admin
     const userMember = workspace.members.find((m) => m.userId === userId)
     if (!userMember || userMember.role === 'member') {
@@ -141,6 +151,11 @@ export async function deleteWorkspace(req: Request, res: Response, next: NextFun
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  // Clients cannot delete workspaces
+  if (req.user?.userType === 'client') {
+    return next(createHttpError(403, 'Clients cannot delete workspaces'))
   }
 
   try {

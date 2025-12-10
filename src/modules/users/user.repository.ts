@@ -3,6 +3,8 @@ import { UserModel, toPublicUser, toUser, type PublicUser, type User } from './u
 export type CreateUserInput = {
   email: string
   name: string
+  userType?: 'employee' | 'client'
+  clientCompanyId?: string
 }
 
 export const userRepository = {
@@ -20,6 +22,8 @@ export const userRepository = {
     const doc = await UserModel.create({
       email: input.email.toLowerCase(),
       name: input.name,
+      userType: input.userType || 'employee',
+      clientCompanyId: input.clientCompanyId,
     })
 
     return toPublicUser(toUser(doc))

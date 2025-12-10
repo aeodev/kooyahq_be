@@ -4,12 +4,14 @@ export interface UserDocument extends Document {
   email: string
   name: string
   isAdmin: boolean
+  userType: 'employee' | 'client'
   position?: string
   birthday?: Date
   profilePic?: string
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  clientCompanyId?: string
   deletedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -32,6 +34,18 @@ const userSchema = new Schema<UserDocument>(
       type: Boolean,
       default: false,
       index: true,
+    },
+    userType: {
+      type: String,
+      enum: ['employee', 'client'],
+      default: 'employee',
+      required: true,
+      index: true,
+    },
+    clientCompanyId: {
+      type: String,
+      index: true,
+      sparse: true,
     },
     profilePic: {
       type: String,
@@ -82,12 +96,14 @@ export type User = {
   email: string
   name: string
   isAdmin: boolean
+  userType: 'employee' | 'client'
   position?: string
   birthday?: string
   profilePic?: string
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  clientCompanyId?: string
   deletedAt?: string
   createdAt: string
   updatedAt: string
@@ -101,12 +117,14 @@ export function toUser(doc: UserDocument): User {
     email: doc.email,
     name: doc.name,
     isAdmin: doc.isAdmin ?? false,
+    userType: (doc.userType as 'employee' | 'client') || 'employee',
     position: doc.position,
     birthday: doc.birthday?.toISOString(),
     profilePic: doc.profilePic,
     banner: doc.banner,
     bio: doc.bio,
     status: doc.status || 'online',
+    clientCompanyId: doc.clientCompanyId,
     deletedAt: doc.deletedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

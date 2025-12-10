@@ -9,6 +9,7 @@ import { notificationRepository } from '../../notifications/notification.reposit
 import { createHttpError } from '../../../utils/http-error'
 import { workspaceService } from '../workspace/workspace.service'
 import { SocketEmitter } from '../../../utils/socket-emitter'
+import { workspaceRoom } from '../../../utils/socket-rooms'
 import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
 
@@ -120,10 +121,33 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
     // Notify if ticket was assigned on creation
     if (assigneeId && assigneeId !== userId) {
       try {
-        await notificationService.createCardAssignmentNotification(assigneeId, ticket.id, userId)
+        await notificationService.createCardAssignmentNotification(
+          assigneeId,
+          ticket.id,
+          userId,
+          ticket.reporterId,
+          board.prefix,
+          ticket.ticketKey
+        )
       } catch (notifError) {
         console.error('Failed to create assignment notification:', notifError)
       }
+    }
+
+    // Emit socket event for real-time updates (exclude source user)
+    try {
+      SocketEmitter.emitToRoomExceptUser(
+        workspaceRoom(board.workspaceId),
+        'ticket:created',
+        {
+          ticket,
+          userId,
+          timestamp: new Date().toISOString(),
+        },
+        userId
+      )
+    } catch (socketError) {
+      console.error('Failed to emit ticket:created socket event:', socketError)
     }
 
     res.status(201).json({
@@ -555,6 +579,8 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
           userId,
           ticket.assigneeId,
           ticket.reporterId,
+          board.prefix,
+          ticket.ticketKey
         )
       } catch (notifError) {
         console.error('Failed to create ticket movement notification:', notifError)
@@ -570,14 +596,18 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
             id,
             userId,
             ticket.reporterId,
+            board.prefix,
+            ticket.ticketKey
           )
         } else if (!data.assigneeId && ticket.reporterId && ticket.reporterId !== userId) {
           // Notify reporter when ticket is unassigned
+          const url = `/workspace/${board.prefix}/${ticket.ticketKey}`
           const notification = await notificationRepository.create({
             userId: ticket.reporterId,
             type: 'card_assigned',
             cardId: id,
             mentionId: userId,
+            url,
           })
           const unreadCount = await notificationRepository.getUnreadCount(ticket.reporterId)
           SocketEmitter.emitToUser(ticket.reporterId, 'notification:new', {
@@ -588,6 +618,22 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       } catch (notifError) {
         console.error('Failed to create assignment notification:', notifError)
       }
+    }
+
+    // Emit socket event for real-time updates (exclude source user)
+    try {
+      SocketEmitter.emitToRoomExceptUser(
+        workspaceRoom(board.workspaceId),
+        'ticket:updated',
+        {
+          ticket: updated,
+          userId,
+          timestamp: new Date().toISOString(),
+        },
+        userId
+      )
+    } catch (socketError) {
+      console.error('Failed to emit ticket:updated socket event:', socketError)
     }
 
     res.json({
@@ -606,6 +652,11 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  // Clients cannot delete tickets
+  if (req.user?.userType === 'client') {
+    return next(createHttpError(403, 'Clients cannot delete tickets'))
   }
 
   try {
@@ -652,6 +703,23 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
       })
     } catch (activityError) {
       console.error('Failed to create activity:', activityError)
+    }
+
+    // Emit socket event for real-time updates (exclude source user)
+    try {
+      SocketEmitter.emitToRoomExceptUser(
+        workspaceRoom(board.workspaceId),
+        'ticket:deleted',
+        {
+          ticketId: ticket.id,
+          boardId: ticket.boardId,
+          userId,
+          timestamp: new Date().toISOString(),
+        },
+        userId
+      )
+    } catch (socketError) {
+      console.error('Failed to emit ticket:deleted socket event:', socketError)
     }
 
     res.json({

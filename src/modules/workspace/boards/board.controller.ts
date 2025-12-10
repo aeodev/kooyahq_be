@@ -15,6 +15,11 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
     return next(createHttpError(401, 'Unauthorized'))
   }
 
+  // Clients cannot create boards
+  if (req.user?.userType === 'client') {
+    return next(createHttpError(403, 'Clients cannot create boards'))
+  }
+
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return next(createHttpError(400, 'Board name is required'))
   }
@@ -289,6 +294,11 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  // Clients cannot delete boards
+  if (req.user?.userType === 'client') {
+    return next(createHttpError(403, 'Clients cannot delete boards'))
   }
 
   try {

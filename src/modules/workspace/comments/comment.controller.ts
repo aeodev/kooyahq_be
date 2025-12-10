@@ -73,6 +73,8 @@ export async function createComment(req: Request, res: Response, next: NextFunct
         comment.id,
         ticket.assigneeId,
         ticket.reporterId,
+        board.prefix,
+        ticket.ticketKey
       )
     } catch (notifError) {
       console.error('Failed to create ticket comment notification:', notifError)

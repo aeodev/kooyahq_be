@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from 'express'
 import { userService } from './user.service'
 import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
+import { authRepository } from '../auth/auth.repository'
+import { hashPassword } from '../../utils/password'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -237,6 +239,76 @@ export async function deleteEmployee(req: Request, res: Response, next: NextFunc
     res.json({
       status: 'success',
       message: 'User deleted successfully',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function createClient(req: Request, res: Response, next: NextFunction) {
+  const { name, email, password, clientCompanyId } = req.body
+
+  try {
+    // Validate required fields
+    if (!name || !name.trim()) {
+      return next(createHttpError(400, 'Name is required'))
+    }
+
+    if (!email || !email.trim()) {
+      return next(createHttpError(400, 'Email is required'))
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      return next(createHttpError(400, 'Invalid email format'))
+    }
+
+    if (!password || password.length < 8) {
+      return next(createHttpError(400, 'Password must be at least 8 characters long'))
+    }
+
+    // Check if email already exists
+    const existingAuth = await authRepository.findByEmail(email.trim().toLowerCase())
+    if (existingAuth) {
+      return next(createHttpError(409, 'Email already in use'))
+    }
+
+    // Create client user
+    const user = await userService.create({
+      email: email.trim(),
+      name: name.trim(),
+      userType: 'client',
+      clientCompanyId: clientCompanyId?.trim() || undefined,
+    })
+
+    // Create auth credentials
+    const passwordHash = await hashPassword(password)
+    await authRepository.create({
+      email: email.trim().toLowerCase(),
+      passwordHash,
+      userId: user.id,
+    })
+
+    // Log admin activity
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'create_client',
+          targetType: 'user',
+          targetId: user.id,
+          changes: { name: user.name, email: user.email, userType: 'client' },
+        })
+      } catch (logError) {
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
+
+    res.status(201).json({
+      status: 'success',
+      data: user,
+      message: 'Client created successfully',
     })
   } catch (error) {
     next(error)

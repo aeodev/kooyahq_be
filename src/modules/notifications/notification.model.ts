@@ -12,6 +12,7 @@ export interface NotificationDocument extends Document {
   cardId?: string
   boardId?: string
   title?: string
+  url?: string
   read: boolean
   createdAt: Date
   updatedAt: Date
@@ -53,6 +54,9 @@ const notificationSchema = new Schema<NotificationDocument>(
     title: {
       type: String,
     },
+    url: {
+      type: String,
+    },
     read: {
       type: Boolean,
       default: false,
@@ -77,6 +81,7 @@ export type Notification = {
   cardId?: string
   boardId?: string
   title?: string
+  url?: string
   read: boolean
   createdAt: string
   updatedAt: string
@@ -94,6 +99,7 @@ export function toNotification(doc: NotificationDocument): Notification {
     cardId: doc.cardId,
     boardId: doc.boardId,
     title: doc.title,
+    url: doc.url,
     read: doc.read ?? false,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

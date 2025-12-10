@@ -63,6 +63,20 @@ export class SocketEmitter {
   }
 
   /**
+   * Emit to all connected clients in the room except a specific user
+   * Useful for broadcasting updates to all clients except the one who initiated the action
+   */
+  static emitToRoomExceptUser<T = unknown>(room: string, event: string, data: T, excludeUserId: string): void {
+    try {
+      const io = getSocketServer()
+      io.to(room).except(userRoom(excludeUserId)).emit(event, data)
+    } catch (error) {
+      // Socket server might not be initialized in tests
+      console.warn('Socket emit failed:', error)
+    }
+  }
+
+  /**
    * Emit time entry update to all (for "All" tab visibility)
    * Backward compatibility helper for time-entry events
    */
