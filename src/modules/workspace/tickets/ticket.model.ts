@@ -31,6 +31,7 @@ export interface TicketGithub {
 export interface TicketViewer {
   userId: string
   viewedAt: Date
+  viewedAgainAt?: Date
 }
 
 export interface TicketDocument extends Document {
@@ -58,6 +59,7 @@ export interface TicketDocument extends Document {
   deletedAt?: Date
   github?: TicketGithub
   viewedBy: TicketViewer[]
+  relatedTickets: string[]
   createdAt: Date
   updatedAt: Date
 }
@@ -111,6 +113,7 @@ const ticketViewerSchema = new Schema<TicketViewer>(
   {
     userId: { type: String, required: true },
     viewedAt: { type: Date, required: true, default: Date.now },
+    viewedAgainAt: { type: Date, required: false },
   },
   { _id: false },
 )
@@ -214,6 +217,10 @@ const ticketSchema = new Schema<TicketDocument>(
       type: [ticketViewerSchema],
       default: [],
     },
+    relatedTickets: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -268,7 +275,9 @@ export type Ticket = {
   viewedBy: Array<{
     userId: string
     viewedAt: string
+    viewedAgainAt?: string
   }>
+  relatedTickets: string[]
   createdAt: string
   updatedAt: string
 }
@@ -322,7 +331,9 @@ export function toTicket(doc: TicketDocument): Ticket {
     viewedBy: (doc.viewedBy || []).map((viewer) => ({
       userId: viewer.userId,
       viewedAt: viewer.viewedAt.toISOString(),
+      viewedAgainAt: viewer.viewedAgainAt?.toISOString(),
     })),
+    relatedTickets: doc.relatedTickets || [],
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }

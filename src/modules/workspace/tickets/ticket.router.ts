@@ -1,19 +1,14 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
-import { uploadCard } from '../../../middleware/upload-card'
 import {
   createTicket,
   deleteTicket,
   getTicketsByBoard,
   getTicketById,
-  moveTicket,
   updateTicket,
-  uploadAttachment,
-  deleteAttachment,
   bulkUpdateRanks,
-  getTicketDetailsSettings,
-  updateTicketDetailsSettings,
-  resetTicketDetailsSettings,
+  addRelatedTicket,
+  removeRelatedTicket,
 } from './ticket.controller'
 import { createComment, deleteComment, getCommentsByTicket, updateComment } from '../comments/comment.controller'
 
@@ -105,43 +100,9 @@ ticketRouter.get('/tickets/:id', authenticate, getTicketById)
 
 /**
  * @swagger
- * /tickets/{id}/move:
- *   put:
- *     summary: Move ticket to different column
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - columnId
- *               - boardId
- *             properties:
- *               columnId:
- *                 type: string
- *               boardId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Ticket moved successfully
- */
-ticketRouter.put('/tickets/:id/move', authenticate, moveTicket)
-
-/**
- * @swagger
  * /tickets/{id}:
  *   put:
- *     summary: Update ticket
+ *     summary: Update ticket (unified endpoint for all ticket changes)
  *     tags: [Tickets]
  *     security:
  *       - bearerAuth: []
@@ -157,23 +118,55 @@ ticketRouter.put('/tickets/:id/move', authenticate, moveTicket)
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - timestamp
- *               - data
  *             properties:
  *               timestamp:
  *                 type: string
  *                 format: date-time
+ *                 description: Optional timestamp for race condition handling
  *               data:
  *                 type: object
+ *                 description: Only include fields that are being changed
  *                 properties:
  *                   title:
  *                     type: string
  *                   description:
  *                     type: object
+ *                   columnId:
+ *                     type: string
+ *                     description: Moving ticket to different column
+ *                   rank:
+ *                     type: string
  *                   priority:
  *                     type: string
  *                   assigneeId:
+ *                     type: string
+ *                   tags:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                   points:
+ *                     type: number
+ *                   acceptanceCriteria:
+ *                     type: array
+ *                   documents:
+ *                     type: array
+ *                   attachments:
+ *                     type: array
+ *                     description: Full attachments array (include all existing + new, exclude removed)
+ *                   startDate:
+ *                     type: string
+ *                     format: date-time
+ *                   endDate:
+ *                     type: string
+ *                     format: date-time
+ *                   dueDate:
+ *                     type: string
+ *                     format: date-time
+ *                   github:
+ *                     type: object
+ *                   parentTicketId:
+ *                     type: string
+ *                   rootEpicId:
  *                     type: string
  *     responses:
  *       200:
@@ -200,6 +193,62 @@ ticketRouter.put('/tickets/:id', authenticate, updateTicket)
  *         description: Ticket deleted
  */
 ticketRouter.delete('/tickets/:id', authenticate, deleteTicket)
+
+/**
+ * @swagger
+ * /tickets/{id}/related-tickets:
+ *   post:
+ *     summary: Add a related ticket
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - relatedTicketId
+ *             properties:
+ *               relatedTicketId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Related ticket added
+ */
+ticketRouter.post('/tickets/:id/related-tickets', authenticate, addRelatedTicket)
+
+/**
+ * @swagger
+ * /tickets/{id}/related-tickets/{relatedTicketId}:
+ *   delete:
+ *     summary: Remove a related ticket
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: relatedTicketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Related ticket removed
+ */
+ticketRouter.delete('/tickets/:id/related-tickets/:relatedTicketId', authenticate, removeRelatedTicket)
 
 
 /**
@@ -243,60 +292,6 @@ ticketRouter.delete('/tickets/:id', authenticate, deleteTicket)
  */
 ticketRouter.post('/boards/:boardId/tickets/bulk-rank', authenticate, bulkUpdateRanks)
 
-/**
- * @swagger
- * /tickets/{ticketId}/attachments:
- *   post:
- *     summary: Upload attachment to ticket
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: ticketId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               image:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Attachment uploaded
- */
-ticketRouter.post('/tickets/:ticketId/attachments', authenticate, uploadCard.single('image'), uploadAttachment)
-
-/**
- * @swagger
- * /tickets/{ticketId}/attachments/{attachmentId}:
- *   delete:
- *     summary: Delete ticket attachment
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: ticketId
- *         required: true
- *         schema:
- *           type: string
- *       - in: path
- *         name: attachmentId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Attachment deleted
- */
-ticketRouter.delete('/tickets/:ticketId/attachments/:attachmentId', authenticate, deleteAttachment)
 
 /**
  * @swagger
@@ -397,76 +392,4 @@ ticketRouter.put('/comments/:id', authenticate, updateComment)
  */
 ticketRouter.delete('/comments/:id', authenticate, deleteComment)
 
-/**
- * @swagger
- * /ticket-details-settings:
- *   get:
- *     summary: Get ticket details settings for user
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: boardId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Ticket details settings
- */
-ticketRouter.get('/ticket-details-settings', authenticate, getTicketDetailsSettings)
-
-/**
- * @swagger
- * /ticket-details-settings:
- *   put:
- *     summary: Update ticket details settings
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               boardId:
- *                 type: string
- *               fieldConfigs:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     fieldName:
- *                       type: string
- *                       enum: [priority, assignee, tags, parent, dueDate, startDate, endDate, branches]
- *                     isVisible:
- *                       type: boolean
- *                     order:
- *                       type: number
- *     responses:
- *       200:
- *         description: Settings updated
- */
-ticketRouter.put('/ticket-details-settings', authenticate, updateTicketDetailsSettings)
-
-/**
- * @swagger
- * /ticket-details-settings/reset:
- *   post:
- *     summary: Reset ticket details settings to defaults
- *     tags: [Tickets]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: boardId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Settings reset to defaults
- */
-ticketRouter.post('/ticket-details-settings/reset', authenticate, resetTicketDetailsSettings)
 

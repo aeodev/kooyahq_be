@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { boardService } from '../boards/board.service'
 import { ticketService } from './ticket.service'
-import { ticketDetailsSettingsService } from './ticket-details-settings.service'
+import { ticketRepository } from './ticket.repository'
 import { activityRepository } from '../activities/activity.repository'
 import { commentService } from '../comments/comment.service'
 import { notificationService } from '../../notifications/notification.service'
@@ -9,7 +9,7 @@ import { notificationRepository } from '../../notifications/notification.reposit
 import { createHttpError } from '../../../utils/http-error'
 import { workspaceService } from '../workspace/workspace.service'
 import { SocketEmitter } from '../../../utils/socket-emitter'
-import { workspaceRoom } from '../../../utils/socket-rooms'
+import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
 
 export async function createTicket(req: Request, res: Response, next: NextFunction) {
@@ -45,6 +45,11 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
 
   if (!ticketType || !['epic', 'story', 'task', 'bug', 'subtask'].includes(ticketType)) {
     return next(createHttpError(400, 'Valid ticket type is required'))
+  }
+
+  // Prevent direct subtask creation - subtasks must be created from an existing ticket
+  if (ticketType === 'subtask' && !parentTicketId) {
+    return next(createHttpError(400, 'Subtasks must have a parent ticket and cannot be created directly'))
   }
 
   try {
@@ -120,13 +125,6 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
         console.error('Failed to create assignment notification:', notifError)
       }
     }
-
-    // Emit socket event for real-time updates (other users will receive this)
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'ticket:created', {
-      ticket,
-      userId,
-      timestamp: new Date().toISOString(),
-    })
 
     res.status(201).json({
       success: true,
@@ -212,59 +210,75 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
       // Don't fail the request if tracking fails
     })
 
-    // Fetch related data in parallel
-    const [history, comments, relatedTickets] = await Promise.all([
+    // Fetch related data in parallel - optimize queries
+    const [history, comments, parent, children, epicTickets, parentSiblings, manualRelated] = await Promise.all([
       // Get ticket history/activities
       activityRepository.findByTicketId(id),
       // Get comments
       commentService.findByTicketId(id),
-      // Get related tickets
-      (async () => {
-        const related: {
-          parent: Ticket | undefined | null
-          children: Ticket[]
-          siblings: Ticket[]
-          epicTickets: Ticket[]
-        } = {
-          parent: null,
-          children: [],
-          siblings: [],
-          epicTickets: [],
-        }
-
-        // Get parent ticket if exists
-        if (ticket.parentTicketId) {
-          related.parent = await ticketService.findById(ticket.parentTicketId)
-        }
-
-        // Get child tickets (tickets that have this ticket as parent)
-        related.children = await ticketService.findByParentTicketId(id)
-
-        // Get root epic if exists
-        if (ticket.rootEpicId) {
-          // Get all tickets in the same epic (including this ticket)
-          const epicTickets = await ticketService.findByRootEpicId(ticket.rootEpicId)
-          // Filter out this ticket and get siblings (same parent or same epic)
-          related.epicTickets = epicTickets.filter((t: Ticket) => t.id !== id)
-          
-          // If this ticket has a parent, get siblings (same parent)
-          if (ticket.parentTicketId) {
-            related.siblings = related.children.filter((t: Ticket) => t.id !== id)
-          } else {
-            // If no parent, siblings are other tickets in the same epic without a parent
-            related.siblings = epicTickets.filter(
-              (t: Ticket) => t.id !== id && !t.parentTicketId
-            )
-          }
-        } else if (ticket.parentTicketId) {
-          // If has parent but no epic, get siblings (same parent)
-          const parentTickets = await ticketService.findByParentTicketId(ticket.parentTicketId)
-          related.siblings = parentTickets.filter((t: Ticket) => t.id !== id)
-        }
-
-        return related
-      })(),
+      // Get parent ticket if exists (parallel)
+      ticket.parentTicketId ? ticketService.findById(ticket.parentTicketId) : Promise.resolve(null),
+      // Get child tickets (parallel)
+      ticketService.findByParentTicketId(id),
+      // Get epic tickets if exists (parallel)
+      ticket.rootEpicId ? ticketService.findByRootEpicId(ticket.rootEpicId) : Promise.resolve([]),
+      // Get siblings if has parent but no epic (parallel)
+      (!ticket.rootEpicId && ticket.parentTicketId) 
+        ? ticketService.findByParentTicketId(ticket.parentTicketId) 
+        : Promise.resolve([]),
+      // Get manually related tickets (parallel)
+      (ticket.relatedTickets && ticket.relatedTickets.length > 0)
+        ? Promise.all(ticket.relatedTickets.map((relatedId) => ticketService.findById(relatedId)))
+        : Promise.resolve([]),
     ])
+
+    // Build related tickets structure from parallel results
+    const related: {
+      parent: Ticket | undefined | null
+      children: Ticket[]
+      siblings: Ticket[]
+      epicTickets: Ticket[]
+      manualRelated: Ticket[]
+    } = {
+      parent: parent || null,
+      children: children || [],
+      siblings: [],
+      epicTickets: [],
+      manualRelated: [],
+    }
+
+    // Process epic tickets
+    if (ticket.rootEpicId && Array.isArray(epicTickets)) {
+      // Filter out the current ticket and any tickets that are epics themselves
+      // Epic tickets section should only show non-epic tickets (tasks, bugs, stories, subtasks) in the same epic
+      related.epicTickets = epicTickets.filter(
+        (t: Ticket) => t.id !== id && t.ticketType !== 'epic'
+      )
+      
+      // Determine siblings based on epic and parent
+      if (ticket.parentTicketId) {
+        // If has parent, siblings are children (already filtered)
+        related.siblings = related.children.filter((t: Ticket) => t.id !== id)
+      } else {
+        // If no parent, siblings are other tickets in the same epic without a parent
+        // Also filter out epics from siblings
+        related.siblings = epicTickets.filter(
+          (t: Ticket) => t.id !== id && !t.parentTicketId && t.ticketType !== 'epic'
+        )
+      }
+    } else if (ticket.parentTicketId && Array.isArray(parentSiblings)) {
+      // If has parent but no epic, siblings are other tickets with same parent
+      related.siblings = parentSiblings.filter((t: Ticket) => t.id !== id)
+    }
+
+    // Process manually related tickets
+    if (Array.isArray(manualRelated)) {
+      related.manualRelated = manualRelated.filter(
+        (t): t is Ticket => t !== undefined && t !== null && t.ticketType !== 'subtask'
+      )
+    }
+
+    const relatedTickets = related
 
     res.json({
       success: true,
@@ -281,107 +295,6 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
   }
 }
 
-export async function moveTicket(req: Request, res: Response, next: NextFunction) {
-  const { id } = req.params
-  const { columnId, boardId } = req.body
-  const userId = req.user?.id
-
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!columnId || typeof columnId !== 'string') {
-    return next(createHttpError(400, 'Column ID is required'))
-  }
-
-  if (!boardId || typeof boardId !== 'string') {
-    return next(createHttpError(400, 'Board ID is required'))
-  }
-
-  try {
-    const board = await boardService.findById(boardId)
-
-    if (!board) {
-      return next(createHttpError(404, 'Board not found'))
-    }
-
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
-      return next(createHttpError(403, 'Forbidden'))
-    }
-
-    // Get the old ticket before moving to capture the previous columnId
-    const oldTicket = await ticketService.findById(id)
-    if (!oldTicket) {
-      return next(createHttpError(404, 'Ticket not found'))
-    }
-
-    const oldColumnId = oldTicket.columnId
-
-    const ticket = await ticketService.moveTicket(id, columnId, boardId, userId)
-
-    if (!ticket) {
-      return next(createHttpError(404, 'Ticket not found'))
-    }
-
-    // Create activity log
-    try {
-      await activityRepository.create({
-        workspaceId: board.workspaceId,
-        boardId,
-        ticketId: ticket.id,
-        actorId: userId,
-        actionType: 'transition',
-        changes: [
-          {
-            field: 'columnId',
-            oldValue: oldColumnId,
-            newValue: columnId,
-            text: `moved ${ticket.ticketKey} to ${columnId}`,
-          },
-        ],
-      })
-    } catch (activityError) {
-      console.error('Failed to create activity:', activityError)
-    }
-
-    // Notify assignee and reporter about ticket movement
-    try {
-      await notificationService.createCardMovedNotification(
-        ticket.id,
-        userId,
-        ticket.assigneeId,
-        ticket.reporterId,
-      )
-    } catch (notifError) {
-      console.error('Failed to create ticket movement notification:', notifError)
-    }
-
-    // Emit socket event for real-time updates
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'ticket:moved', {
-      ticket,
-      boardId,
-      oldColumnId,
-      newColumnId: columnId,
-      userId,
-      timestamp: new Date().toISOString(),
-    })
-
-    res.json({
-      success: true,
-      data: ticket,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    next(error)
-  }
-}
-
 export async function updateTicket(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
   const { timestamp, data } = req.body
@@ -391,10 +304,8 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  // Validate timestamp for race condition handling
-  if (!timestamp) {
-    return next(createHttpError(400, 'Timestamp is required'))
-  }
+  // Timestamp is optional - only required for certain operations if needed
+  // If not provided, we'll use current timestamp
 
   try {
     const ticket = await ticketService.findById(id)
@@ -420,6 +331,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     }
 
     const previousAssigneeId = ticket.assigneeId
+    const previousColumnId = ticket.columnId
     const changes: Array<{
       field: string
       oldValue: any
@@ -450,7 +362,19 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       })
     }
     if (data.columnId !== undefined) {
+      const oldColumnId = previousColumnId
       updates.columnId = data.columnId
+      // Track column change for activity log
+      if (oldColumnId !== data.columnId) {
+        const oldColumn = board.columns.find(col => col.id === oldColumnId)
+        const newColumn = board.columns.find(col => col.id === data.columnId)
+        changes.push({
+          field: 'columnId',
+          oldValue: oldColumnId,
+          newValue: data.columnId,
+          text: `moved ${ticket.ticketKey} to ${newColumn?.name || data.columnId}`,
+        })
+      }
     }
     if (data.rank !== undefined) {
       updates.rank = data.rank
@@ -468,12 +392,21 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       updates.tags = Array.isArray(data.tags) ? data.tags : []
     }
     if (data.assigneeId !== undefined) {
+      let assigneeName = 'user'
+      if (data.assigneeId) {
+        try {
+          const assignee = await userService.getPublicProfile(data.assigneeId)
+          assigneeName = assignee?.name || 'user'
+        } catch (error) {
+          console.error('Error fetching assignee name:', error)
+        }
+      }
       changes.push({
         field: 'assigneeId',
         oldValue: previousAssigneeId || null,
         newValue: data.assigneeId || null,
         text: data.assigneeId
-          ? `assigned ${ticket.ticketKey} to user`
+          ? `assigned ${ticket.ticketKey} to ${assigneeName}`
           : `unassigned ${ticket.ticketKey}`,
       })
       updates.assigneeId = data.assigneeId || null
@@ -494,7 +427,40 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       updates.documents = Array.isArray(data.documents) ? data.documents : []
     }
     if (data.attachments !== undefined) {
-      updates.attachments = Array.isArray(data.attachments) ? data.attachments : []
+      const oldAttachments = ticket.attachments || []
+      const newAttachments = Array.isArray(data.attachments) ? data.attachments : []
+      
+      // Track attachment changes
+      const addedAttachments = newAttachments.filter(
+        (newAtt) => !oldAttachments.some((oldAtt) => oldAtt.id === newAtt.id)
+      )
+      const removedAttachments = oldAttachments.filter(
+        (oldAtt) => !newAttachments.some((newAtt) => newAtt.id === oldAtt.id)
+      )
+      
+      if (addedAttachments.length > 0) {
+        addedAttachments.forEach((att) => {
+          changes.push({
+            field: 'attachment',
+            oldValue: null,
+            newValue: att.name,
+            text: `uploaded ${att.name}`,
+          })
+        })
+      }
+      
+      if (removedAttachments.length > 0) {
+        removedAttachments.forEach((att) => {
+          changes.push({
+            field: 'attachment',
+            oldValue: att.name,
+            newValue: null,
+            text: `removed ${att.name}`,
+          })
+        })
+      }
+      
+      updates.attachments = newAttachments
     }
     if (data.startDate !== undefined) {
       updates.startDate = data.startDate ? new Date(data.startDate) : null
@@ -508,6 +474,52 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     if (data.github !== undefined) {
       updates.github = data.github
     }
+    if (data.parentTicketId !== undefined) {
+      const oldParentTicketId = ticket.parentTicketId
+      updates.parentTicketId = data.parentTicketId || null
+      if (oldParentTicketId !== data.parentTicketId) {
+        let parentTicketKey = data.parentTicketId
+        if (data.parentTicketId) {
+          try {
+            const parentTicket = await ticketService.findById(data.parentTicketId)
+            parentTicketKey = parentTicket?.ticketKey || data.parentTicketId
+          } catch (error) {
+            console.error('Error fetching parent ticket:', error)
+          }
+        }
+        changes.push({
+          field: 'parentTicketId',
+          oldValue: oldParentTicketId || null,
+          newValue: data.parentTicketId || null,
+          text: data.parentTicketId
+            ? `set parent ticket to ${parentTicketKey}`
+            : 'removed parent ticket',
+        })
+      }
+    }
+    if (data.rootEpicId !== undefined) {
+      const oldRootEpicId = ticket.rootEpicId
+      updates.rootEpicId = data.rootEpicId || null
+      if (oldRootEpicId !== data.rootEpicId) {
+        let epicTicketKey = data.rootEpicId
+        if (data.rootEpicId) {
+          try {
+            const epicTicket = await ticketService.findById(data.rootEpicId)
+            epicTicketKey = epicTicket?.ticketKey || data.rootEpicId
+          } catch (error) {
+            console.error('Error fetching epic ticket:', error)
+          }
+        }
+        changes.push({
+          field: 'rootEpicId',
+          oldValue: oldRootEpicId || null,
+          newValue: data.rootEpicId || null,
+          text: data.rootEpicId
+            ? `set root epic to ${epicTicketKey}`
+            : 'removed root epic',
+        })
+      }
+    }
 
     const updated = await ticketService.updateTicket(id, updates, userId)
 
@@ -518,16 +530,34 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     // Create activity log if there are changes
     if (changes.length > 0) {
       try {
+        // Determine action type based on changes
+        const hasColumnChange = changes.some((c) => c.field === 'columnId')
+        const actionType = hasColumnChange ? 'transition' : 'update'
+        
         await activityRepository.create({
           workspaceId: board.workspaceId,
           boardId: ticket.boardId,
           ticketId: ticket.id,
           actorId: userId,
-          actionType: 'update',
+          actionType,
           changes,
         })
       } catch (activityError) {
         console.error('Failed to create activity:', activityError)
+      }
+    }
+
+    // Notify if column changed (ticket moved)
+    if (data.columnId !== undefined && data.columnId !== previousColumnId) {
+      try {
+        await notificationService.createCardMovedNotification(
+          ticket.id,
+          userId,
+          ticket.assigneeId,
+          ticket.reporterId,
+        )
+      } catch (notifError) {
+        console.error('Failed to create ticket movement notification:', notifError)
       }
     }
 
@@ -559,13 +589,6 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
         console.error('Failed to create assignment notification:', notifError)
       }
     }
-
-    // Emit socket event for real-time updates (other users will receive this)
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'ticket:updated', {
-      ticket: updated,
-      userId,
-      timestamp: new Date().toISOString(),
-    })
 
     res.json({
       success: true,
@@ -641,33 +664,31 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
   }
 }
 
-export async function uploadAttachment(req: Request, res: Response, next: NextFunction) {
-  const { ticketId } = req.params
+
+export async function addRelatedTicket(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params
+  const { relatedTicketId } = req.body
   const userId = req.user?.id
-  const file = req.file
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  if (!file) {
-    return next(createHttpError(400, 'File is required'))
+  if (!relatedTicketId || typeof relatedTicketId !== 'string') {
+    return next(createHttpError(400, 'relatedTicketId is required'))
   }
 
   try {
-    const ticket = await ticketService.findById(ticketId)
-
+    const ticket = await ticketService.findById(id)
     if (!ticket) {
       return next(createHttpError(404, 'Ticket not found'))
     }
 
     const board = await boardService.findById(ticket.boardId)
-
     if (!board) {
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
     const workspace = await workspaceService.findById(board.workspaceId)
     if (!workspace) {
       return next(createHttpError(404, 'Workspace not found'))
@@ -677,41 +698,36 @@ export async function uploadAttachment(req: Request, res: Response, next: NextFu
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const url = (file as any).cloudinaryUrl || ''
-
-    const attachment = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      url,
-      name: file.originalname,
-      type: file.mimetype,
-      uploadedAt: new Date(),
+    // Validate related ticket exists
+    const relatedTicket = await ticketService.findById(relatedTicketId)
+    if (!relatedTicket) {
+      return next(createHttpError(404, 'Related ticket not found'))
     }
 
-    const updated = await ticketService.addAttachment(ticketId, attachment)
+    // Validate related ticket is not epic or subtask
+    if (relatedTicket.ticketType === 'epic' || relatedTicket.ticketType === 'subtask') {
+      return next(createHttpError(400, 'Cannot relate to epics or subtasks'))
+    }
+
+    // Validate not adding self
+    if (relatedTicketId === id) {
+      return next(createHttpError(400, 'Cannot relate ticket to itself'))
+    }
+
+    // Check if already related
+    if (ticket.relatedTickets && ticket.relatedTickets.includes(relatedTicketId)) {
+      return res.json({
+        success: true,
+        data: ticket,
+        message: 'Ticket already related',
+      })
+    }
+
+    // Add relationship
+    const updated = await ticketRepository.addRelatedTicket(id, relatedTicketId)
 
     if (!updated) {
       return next(createHttpError(404, 'Ticket not found'))
-    }
-
-    // Create activity log
-    try {
-      await activityRepository.create({
-        workspaceId: board.workspaceId,
-        boardId: ticket.boardId,
-        ticketId: ticket.id,
-        actorId: userId,
-        actionType: 'upload',
-        changes: [
-          {
-            field: 'attachment',
-            oldValue: null,
-            newValue: attachment.name,
-            text: `uploaded ${attachment.name}`,
-          },
-        ],
-      })
-    } catch (activityError) {
-      console.error('Failed to create activity:', activityError)
     }
 
     res.json({
@@ -724,8 +740,8 @@ export async function uploadAttachment(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function deleteAttachment(req: Request, res: Response, next: NextFunction) {
-  const { ticketId, attachmentId } = req.params
+export async function removeRelatedTicket(req: Request, res: Response, next: NextFunction) {
+  const { id, relatedTicketId } = req.params
   const userId = req.user?.id
 
   if (!userId) {
@@ -733,19 +749,16 @@ export async function deleteAttachment(req: Request, res: Response, next: NextFu
   }
 
   try {
-    const ticket = await ticketService.findById(ticketId)
-
+    const ticket = await ticketService.findById(id)
     if (!ticket) {
       return next(createHttpError(404, 'Ticket not found'))
     }
 
     const board = await boardService.findById(ticket.boardId)
-
     if (!board) {
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
     const workspace = await workspaceService.findById(board.workspaceId)
     if (!workspace) {
       return next(createHttpError(404, 'Workspace not found'))
@@ -755,10 +768,11 @@ export async function deleteAttachment(req: Request, res: Response, next: NextFu
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const updated = await ticketService.removeAttachment(ticketId, attachmentId)
+    // Remove relationship
+    const updated = await ticketRepository.removeRelatedTicket(id, relatedTicketId)
 
     if (!updated) {
-      return next(createHttpError(404, 'Ticket or attachment not found'))
+      return next(createHttpError(404, 'Ticket not found'))
     }
 
     res.json({
@@ -818,81 +832,4 @@ export async function bulkUpdateRanks(req: Request, res: Response, next: NextFun
   }
 }
 
-export async function getTicketDetailsSettings(req: Request, res: Response, next: NextFunction) {
-  const userId = req.user?.id
-  const { boardId } = req.query
-
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  try {
-    const settings = await ticketDetailsSettingsService.getOrCreateSettings(
-      userId,
-      boardId as string | undefined,
-    )
-
-    res.json({
-      success: true,
-      data: settings,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    next(error)
-  }
-}
-
-export async function updateTicketDetailsSettings(req: Request, res: Response, next: NextFunction) {
-  const userId = req.user?.id
-  const { boardId } = req.body
-  const { fieldConfigs } = req.body
-
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!fieldConfigs || !Array.isArray(fieldConfigs)) {
-    return next(createHttpError(400, 'fieldConfigs is required and must be an array'))
-  }
-
-  try {
-    const settings = await ticketDetailsSettingsService.updateSettings(
-      userId,
-      boardId || null,
-      { fieldConfigs },
-    )
-
-    res.json({
-      success: true,
-      data: settings,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    next(error)
-  }
-}
-
-export async function resetTicketDetailsSettings(req: Request, res: Response, next: NextFunction) {
-  const userId = req.user?.id
-  const { boardId } = req.query
-
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  try {
-    const settings = await ticketDetailsSettingsService.resetSettings(
-      userId,
-      boardId as string | undefined,
-    )
-
-    res.json({
-      success: true,
-      data: settings,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    next(error)
-  }
-}
 

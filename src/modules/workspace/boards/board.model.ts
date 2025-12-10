@@ -15,9 +15,27 @@ export interface BoardMember {
   joinedAt: Date
 }
 
+export type DetailFieldName =
+  | 'priority'
+  | 'assignee'
+  | 'tags'
+  | 'parent'
+  | 'dueDate'
+  | 'startDate'
+  | 'endDate'
+
+export interface TicketDetailsFieldConfig {
+  fieldName: DetailFieldName
+  isVisible: boolean
+  order: number // Lower numbers appear first (top to bottom)
+}
+
 export interface BoardSettings {
   defaultView: 'board' | 'list' | 'timeline'
   showSwimlanes: boolean
+  ticketDetailsSettings: {
+    fieldConfigs: TicketDetailsFieldConfig[]
+  }
 }
 
 export interface CreateBoardInput {
@@ -74,6 +92,27 @@ const boardMemberSchema = new Schema<BoardMember>(
   { _id: false },
 )
 
+const ticketDetailsFieldConfigSchema = new Schema<TicketDetailsFieldConfig>(
+  {
+    fieldName: {
+      type: String,
+      required: true,
+      enum: ['priority', 'assignee', 'tags', 'parent', 'dueDate', 'startDate', 'endDate'],
+    },
+    isVisible: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
+    order: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false },
+)
+
 const boardSettingsSchema = new Schema<BoardSettings>(
   {
     defaultView: {
@@ -83,6 +122,38 @@ const boardSettingsSchema = new Schema<BoardSettings>(
       default: 'board',
     },
     showSwimlanes: { type: Boolean, required: true, default: false },
+    ticketDetailsSettings: {
+      type: new Schema(
+        {
+          fieldConfigs: {
+            type: [ticketDetailsFieldConfigSchema],
+            required: true,
+            default: () => [
+              { fieldName: 'priority', isVisible: true, order: 0 },
+              { fieldName: 'assignee', isVisible: true, order: 1 },
+              { fieldName: 'tags', isVisible: true, order: 2 },
+              { fieldName: 'parent', isVisible: true, order: 3 },
+              { fieldName: 'dueDate', isVisible: true, order: 4 },
+              { fieldName: 'startDate', isVisible: true, order: 5 },
+              { fieldName: 'endDate', isVisible: true, order: 6 },
+            ],
+          },
+        },
+        { _id: false },
+      ),
+      required: true,
+      default: () => ({
+        fieldConfigs: [
+          { fieldName: 'priority', isVisible: true, order: 0 },
+          { fieldName: 'assignee', isVisible: true, order: 1 },
+          { fieldName: 'tags', isVisible: true, order: 2 },
+          { fieldName: 'parent', isVisible: true, order: 3 },
+          { fieldName: 'dueDate', isVisible: true, order: 4 },
+          { fieldName: 'startDate', isVisible: true, order: 5 },
+          { fieldName: 'endDate', isVisible: true, order: 6 },
+        ],
+      }),
+    },
   },
   { _id: false },
 )
@@ -123,6 +194,17 @@ const boardSchema = new Schema<BoardDocument>(
       default: () => ({
         defaultView: 'board',
         showSwimlanes: false,
+        ticketDetailsSettings: {
+          fieldConfigs: [
+            { fieldName: 'priority', isVisible: true, order: 0 },
+            { fieldName: 'assignee', isVisible: true, order: 1 },
+            { fieldName: 'tags', isVisible: true, order: 2 },
+            { fieldName: 'parent', isVisible: true, order: 3 },
+            { fieldName: 'dueDate', isVisible: true, order: 4 },
+            { fieldName: 'startDate', isVisible: true, order: 5 },
+            { fieldName: 'endDate', isVisible: true, order: 6 },
+          ],
+        },
       }),
     },
     columns: {
@@ -163,6 +245,13 @@ export type Board = {
   settings: {
     defaultView: 'board' | 'list' | 'timeline'
     showSwimlanes: boolean
+    ticketDetailsSettings: {
+      fieldConfigs: Array<{
+        fieldName: DetailFieldName
+        isVisible: boolean
+        order: number
+      }>
+    }
   }
   columns: Array<{
     id: string
@@ -195,6 +284,21 @@ export function toBoard(doc: BoardDocument): Board {
     settings: {
       defaultView: doc.settings.defaultView as 'board' | 'list' | 'timeline',
       showSwimlanes: doc.settings.showSwimlanes,
+      ticketDetailsSettings: {
+        fieldConfigs: doc.settings.ticketDetailsSettings?.fieldConfigs?.map((config) => ({
+          fieldName: config.fieldName as DetailFieldName,
+          isVisible: config.isVisible,
+          order: config.order,
+        })) || [
+          { fieldName: 'priority', isVisible: true, order: 0 },
+          { fieldName: 'assignee', isVisible: true, order: 1 },
+          { fieldName: 'tags', isVisible: true, order: 2 },
+          { fieldName: 'parent', isVisible: true, order: 3 },
+          { fieldName: 'dueDate', isVisible: true, order: 4 },
+          { fieldName: 'startDate', isVisible: true, order: 5 },
+          { fieldName: 'endDate', isVisible: true, order: 6 },
+        ],
+      },
     },
     columns: doc.columns.map((col) => ({
       id: col.id,

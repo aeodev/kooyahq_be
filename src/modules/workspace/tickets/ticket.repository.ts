@@ -79,6 +79,7 @@ export type UpdateTicketInput = {
     pullRequestUrl?: string
     status?: 'open' | 'merged' | 'closed'
   }
+  relatedTickets?: string[]
 }
 
 /**
@@ -143,6 +144,7 @@ export const ticketRepository = {
       endDate: input.endDate,
       dueDate: input.dueDate,
       github: input.github,
+      relatedTickets: input.relatedTickets || [],
     })
 
     return toTicket(doc)
@@ -191,6 +193,7 @@ export const ticketRepository = {
     if (updates.documents !== undefined) updateData.documents = updates.documents
     if (updates.attachments !== undefined) updateData.attachments = updates.attachments
     if (updates.github !== undefined) updateData.github = updates.github
+    if (updates.relatedTickets !== undefined) updateData.relatedTickets = updates.relatedTickets
 
     // Handle nullable fields
     if (updates.points === null) {
@@ -314,16 +317,45 @@ export const ticketRepository = {
     const existingViewerIndex = doc.viewedBy.findIndex((v) => v.userId === userId)
 
     if (existingViewerIndex >= 0) {
-      // Update existing viewer's viewedAt timestamp
-      doc.viewedBy[existingViewerIndex].viewedAt = new Date()
+      // Update existing viewer's viewedAgainAt timestamp (keep viewedAt as first view time)
+      doc.viewedBy[existingViewerIndex].viewedAgainAt = new Date()
     } else {
-      // Add new viewer
+      // Add new viewer with viewedAt as first view time
       doc.viewedBy.push({
         userId,
         viewedAt: new Date(),
       })
     }
 
+    await doc.save()
+    return toTicket(doc)
+  },
+
+  async addRelatedTicket(ticketId: string, relatedTicketId: string): Promise<Ticket | null> {
+    const doc = await TicketModel.findById(ticketId).exec()
+    if (!doc) {
+      return null
+    }
+
+    // Check if already related
+    if (doc.relatedTickets.includes(relatedTicketId)) {
+      return toTicket(doc)
+    }
+
+    // Add to array
+    doc.relatedTickets.push(relatedTicketId)
+    await doc.save()
+    return toTicket(doc)
+  },
+
+  async removeRelatedTicket(ticketId: string, relatedTicketId: string): Promise<Ticket | null> {
+    const doc = await TicketModel.findById(ticketId).exec()
+    if (!doc) {
+      return null
+    }
+
+    // Remove from array
+    doc.relatedTickets = doc.relatedTickets.filter((id) => id !== relatedTicketId)
     await doc.save()
     return toTicket(doc)
   },
