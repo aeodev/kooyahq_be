@@ -12,6 +12,7 @@ import { SocketEmitter } from '../../../utils/socket-emitter'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
+import { ticketCache } from '../cache/ticket.cache'
 
 export async function createTicket(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
@@ -96,6 +97,7 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
       },
       userId,
     )
+    await ticketCache.invalidateBoardTickets(boardId)
 
     // Create activity log
     try {
@@ -185,7 +187,17 @@ export async function getTicketsByBoard(req: Request, res: Response, next: NextF
       return next(createHttpError(403, 'Forbidden'))
     }
 
+    const cachedTickets = await ticketCache.getBoardTickets(boardId)
+    if (cachedTickets) {
+      return res.json({
+        success: true,
+        data: cachedTickets,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
     const tickets = await ticketService.findByBoardId(boardId)
+    await ticketCache.setBoardTickets(boardId, tickets)
 
     res.json({
       success: true,
@@ -451,19 +463,20 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       updates.documents = Array.isArray(data.documents) ? data.documents : []
     }
     if (data.attachments !== undefined) {
-      const oldAttachments = ticket.attachments || []
-      const newAttachments = Array.isArray(data.attachments) ? data.attachments : []
+      type TicketAttachment = Ticket['attachments'][number]
+      const oldAttachments: TicketAttachment[] = (ticket.attachments || []) as TicketAttachment[]
+      const newAttachments: TicketAttachment[] = (Array.isArray(data.attachments) ? data.attachments : []) as TicketAttachment[]
       
       // Track attachment changes
       const addedAttachments = newAttachments.filter(
-        (newAtt) => !oldAttachments.some((oldAtt) => oldAtt.id === newAtt.id)
+        (newAtt: TicketAttachment) => !oldAttachments.some((oldAtt) => oldAtt.id === newAtt.id)
       )
       const removedAttachments = oldAttachments.filter(
-        (oldAtt) => !newAttachments.some((newAtt) => newAtt.id === oldAtt.id)
+        (oldAtt: TicketAttachment) => !newAttachments.some((newAtt: TicketAttachment) => newAtt.id === oldAtt.id)
       )
       
       if (addedAttachments.length > 0) {
-        addedAttachments.forEach((att) => {
+        addedAttachments.forEach((att: TicketAttachment) => {
           changes.push({
             field: 'attachment',
             oldValue: null,
@@ -474,7 +487,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       }
       
       if (removedAttachments.length > 0) {
-        removedAttachments.forEach((att) => {
+        removedAttachments.forEach((att: TicketAttachment) => {
           changes.push({
             field: 'attachment',
             oldValue: att.name,
@@ -550,6 +563,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     if (!updated) {
       return next(createHttpError(404, 'Ticket not found'))
     }
+    await ticketCache.invalidateBoardTickets(ticket.boardId)
 
     // Create activity log if there are changes
     if (changes.length > 0) {
@@ -683,6 +697,7 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
     }
 
     await ticketService.deleteTicket(id)
+    await ticketCache.invalidateBoardTickets(ticket.boardId)
 
     // Create activity log
     try {
@@ -797,6 +812,7 @@ export async function addRelatedTicket(req: Request, res: Response, next: NextFu
     if (!updated) {
       return next(createHttpError(404, 'Ticket not found'))
     }
+    await ticketCache.invalidateBoardTickets(ticket.boardId)
 
     res.json({
       success: true,
@@ -842,6 +858,7 @@ export async function removeRelatedTicket(req: Request, res: Response, next: Nex
     if (!updated) {
       return next(createHttpError(404, 'Ticket not found'))
     }
+    await ticketCache.invalidateBoardTickets(ticket.boardId)
 
     res.json({
       success: true,
@@ -889,6 +906,7 @@ export async function bulkUpdateRanks(req: Request, res: Response, next: NextFun
     }))
 
     const updatedTickets = await ticketService.bulkUpdateRanks(boardId, updates)
+    await ticketCache.invalidateBoardTickets(boardId)
 
     res.json({
       success: true,
@@ -899,5 +917,3 @@ export async function bulkUpdateRanks(req: Request, res: Response, next: NextFun
     next(error)
   }
 }
-
-

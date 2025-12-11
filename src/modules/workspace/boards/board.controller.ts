@@ -5,6 +5,8 @@ import { createHttpError } from '../../../utils/http-error'
 import { SocketEmitter } from '../../../utils/socket-emitter'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import type { Board } from './board.model'
+import { boardCache } from '../cache/board.cache'
+import { ticketCache } from '../cache/ticket.cache'
 
 export async function createBoard(req: Request, res: Response, next: NextFunction) {
   const { workspaceId } = req.params
@@ -45,6 +47,9 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
       members: [], // Boards don't have members - use workspace membership
       createdBy: userId,
     })
+
+    await boardCache.setBoard(board)
+    await boardCache.invalidateBoardLists(workspaceId)
 
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(workspaceId), 'board:created', {
@@ -90,7 +95,11 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
   }
 
   try {
-    const boards = await boardService.findByWorkspaceId(workspaceId, type)
+    let boards = await boardCache.getBoards(workspaceId, type)
+    if (!boards) {
+      boards = await boardService.findByWorkspaceId(workspaceId, type)
+      await boardCache.setBoards(workspaceId, boards, type)
+    }
     
     // Get favorite board IDs for the user
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
@@ -121,7 +130,13 @@ export async function getBoardById(req: Request, res: Response, next: NextFuncti
   }
 
   try {
-    const board = await boardService.findById(id)
+    let board = await boardCache.getBoard(id)
+    if (!board) {
+      board = await boardService.findById(id)
+      if (board) {
+        await boardCache.setBoard(board)
+      }
+    }
 
     if (!board) {
       return next(createHttpError(404, 'Board not found'))
@@ -161,6 +176,7 @@ export async function getBoardByKey(req: Request, res: Response, next: NextFunct
   }
 
   try {
+    const normalizedKey = key.toUpperCase()
     // Get user's workspaces
     const workspaceServiceModule = await import('../workspace/workspace.service')
     const workspaces = await workspaceServiceModule.workspaceService.findByUserId(userId)
@@ -172,7 +188,13 @@ export async function getBoardByKey(req: Request, res: Response, next: NextFunct
     // Search for board by prefix across user's workspaces
     let board = null
     for (const workspace of workspaces) {
-      board = await boardService.findByPrefix(workspace.id, key.toUpperCase())
+      board = await boardCache.getBoardByPrefix(workspace.id, normalizedKey)
+      if (!board) {
+        board = await boardService.findByPrefix(workspace.id, normalizedKey)
+        if (board) {
+          await boardCache.setBoard(board)
+        }
+      }
       if (board) {
         // Boards use workspace membership - if user is workspace member, they can access
         const isWorkspaceMember = workspace.members && workspace.members.some((m) => m.userId === userId)
@@ -263,6 +285,12 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       return next(createHttpError(404, 'Board not found'))
     }
 
+    if (board.prefix !== updated.prefix) {
+      await boardCache.deleteBoard(board.id, board.workspaceId, board.prefix)
+    }
+    await boardCache.setBoard(updated)
+    await boardCache.invalidateBoardLists(board.workspaceId)
+
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'board:updated', {
       board: updated,
@@ -321,6 +349,9 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
     }
 
     await boardService.delete(id)
+    await boardCache.deleteBoard(board.id, board.workspaceId, board.prefix)
+    await boardCache.invalidateBoardLists(board.workspaceId)
+    await ticketCache.invalidateBoardTickets(id)
 
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'board:deleted', {

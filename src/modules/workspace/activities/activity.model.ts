@@ -1,6 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
-
-export type RichTextDoc = Record<string, any>
+import type { RichTextDoc } from '../tickets/ticket.model'
 
 export interface ChangeLog {
   field: string

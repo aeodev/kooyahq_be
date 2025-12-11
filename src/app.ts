@@ -86,10 +86,8 @@ export function createApp() {
   app.use('/api/media', mediaRouter)
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)
-  // CRITICAL: Register board router BEFORE ticket router
   app.use('/api/admin', adminRouter)
-  // CRITICAL: Register board router BEFORE card router
-  // This ensures /api/boards routes match before the more general /api routes
+  // Board routes must come before ticket routes to ensure correct matching
   app.use('/api', boardRouter)
   // Ticket router routes (/api/boards/:boardId/tickets and /api/tickets/:id) come after
   app.use('/api', ticketRouter)

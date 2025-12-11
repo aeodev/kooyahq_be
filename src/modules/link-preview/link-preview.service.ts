@@ -2,29 +2,6 @@ import type { LinkPreview, LinkPreviewOptions } from './link-preview.types'
 import { getCachedPreview, setCachedPreview } from './link-preview.cache'
 import { isGifUrl, normalizeImageUrl } from '../../utils/image.utils'
 
-// Normalize URL (convert relative to absolute) - general purpose, not just images
-function normalizeUrl(url: string, baseUrl: string): string {
-  if (!url) return url
-  
-  // Already absolute
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url
-  }
-  
-  // Protocol-relative URL
-  if (url.startsWith('//')) {
-    return `https:${url}`
-  }
-  
-  // Relative URL - resolve against base URL
-  try {
-    const base = new URL(baseUrl)
-    return new URL(url, base.origin).href
-  } catch {
-    return url
-  }
-}
-
 // Extract meta tag content from HTML
 function extractMetaTag(html: string, property: string, attribute: 'property' | 'name' | 'itemprop' = 'property'): string | undefined {
   const patterns = [

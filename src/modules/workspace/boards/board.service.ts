@@ -115,6 +115,17 @@ export class BoardService {
     const settings = data.settings || {
       defaultView: 'board' as const,
       showSwimlanes: false,
+      ticketDetailsSettings: {
+        fieldConfigs: [
+          { fieldName: 'priority', isVisible: true, order: 0 },
+          { fieldName: 'assignee', isVisible: true, order: 1 },
+          { fieldName: 'tags', isVisible: true, order: 2 },
+          { fieldName: 'parent', isVisible: true, order: 3 },
+          { fieldName: 'dueDate', isVisible: true, order: 4 },
+          { fieldName: 'startDate', isVisible: true, order: 5 },
+          { fieldName: 'endDate', isVisible: true, order: 6 },
+        ],
+      },
     }
 
     // Boards don't have members - they use workspace membership

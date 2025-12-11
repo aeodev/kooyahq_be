@@ -40,6 +40,7 @@ export type CreateTicketInput = {
     pullRequestUrl?: string
     status?: 'open' | 'merged' | 'closed'
   }
+  relatedTickets?: string[]
 }
 
 export type UpdateTicketInput = {
@@ -49,7 +50,7 @@ export type UpdateTicketInput = {
   rootEpicId?: string
   columnId?: string
   rank?: string
-  points?: number
+  points?: number | null
   priority?: 'highest' | 'high' | 'medium' | 'low' | 'lowest'
   tags?: string[]
   assigneeId?: string | null
@@ -314,7 +315,7 @@ export const ticketRepository = {
       return null
     }
 
-    const existingViewerIndex = doc.viewedBy.findIndex((v) => v.userId === userId)
+    const existingViewerIndex = doc.viewedBy.findIndex((v: { userId: string }) => v.userId === userId)
 
     if (existingViewerIndex >= 0) {
       // Update existing viewer's viewedAgainAt timestamp (keep viewedAt as first view time)
@@ -355,9 +356,8 @@ export const ticketRepository = {
     }
 
     // Remove from array
-    doc.relatedTickets = doc.relatedTickets.filter((id) => id !== relatedTicketId)
+    doc.relatedTickets = doc.relatedTickets.filter((id: string) => id !== relatedTicketId)
     await doc.save()
     return toTicket(doc)
   },
 }
-

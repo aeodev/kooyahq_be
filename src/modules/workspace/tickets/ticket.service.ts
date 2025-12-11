@@ -168,6 +168,7 @@ export const ticketService = {
       endDate?: Date | null
       dueDate?: Date | null
       relatedTickets?: string[]
+      completedAt?: Date | null
       github?: {
         branchName?: string
         pullRequestUrl?: string
@@ -349,4 +350,3 @@ export const ticketService = {
     return ticketRepository.addViewer(ticketId, userId)
   },
 }
-
