@@ -7,3 +7,4 @@ export function employeeOnly(req: Request, _res: Response, next: NextFunction) {
   }
   next()
 }
+
