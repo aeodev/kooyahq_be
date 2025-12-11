@@ -58,4 +58,5 @@ export const env = {
     apiKey: process.env.LIVEKIT_API_KEY ?? '',
     apiSecret: process.env.LIVEKIT_API_SECRET ?? '',
   },
+  openaiApiKey: process.env.OPENAI_API_KEY, // Optional - AI features will be disabled if not provided
 }
