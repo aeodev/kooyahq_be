@@ -62,7 +62,7 @@ export function toPagePermission(doc: PagePermissionDocument): PagePermission {
     userId: doc.userId,
     role: doc.role as 'view' | 'edit' | 'comment' | 'admin',
     workspaceId: doc.workspaceId,
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
+    createdAt: doc.createdAt?.toISOString() || new Date().toISOString(),
+    updatedAt: doc.updatedAt?.toISOString() || new Date().toISOString(),
   }
 }

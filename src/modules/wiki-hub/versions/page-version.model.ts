@@ -1,5 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
-import type { RichTextDoc } from './page.model'
+import type { RichTextDoc } from '../pages/page.model'
 
 export interface PageVersionDocument extends Document {
   pageId: string
@@ -64,6 +64,6 @@ export function toPageVersion(doc: PageVersionDocument): PageVersion {
     content: doc.content as RichTextDoc,
     editorId: doc.editorId,
     changeSummary: doc.changeSummary,
-    createdAt: doc.createdAt.toISOString(),
+    createdAt: doc.createdAt?.toISOString() || new Date().toISOString(),
   }
 }

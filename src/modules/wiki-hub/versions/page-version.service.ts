@@ -1,8 +1,8 @@
 import { pageVersionRepository } from './page-version.repository'
-import { pageRepository } from './page.repository'
-import { pageService } from './page.service'
+import { pageRepository } from '../pages/page.repository'
+import { pageService } from '../pages/page.service'
 import type { PageVersion } from './page-version.model'
-import type { Page } from './page.model'
+import type { Page } from '../pages/page.model'
 import * as diff from 'diff'
 
 export class PageVersionService {

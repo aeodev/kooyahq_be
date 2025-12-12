@@ -1,7 +1,7 @@
 import { pageRepository, type CreatePageInput, type UpdatePageInput } from './page.repository'
-import { pageVersionRepository } from './page-version.repository'
+import { pageVersionRepository } from '../versions/page-version.repository'
 import { pagePermissionRepository } from './page-permission.repository'
-import { workspaceService } from '../workspace/workspace/workspace.service'
+import { workspaceService } from '../../workspace/workspace/workspace.service'
 import type { Page } from './page.model'
 
 export class PageService {

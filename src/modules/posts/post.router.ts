@@ -12,6 +12,7 @@ postRouter.get('/', getPosts)
 postRouter.get('/me', getMyPosts)
 postRouter.post('/', uploadPost.single('image'), createPost)
 postRouter.put('/:id', uploadPost.single('image'), updatePost)
+postRouter.delete('/:id', deletePost)
 postRouter.post('/:id/poll/vote', votePoll)
 
 // Post comments routes

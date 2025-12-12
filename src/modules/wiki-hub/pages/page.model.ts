@@ -152,12 +152,12 @@ export function toPage(doc: PageDocument): Page {
     isPinned: doc.isPinned || false,
     favorites: (doc.favorites || []).map((fav) => ({
       userId: fav.userId,
-      favoritedAt: fav.favoritedAt.toISOString(),
+      favoritedAt: fav.favoritedAt?.toISOString() || new Date().toISOString(),
     })),
     linkedTicketIds: doc.linkedTicketIds || [],
     linkedProjectIds: doc.linkedProjectIds || [],
     deletedAt: doc.deletedAt?.toISOString(),
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
+    createdAt: doc.createdAt?.toISOString() || new Date().toISOString(),
+    updatedAt: doc.updatedAt?.toISOString() || new Date().toISOString(),
   }
 }

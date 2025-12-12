@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { templateRepository, type CreateTemplateInput } from './template.repository'
-import { pageService } from './page.service'
-import { createHttpError } from '../../utils/http-error'
+import { pageService } from '../pages/page.service'
+import { createHttpError } from '../../../utils/http-error'
 
 export async function createTemplate(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id

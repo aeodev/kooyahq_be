@@ -6,18 +6,28 @@
  * with Workspace, Tasks, and Feed.
  */
 
-export * from './page.model'
-export * from './page-version.model'
-export * from './template.model'
-export * from './page-tag.model'
-export * from './page-permission.model'
-export * from './page-attachment.model'
-export * from './page-backlink.model'
-export * from './page.repository'
-export * from './page-version.repository'
-export * from './template.repository'
-export * from './page-permission.repository'
-export * from './page.service'
-export * from './page-version.service'
-export * from './ai.service'
-export * from './search.service'
+// Module router
+export * from './wiki-hub.router'
+
+// Pages
+export * from './pages/page.model'
+export * from './pages/page.repository'
+export * from './pages/page.service'
+export * from './pages/page-tag.model'
+export * from './pages/page-permission.model'
+export * from './pages/page-attachment.model'
+export * from './pages/page-backlink.model'
+export * from './pages/page-permission.repository'
+export * from './pages/search.service'
+
+// Versions
+export * from './versions/page-version.model'
+export * from './versions/page-version.repository'
+export * from './versions/page-version.service'
+
+// Templates
+export * from './templates/template.model'
+export * from './templates/template.repository'
+
+// AI
+export * from './ai/ai.service'

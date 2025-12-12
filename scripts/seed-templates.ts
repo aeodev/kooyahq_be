@@ -1,5 +1,5 @@
 import { connectToDatabase, disconnectFromDatabase } from '../src/lib/mongo'
-import { templateRepository } from '../src/modules/wiki-hub/template.repository'
+import { templateRepository } from '../src/modules/wiki-hub/templates/template.repository'
 
 const defaultTemplates = [
   {

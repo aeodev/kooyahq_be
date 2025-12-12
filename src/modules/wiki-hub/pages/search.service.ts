@@ -1,5 +1,5 @@
 import { pageRepository } from './page.repository'
-import { aiService } from './ai.service'
+import { aiService } from '../ai/ai.service'
 import type { Page } from './page.model'
 
 export class SearchService {
@@ -51,7 +51,7 @@ export class SearchService {
 
       // Use semantic search to find similar pages
       const pageText = `${page.title} ${this.extractTextFromRichText(page.content)}`
-      const related = await aiService.semanticSearch(pageText, page.workspaceId)
+      const related = await aiService.semanticSearch(pageText, otherPages)
 
       // Filter out the current page and return top 5
       return related.filter((p) => p.id !== pageId).slice(0, 5)

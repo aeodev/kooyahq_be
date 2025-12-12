@@ -52,6 +52,6 @@ export function toPageBacklink(doc: PageBacklinkDocument): PageBacklink {
     pageId: doc.pageId,
     linkedPageId: doc.linkedPageId,
     workspaceId: doc.workspaceId,
-    createdAt: doc.createdAt.toISOString(),
+    createdAt: doc.createdAt?.toISOString() || new Date().toISOString(),
   }
 }

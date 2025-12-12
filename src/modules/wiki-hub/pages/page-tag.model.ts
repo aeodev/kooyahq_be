@@ -51,6 +51,6 @@ export function toPageTag(doc: PageTagDocument): PageTag {
     pageId: doc.pageId,
     tagName: doc.tagName,
     workspaceId: doc.workspaceId,
-    createdAt: doc.createdAt.toISOString(),
+    createdAt: doc.createdAt?.toISOString() || new Date().toISOString(),
   }
 }

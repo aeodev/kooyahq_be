@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
 import { aiService } from './ai.service'
-import { pageService } from './page.service'
-import { searchService } from './search.service'
-import { createHttpError } from '../../utils/http-error'
+import { pageService } from '../pages/page.service'
+import { searchService } from '../pages/search.service'
+import { createHttpError } from '../../../utils/http-error'
 
 export async function summarizePage(req: Request, res: Response, next: NextFunction) {
   const { pageId } = req.body

@@ -1,25 +1,29 @@
 import type { NextFunction, Request, Response } from 'express'
 import { pageService } from './page.service'
-import { pageVersionService } from './page-version.service'
-import { createHttpError } from '../../utils/http-error'
-import { upload } from '../../middleware/upload'
+import { pageVersionService } from '../versions/page-version.service'
+import { createHttpError } from '../../../utils/http-error'
+import { upload } from '../../../middleware/upload'
 import { PageAttachmentModel, toPageAttachment } from './page-attachment.model'
-import { activityRepository } from '../workspace/activities/activity.repository'
+import { activityRepository } from '../../workspace/activities/activity.repository'
+import {
+  requireAuth,
+  sendResponse,
+  handleControllerError,
+  validateQueryParam,
+  validateBodyField,
+} from '../utils/controller-helpers'
 
 export async function createPage(req: Request, res: Response, next: NextFunction) {
-  const userId = req.user?.id
-  const { workspaceId, title, content, parentPageId, status, templateId, tags, category } =
-    req.body
+  const userId = requireAuth(req, next)
+  if (!userId) return
 
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!workspaceId || !title) {
-    return next(createHttpError(400, 'Workspace ID and title are required'))
-  }
+  const workspaceId = validateBodyField(req, 'workspaceId', next)
+  const title = validateBodyField(req, 'title', next)
+  if (!workspaceId || !title) return
 
   try {
+    const { content, parentPageId, status, templateId, tags, category } = req.body
+
     const page = await pageService.createPage(
       {
         workspaceId,
@@ -38,7 +42,7 @@ export async function createPage(req: Request, res: Response, next: NextFunction
     try {
       await activityRepository.create({
         workspaceId,
-        boardId: '', // Pages don't have boards, use empty string
+        boardId: '',
         actorId: userId,
         actionType: 'create',
         changes: [
@@ -54,44 +58,26 @@ export async function createPage(req: Request, res: Response, next: NextFunction
       console.error('Failed to create activity:', activityError)
     }
 
-    res.status(201).json({
-      success: true,
-      data: page,
-      timestamp: new Date().toISOString(),
-    })
+    return sendResponse(res, page, 201)
   } catch (error: any) {
-    if (error.message.includes('not a member')) {
-      return next(createHttpError(403, error.message))
-    }
-    next(error)
+    handleControllerError(error, next, 'Failed to create page')
   }
 }
 
 export async function getPage(req: Request, res: Response, next: NextFunction) {
-  const { id } = req.params
-  const userId = req.user?.id
+  const userId = requireAuth(req, next)
+  if (!userId) return
 
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
+  const { id } = req.params
 
   try {
     const page = await pageService.getPage(id, userId)
-
     if (!page) {
       return next(createHttpError(404, 'Page not found'))
     }
-
-    res.json({
-      success: true,
-      data: page,
-      timestamp: new Date().toISOString(),
-    })
+    return sendResponse(res, page)
   } catch (error: any) {
-    if (error.message.includes('permission')) {
-      return next(createHttpError(403, error.message))
-    }
-    next(error)
+    handleControllerError(error, next, 'Failed to get page')
   }
 }
 
@@ -242,62 +228,33 @@ export async function deletePage(req: Request, res: Response, next: NextFunction
 }
 
 export async function listPages(req: Request, res: Response, next: NextFunction) {
-  const { workspaceId } = req.query
-  const userId = req.user?.id
+  const userId = requireAuth(req, next)
+  if (!userId) return
 
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!workspaceId || typeof workspaceId !== 'string') {
-    return next(createHttpError(400, 'Workspace ID is required'))
-  }
+  const workspaceId = validateQueryParam(req, 'workspaceId', next)
+  if (!workspaceId) return
 
   try {
     const pages = await pageService.listPages(workspaceId, userId)
-
-    res.json({
-      success: true,
-      data: pages,
-      timestamp: new Date().toISOString(),
-    })
+    return sendResponse(res, pages)
   } catch (error: any) {
-    if (error.message.includes('not a member')) {
-      return next(createHttpError(403, error.message))
-    }
-    next(error)
+    handleControllerError(error, next, 'Failed to list pages')
   }
 }
 
 export async function searchPages(req: Request, res: Response, next: NextFunction) {
-  const { workspaceId, q } = req.query
-  const userId = req.user?.id
+  const userId = requireAuth(req, next)
+  if (!userId) return
 
-  if (!userId) {
-    return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!workspaceId || typeof workspaceId !== 'string') {
-    return next(createHttpError(400, 'Workspace ID is required'))
-  }
-
-  if (!q || typeof q !== 'string') {
-    return next(createHttpError(400, 'Search query is required'))
-  }
+  const workspaceId = validateQueryParam(req, 'workspaceId', next)
+  const q = validateQueryParam(req, 'q', next)
+  if (!workspaceId || !q) return
 
   try {
     const pages = await pageService.searchPages(workspaceId, q, userId)
-
-    res.json({
-      success: true,
-      data: pages,
-      timestamp: new Date().toISOString(),
-    })
+    return sendResponse(res, pages)
   } catch (error: any) {
-    if (error.message.includes('not a member')) {
-      return next(createHttpError(403, error.message))
-    }
-    next(error)
+    handleControllerError(error, next, 'Failed to search pages')
   }
 }
 

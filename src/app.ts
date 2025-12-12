@@ -25,9 +25,7 @@ import { presenceRouter } from './modules/presence/presence.router'
 import { meetRouter } from './modules/meet/meet.router'
 import { mediaRouter } from './modules/media/media.router'
 import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
-import { pageRouter } from './modules/wiki-hub/page.router'
-import { templateRouter } from './modules/wiki-hub/template.router'
-import { aiRouter } from './modules/wiki-hub/ai.router'
+import { wikiHubRouter } from './modules/wiki-hub/wiki-hub.router'
 
 export function createApp() {
   const app = express()
@@ -88,9 +86,7 @@ export function createApp() {
   app.use('/api/projects', projectRouter)
   app.use('/api/media', mediaRouter)
   // Wiki Hub module routes
-  app.use('/api/wiki-hub/pages', pageRouter)
-  app.use('/api/wiki-hub/templates', templateRouter)
-  app.use('/api/wiki-hub/ai', aiRouter)
+  app.use('/api/wiki-hub', wikiHubRouter)
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)
   // CRITICAL: Register board router BEFORE ticket router

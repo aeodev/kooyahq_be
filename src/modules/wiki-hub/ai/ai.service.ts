@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
-import { env } from '../../config/env'
-import type { RichTextDoc } from './page.model'
-import type { Page } from './page.model'
+import { env } from '../../../config/env'
+import type { RichTextDoc } from '../pages/page.model'
+import type { Page } from '../pages/page.model'
 
 // Initialize OpenAI client (only if API key is provided)
 let openai: OpenAI | null = null

@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { authenticate } from '../../middleware/authenticate'
-import { upload } from '../../middleware/upload'
+import { authenticate } from '../../../middleware/authenticate'
+import { upload } from '../../../middleware/upload'
 import {
   createPage,
   getPage,

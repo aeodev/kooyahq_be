@@ -76,6 +76,6 @@ export function toPageAttachment(doc: PageAttachmentDocument): PageAttachment {
     name: doc.name,
     size: doc.size,
     uploadedBy: doc.uploadedBy,
-    uploadedAt: doc.uploadedAt.toISOString(),
+    uploadedAt: doc.uploadedAt?.toISOString() || new Date().toISOString(),
   }
 }
