@@ -8,6 +8,7 @@ import {
   getBoardById,
   getBoardByKey,
   getBoards,
+  getBoardsForUser,
   updateBoard,
   toggleFavoriteBoard,
 } from './board.controller'
@@ -60,6 +61,14 @@ boardRouter.post(
   createBoard
 )
 
+// Global create board (no workspace scoping)
+boardRouter.post(
+  '/boards',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_CREATE, PERMISSIONS.BOARD_FULL_ACCESS),
+  createBoard
+)
+
 /**
  * @swagger
  * /workspaces/{workspaceId}/boards:
@@ -88,6 +97,14 @@ boardRouter.get(
   authenticate,
   requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
   getBoards
+)
+
+// Boards accessible to current user (member or owner) across workspaces
+boardRouter.get(
+  '/boards',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
+  getBoardsForUser
 )
 
 /**

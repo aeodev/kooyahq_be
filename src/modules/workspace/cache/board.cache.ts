@@ -2,10 +2,7 @@ import type { Board } from '../boards/board.model'
 import { deleteKeys, getJson, setJson } from '../../../lib/redis'
 
 const boardKey = (id: string) => `board:${id}`
-const boardPrefixKey = (workspaceId: string, prefix: string) =>
-  `board:${workspaceId}:prefix:${prefix.toUpperCase()}`
-const boardListKey = (workspaceId: string, type?: 'kanban' | 'sprint') =>
-  `boards:${workspaceId}:${type ?? 'all'}`
+const boardPrefixKey = (prefix: string) => `board:prefix:${prefix.toUpperCase()}`
 
 export const boardCache = {
   async getBoard(id: string): Promise<Board | null> {
@@ -13,33 +10,14 @@ export const boardCache = {
   },
 
   async setBoard(board: Board): Promise<void> {
-    await Promise.all([
-      setJson(boardKey(board.id), board),
-      setJson(boardPrefixKey(board.workspaceId, board.prefix), board),
-    ])
+    await Promise.all([setJson(boardKey(board.id), board), setJson(boardPrefixKey(board.prefix), board)])
   },
 
-  async deleteBoard(boardId: string, workspaceId: string, prefix: string): Promise<void> {
-    await deleteKeys([boardKey(boardId), boardPrefixKey(workspaceId, prefix)])
+  async deleteBoard(boardId: string, prefix: string): Promise<void> {
+    await deleteKeys([boardKey(boardId), boardPrefixKey(prefix)])
   },
 
-  async getBoardByPrefix(workspaceId: string, prefix: string): Promise<Board | null> {
-    return getJson<Board>(boardPrefixKey(workspaceId, prefix))
-  },
-
-  async getBoards(workspaceId: string, type?: 'kanban' | 'sprint'): Promise<Board[] | null> {
-    return getJson<Board[]>(boardListKey(workspaceId, type))
-  },
-
-  async setBoards(workspaceId: string, boards: Board[], type?: 'kanban' | 'sprint'): Promise<void> {
-    await setJson(boardListKey(workspaceId, type), boards)
-  },
-
-  async invalidateBoardLists(workspaceId: string): Promise<void> {
-    await deleteKeys([
-      boardListKey(workspaceId, 'kanban'),
-      boardListKey(workspaceId, 'sprint'),
-      boardListKey(workspaceId, undefined),
-    ])
+  async getBoardByPrefix(prefix: string): Promise<Board | null> {
+    return getJson<Board>(boardPrefixKey(prefix))
   },
 }

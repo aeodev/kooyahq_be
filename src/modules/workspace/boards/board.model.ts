@@ -1,5 +1,7 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
+export const DEFAULT_WORKSPACE_ID = 'global'
+
 export interface BoardColumn {
   id: string
   name: string
@@ -41,7 +43,7 @@ export interface BoardSettings {
 export interface CreateBoardInput {
   name: string
   type: 'kanban' | 'sprint'
-  workspaceId: string
+  workspaceId?: string
   prefix?: string
   description?: string
   emoji?: string
@@ -162,7 +164,8 @@ const boardSchema = new Schema<BoardDocument>(
   {
     workspaceId: {
       type: String,
-      required: true,
+      required: false,
+      default: DEFAULT_WORKSPACE_ID,
       index: true,
     },
     name: {
@@ -319,4 +322,3 @@ export function toBoard(doc: BoardDocument): Board {
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-

@@ -2,6 +2,7 @@ import type { AuthenticatedSocket } from '../../../lib/socket'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import { PERMISSIONS } from '../../auth/rbac/permissions'
 import { socketHasPermission } from '../../auth/rbac/socket-permissions'
+import { DEFAULT_WORKSPACE_ID } from './board.model'
 
 /**
  * Register socket handlers for workspace/boards module
@@ -11,6 +12,12 @@ export function registerBoardHandlers(socket: AuthenticatedSocket): void {
   const userId = socket.userId
   if (!userId) {
     return
+  }
+
+  // Auto-join the global boards room for real-time updates
+  if (socketHasPermission(socket, PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS)) {
+    socket.join(workspaceRoom(DEFAULT_WORKSPACE_ID))
+    console.log(`User ${userId} joined default boards room`)
   }
 
   // Join a workspace room to receive board updates

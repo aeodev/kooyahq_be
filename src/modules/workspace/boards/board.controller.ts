@@ -1,17 +1,25 @@
 import type { NextFunction, Request, Response } from 'express'
-import { boardService } from './board.service'
+import { boardService, normalizeBoardMembers } from './board.service'
 import { boardFavoriteService } from './board-favorite.service'
 import { createHttpError } from '../../../utils/http-error'
 import { SocketEmitter } from '../../../utils/socket-emitter'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import type { Board } from './board.model'
+import { DEFAULT_WORKSPACE_ID } from './board.model'
 import { boardCache } from '../cache/board.cache'
 import { ticketCache } from '../cache/ticket.cache'
+import { notificationService } from '../../notifications/notification.service'
+
+const isBoardMember = (board: Board, userId: string) =>
+  board.createdBy === userId || (board.members ?? []).some((m) => m.userId === userId)
+
+const isBoardAdmin = (board: Board, userId: string) =>
+  board.createdBy === userId || (board.members ?? []).some((m) => m.userId === userId && m.role === 'admin')
 
 export async function createBoard(req: Request, res: Response, next: NextFunction) {
-  const { workspaceId } = req.params
   const { name, type, description, prefix, emoji, columns, settings, members } = req.body
   const userId = req.user?.id
+  const workspaceId = req.params.workspaceId || DEFAULT_WORKSPACE_ID
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
@@ -30,11 +38,9 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
     return next(createHttpError(400, 'Board type must be "kanban" or "sprint"'))
   }
 
-  if (!workspaceId) {
-    return next(createHttpError(400, 'Workspace ID is required'))
-  }
-
   try {
+    const normalizedMembers = normalizeBoardMembers(members, userId)
+
     const board = await boardService.create({
       workspaceId,
       name: name.trim(),
@@ -44,12 +50,11 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
       emoji,
       columns: columns || [], // Empty by default
       settings,
-      members: [], // Boards don't have members - use workspace membership
+      members: normalizedMembers,
       createdBy: userId,
     })
 
     await boardCache.setBoard(board)
-    await boardCache.invalidateBoardLists(workspaceId)
 
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(workspaceId), 'board:created', {
@@ -57,6 +62,20 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
       userId,
       timestamp: new Date().toISOString(),
     })
+
+    // Notify invited members (excluding creator)
+    const invitedIds = Array.from(
+      new Set(normalizedMembers.filter((m) => m.userId !== userId).map((m) => m.userId)),
+    )
+    try {
+      await Promise.all(
+        invitedIds.map((memberId) =>
+          notificationService.createBoardMemberNotification(memberId, board.id, userId),
+        ),
+      )
+    } catch (notifyError) {
+      console.error('Failed to send board invite notifications', notifyError)
+    }
 
     res.status(201).json({
       success: true,
@@ -77,16 +96,11 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
 }
 
 export async function getBoards(req: Request, res: Response, next: NextFunction) {
-  const { workspaceId } = req.params
   const type = req.query.type as 'kanban' | 'sprint' | undefined
   const userId = req.user?.id
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  if (!workspaceId) {
-    return next(createHttpError(400, 'Workspace ID is required'))
   }
 
   // Validate type if provided
@@ -95,21 +109,56 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
   }
 
   try {
-    let boards = await boardCache.getBoards(workspaceId, type)
-    if (!boards) {
-      boards = await boardService.findByWorkspaceId(workspaceId, type)
-      await boardCache.setBoards(workspaceId, boards, type)
-    }
-    
+    const boards = await boardService.findByUserId(userId)
+
     // Get favorite board IDs for the user
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
     const favoriteSet = new Set(favoriteBoardIds)
     
     // Add isFavorite property to each board
-    const boardsWithFavorites = boards.map(board => ({
-      ...board,
-      isFavorite: favoriteSet.has(board.id),
-    }))
+    const boardsWithFavorites = boards
+      .filter((board) => !type || board.type === type)
+      .map(board => ({
+        ...board,
+        isFavorite: favoriteSet.has(board.id),
+      }))
+
+    // Only allow boards where the user is a member or creator
+    const accessibleBoards = boardsWithFavorites.filter((board) => isBoardMember(board, userId))
+
+    res.json({
+      success: true,
+      data: accessibleBoards,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getBoardsForUser(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+  const type = req.query.type as 'kanban' | 'sprint' | undefined
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (type && type !== 'kanban' && type !== 'sprint') {
+    return next(createHttpError(400, 'Board type must be \"kanban\" or \"sprint\"'))
+  }
+
+  try {
+    const boards = await boardService.findByUserId(userId)
+    const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
+    const favoriteSet = new Set(favoriteBoardIds)
+
+    const boardsWithFavorites = boards
+      .filter((board) => !type || board.type === type)
+      .map((board) => ({
+        ...board,
+        isFavorite: favoriteSet.has(board.id),
+      }))
 
     res.json({
       success: true,
@@ -142,14 +191,8 @@ export async function getBoardById(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    // Allow board access only if user is a board member or creator
+    if (!isBoardMember(board, userId)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -177,38 +220,23 @@ export async function getBoardByKey(req: Request, res: Response, next: NextFunct
 
   try {
     const normalizedKey = key.toUpperCase()
-    // Get user's workspaces
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspaces = await workspaceServiceModule.workspaceService.findByUserId(userId)
+    let board: Board | null = await boardCache.getBoardByPrefix(normalizedKey)
 
-    if (!workspaces || workspaces.length === 0) {
-      return next(createHttpError(404, 'Board not found'))
-    }
-
-    // Search for board by prefix across user's workspaces
-    let board = null
-    for (const workspace of workspaces) {
-      board = await boardCache.getBoardByPrefix(workspace.id, normalizedKey)
-      if (!board) {
-        board = await boardService.findByPrefix(workspace.id, normalizedKey)
-        if (board) {
-          await boardCache.setBoard(board)
-        }
-      }
+    // Fallback: search globally for this prefix
+    if (!board) {
+      board = await boardService.findByPrefixAnyWorkspace(normalizedKey)
       if (board) {
-        // Boards use workspace membership - if user is workspace member, they can access
-        const isWorkspaceMember = workspace.members && workspace.members.some((m) => m.userId === userId)
-        
-        if (isWorkspaceMember) {
-          break
-        }
-        // If board found but user doesn't have workspace access, continue searching other workspaces
-        board = null
+        await boardCache.setBoard(board)
       }
     }
 
     if (!board) {
       return next(createHttpError(404, 'Board not found'))
+    }
+
+    // Final access check: require board membership or creator
+    if (!isBoardMember(board, userId)) {
+      return next(createHttpError(403, 'Forbidden'))
     }
 
     res.json({
@@ -242,19 +270,24 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check permissions - user must be workspace admin or owner (boards use workspace membership)
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const workspaceMember = workspace.members.find((m) => m.userId === userId)
-    if (!workspaceMember || workspaceMember.role === 'member') {
-      // Only workspace owners and admins can delete boards
+    // Check permissions - board admins can update
+    if (!isBoardAdmin(board, userId)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const updates: Partial<Pick<Board, 'name' | 'description' | 'prefix' | 'emoji' | 'settings' | 'columns'>> = {}
+    const updates: Partial<{
+      name: string
+      description?: string
+      prefix?: string
+      emoji?: string
+      settings: Board['settings']
+      columns: Board['columns']
+      members: Array<{
+        userId: string
+        role: 'admin' | 'member' | 'viewer'
+        joinedAt: Date
+      }>
+    }> = {}
     if (data.name !== undefined) {
       if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
         return next(createHttpError(400, 'Board name is required'))
@@ -276,8 +309,21 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
     if (data.columns !== undefined) {
       updates.columns = Array.isArray(data.columns) ? data.columns : []
     }
-    // Boards don't have members - they use workspace membership
-    // Ignore data.members if provided
+    // Handle members updates (invite/remove)
+    if (data.members !== undefined) {
+      if (!Array.isArray(data.members)) {
+        return next(createHttpError(400, 'Members must be an array'))
+      }
+      updates.members = normalizeBoardMembers(data.members as any, board.createdBy, board.members)
+      // Prevent removing creator
+      if (!updates.members.some((m) => m.userId === board.createdBy)) {
+        updates.members.push({
+          userId: board.createdBy,
+          role: 'admin',
+          joinedAt: new Date(),
+        })
+      }
+    }
 
     const updated = await boardService.update(id, updates)
 
@@ -286,13 +332,25 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
     }
 
     if (board.prefix !== updated.prefix) {
-      await boardCache.deleteBoard(board.id, board.workspaceId, board.prefix)
+      await boardCache.deleteBoard(board.id, board.prefix)
     }
     await boardCache.setBoard(updated)
-    await boardCache.invalidateBoardLists(board.workspaceId)
+
+    // Notify newly added members
+    if (updates.members) {
+      const previousIds = new Set(board.members.map((m) => m.userId))
+      const addedIds = updates.members
+        .filter((member) => !previousIds.has(member.userId) && member.userId !== userId)
+        .map((member) => member.userId)
+      await Promise.all(
+        addedIds.map((memberId) =>
+          notificationService.createBoardMemberNotification(memberId, updated.id, userId),
+        ),
+      )
+    }
 
     // Emit socket event for real-time updates
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'board:updated', {
+    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId || DEFAULT_WORKSPACE_ID), 'board:updated', {
       board: updated,
       userId,
       timestamp: new Date().toISOString(),
@@ -336,25 +394,17 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check permissions - user must be workspace admin or owner (boards use workspace membership)
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const workspaceMember = workspace.members.find((m) => m.userId === userId)
-    if (!workspaceMember || workspaceMember.role === 'member') {
-      // Only workspace owners and admins can delete boards
+    // Check permissions - board admins can delete
+    if (!isBoardAdmin(board, userId)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
     await boardService.delete(id)
-    await boardCache.deleteBoard(board.id, board.workspaceId, board.prefix)
-    await boardCache.invalidateBoardLists(board.workspaceId)
+    await boardCache.deleteBoard(board.id, board.prefix)
     await ticketCache.invalidateBoardTickets(id)
 
     // Emit socket event for real-time updates
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'board:deleted', {
+    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId || DEFAULT_WORKSPACE_ID), 'board:deleted', {
       boardId: id,
       userId,
       timestamp: new Date().toISOString(),
@@ -389,21 +439,15 @@ export async function toggleFavoriteBoard(req: Request, res: Response, next: Nex
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    // Check if user is allowed: board member or creator
+    if (!isBoardMember(board, userId)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
     const result = await boardFavoriteService.toggleFavorite(userId, boardId)
 
     // Emit socket event for real-time updates
-    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId), 'board:favorite-toggled', {
+    SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId || DEFAULT_WORKSPACE_ID), 'board:favorite-toggled', {
       boardId,
       userId,
       isFavorite: result.isFavorite,

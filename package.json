@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "seed:workspace": "ts-node scripts/seed-workspace.ts",
-    "fix:indexes": "ts-node scripts/fix-board-indexes.ts"
+    "fix:indexes": "ts-node scripts/fix-board-indexes.ts",
+    "smoke:board-members": "ts-node scripts/smoke-board-members.ts"
   },
   "keywords": [],
   "author": "",

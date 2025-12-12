@@ -1,14 +1,18 @@
-import { BoardModel, toBoard, type Board, type CreateBoardInput } from './board.model'
+import { BoardModel, DEFAULT_WORKSPACE_ID, toBoard, type Board, type CreateBoardInput } from './board.model'
 
 export class BoardRepository {
   async create(data: CreateBoardInput): Promise<Board> {
-    const board = await BoardModel.create(data)
+    const board = await BoardModel.create({
+      ...data,
+      workspaceId: data.workspaceId || DEFAULT_WORKSPACE_ID,
+    })
     return toBoard(board)
   }
 
-  async findByWorkspaceId(workspaceId: string, type?: 'kanban' | 'sprint'): Promise<Board[]> {
+  async findByWorkspaceId(workspaceId?: string, type?: 'kanban' | 'sprint'): Promise<Board[]> {
+    const targetWorkspaceId = workspaceId || DEFAULT_WORKSPACE_ID
     const query: any = {
-      workspaceId,
+      workspaceId: targetWorkspaceId,
       deletedAt: { $exists: false },
     }
     if (type) {
@@ -26,21 +30,42 @@ export class BoardRepository {
     return board ? toBoard(board) : null
   }
 
-  async findByPrefix(workspaceId: string, prefix: string): Promise<Board | null> {
+  async findByPrefix(workspaceId: string | undefined, prefix: string): Promise<Board | null> {
+    const targetWorkspaceId = workspaceId || DEFAULT_WORKSPACE_ID
     const board = await BoardModel.findOne({
-      workspaceId,
+      workspaceId: targetWorkspaceId,
       prefix: prefix.toUpperCase(),
       deletedAt: { $exists: false },
     })
     return board ? toBoard(board) : null
   }
 
-  async findByPrefixIncludingDeleted(workspaceId: string, prefix: string): Promise<Board | null> {
+  async findByPrefixIncludingDeleted(workspaceId: string | undefined, prefix: string): Promise<Board | null> {
+    const targetWorkspaceId = workspaceId || DEFAULT_WORKSPACE_ID
     const board = await BoardModel.findOne({
-      workspaceId,
+      workspaceId: targetWorkspaceId,
       prefix: prefix.toUpperCase(),
     })
     return board ? toBoard(board) : null
+  }
+
+  async findByPrefixAnyWorkspace(prefix: string): Promise<Board | null> {
+    const board = await BoardModel.findOne({
+      prefix: prefix.toUpperCase(),
+      deletedAt: { $exists: false },
+    })
+    return board ? toBoard(board) : null
+  }
+
+  async findByUserId(userId: string): Promise<Board[]> {
+    const boards = await BoardModel.find({
+      deletedAt: { $exists: false },
+      $or: [
+        { createdBy: userId },
+        { 'members.userId': userId },
+      ],
+    }).sort({ updatedAt: -1 })
+    return boards.map(toBoard)
   }
 
   async findByIdIncludingDeleted(id: string): Promise<Board | null> {

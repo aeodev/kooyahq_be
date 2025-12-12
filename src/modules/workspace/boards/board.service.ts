@@ -1,18 +1,5 @@
 import { boardRepository } from './board.repository'
-import type { Board, CreateBoardInput } from './board.model'
-
-const DEFAULT_KANBAN_COLUMNS = [
-  { id: 'col_todo', name: 'To Do', order: 0, isDoneColumn: false },
-  { id: 'col_doing', name: 'Doing', order: 1, isDoneColumn: false },
-  { id: 'col_done', name: 'Done', order: 2, isDoneColumn: true },
-]
-
-const DEFAULT_SPRINT_COLUMNS = [
-  { id: 'col_backlog', name: 'Backlog', order: 0, isDoneColumn: false },
-  { id: 'col_sprint', name: 'Sprint', order: 1, isDoneColumn: false },
-  { id: 'col_review', name: 'Review', order: 2, isDoneColumn: false },
-  { id: 'col_done', name: 'Done', order: 3, isDoneColumn: true },
-]
+import { DEFAULT_WORKSPACE_ID, type Board, type BoardMember, type CreateBoardInput } from './board.model'
 
 /**
  * Generate a unique board prefix from the board name
@@ -32,11 +19,11 @@ function generateBoardPrefix(name: string): string {
  * Validate prefix uniqueness, including checking deleted boards
  */
 async function validatePrefixUniqueness(
-  workspaceId: string,
   prefix: string,
   excludeBoardId?: string,
 ): Promise<{ isValid: boolean; isDeleted: boolean; message?: string }> {
   const normalizedPrefix = prefix.toUpperCase()
+  const workspaceId = DEFAULT_WORKSPACE_ID
   
   // Check for existing active board with this prefix
   const activeBoard = await boardRepository.findByPrefix(workspaceId, normalizedPrefix)
@@ -65,13 +52,13 @@ async function validatePrefixUniqueness(
  * Generate a unique board prefix, checking for conflicts within workspace
  */
 async function generateUniquePrefix(
-  workspaceId: string,
   name: string,
   existingPrefix?: string,
 ): Promise<string> {
+  const workspaceId = DEFAULT_WORKSPACE_ID
   if (existingPrefix) {
     // Validate the provided prefix
-    const validation = await validatePrefixUniqueness(workspaceId, existingPrefix)
+    const validation = await validatePrefixUniqueness(existingPrefix)
     if (validation.isValid) {
       return existingPrefix.toUpperCase()
     }
@@ -92,14 +79,60 @@ async function generateUniquePrefix(
   return prefix.toUpperCase()
 }
 
+export function normalizeBoardMembers(
+  rawMembers: Array<Partial<BoardMember> | string> | undefined,
+  creatorId: string,
+  existingMembers: Array<BoardMember | { userId: string; role: 'admin' | 'member' | 'viewer'; joinedAt: string | Date }> = [],
+): BoardMember[] {
+  const now = new Date()
+  const previousMembers = new Map(
+    existingMembers.map((member) => [member.userId, { ...member, joinedAt: new Date(member.joinedAt) }]),
+  )
+
+  const normalizedMembers = new Map<string, BoardMember>()
+
+  const source = Array.isArray(rawMembers) ? rawMembers : []
+  source.forEach((member) => {
+    const userId = typeof member === 'string' ? member : member?.userId
+    if (!userId) return
+
+    const providedRole = typeof member === 'string' ? undefined : (member as BoardMember)?.role
+    const role: BoardMember['role'] =
+      providedRole === 'admin' || providedRole === 'viewer' ? providedRole : 'member'
+
+    const previous = previousMembers.get(userId)
+    const joinedAt =
+      typeof (member as BoardMember)?.joinedAt === 'string' || (member as BoardMember)?.joinedAt instanceof Date
+        ? new Date((member as BoardMember).joinedAt as any)
+        : previous?.joinedAt || now
+
+    normalizedMembers.set(userId, {
+      userId,
+      role: previous?.role ?? role,
+      joinedAt,
+    })
+  })
+
+  // Ensure creator is always an admin member
+  const creatorExisting = normalizedMembers.get(creatorId) || previousMembers.get(creatorId)
+  normalizedMembers.set(creatorId, {
+    userId: creatorId,
+    role: 'admin',
+    joinedAt: creatorExisting?.joinedAt || now,
+  })
+
+  return Array.from(normalizedMembers.values())
+}
+
 export class BoardService {
   async create(data: CreateBoardInput): Promise<Board> {
+    const workspaceId = data.workspaceId || DEFAULT_WORKSPACE_ID
     // Boards start empty - no default columns
     const columns = data.columns || []
 
     // Validate prefix if provided
     if (data.prefix) {
-      const validation = await validatePrefixUniqueness(data.workspaceId, data.prefix)
+      const validation = await validatePrefixUniqueness(data.prefix)
       if (!validation.isValid) {
         const error = new Error(validation.message || 'Prefix is not unique')
         ;(error as any).statusCode = 409
@@ -109,7 +142,7 @@ export class BoardService {
     }
 
     // Generate unique prefix if not provided
-    const prefix = await generateUniquePrefix(data.workspaceId, data.name, data.prefix)
+    const prefix = await generateUniquePrefix(data.name, data.prefix)
 
     // Set default settings if not provided
     const settings = data.settings || {
@@ -128,12 +161,12 @@ export class BoardService {
       },
     }
 
-    // Boards don't have members - they use workspace membership
-    const members: any[] = []
+    const members = normalizeBoardMembers(data.members, data.createdBy)
 
     try {
       return await boardRepository.create({
         ...data,
+        workspaceId,
         prefix,
         columns,
         settings,
@@ -143,7 +176,7 @@ export class BoardService {
     } catch (error: any) {
       // Handle MongoDB duplicate key error
       if (error.code === 11000 || error.message?.includes('duplicate')) {
-        const validation = await validatePrefixUniqueness(data.workspaceId, prefix)
+        const validation = await validatePrefixUniqueness(prefix)
         const err = new Error(
           validation.isDeleted
             ? `A deleted board with key "${prefix}" exists. Please choose a different key.`
@@ -158,18 +191,26 @@ export class BoardService {
   }
 
   async findByWorkspaceId(
-    workspaceId: string,
+    workspaceId?: string,
     type?: 'kanban' | 'sprint',
   ): Promise<Board[]> {
-    return boardRepository.findByWorkspaceId(workspaceId, type)
+    return boardRepository.findByWorkspaceId(workspaceId || DEFAULT_WORKSPACE_ID, type)
   }
 
   async findById(id: string): Promise<Board | null> {
     return boardRepository.findById(id)
   }
 
-  async findByPrefix(workspaceId: string, prefix: string): Promise<Board | null> {
-    return boardRepository.findByPrefix(workspaceId, prefix)
+  async findByPrefix(workspaceId: string | undefined, prefix: string): Promise<Board | null> {
+    return boardRepository.findByPrefix(workspaceId || DEFAULT_WORKSPACE_ID, prefix)
+  }
+
+  async findByPrefixAnyWorkspace(prefix: string): Promise<Board | null> {
+    return boardRepository.findByPrefixAnyWorkspace(prefix)
+  }
+
+  async findByUserId(userId: string): Promise<Board[]> {
+    return boardRepository.findByUserId(userId)
   }
 
   async update(
@@ -199,18 +240,15 @@ export class BoardService {
       }>
     }>,
   ): Promise<Board | null> {
+    let currentBoard: Board | null = null
     // Validate prefix if being updated
     if (updates.prefix) {
-      const currentBoard = await this.findById(id)
+      currentBoard = await this.findById(id)
       if (!currentBoard) {
         return null
       }
 
-      const validation = await validatePrefixUniqueness(
-        currentBoard.workspaceId,
-        updates.prefix,
-        id
-      )
+      const validation = await validatePrefixUniqueness(updates.prefix, id)
       if (!validation.isValid) {
         const error = new Error(validation.message || 'Prefix is not unique')
         ;(error as any).statusCode = 409
@@ -219,22 +257,26 @@ export class BoardService {
       }
     }
 
+    // Normalize members if provided
+    const normalizedUpdates = { ...updates }
+    if (updates.members) {
+      currentBoard = currentBoard ?? await this.findById(id)
+      const creatorId = currentBoard?.createdBy || (updates.members[0] as any)?.userId || ''
+      normalizedUpdates.members = normalizeBoardMembers(updates.members as any, creatorId, currentBoard?.members)
+    }
+
     try {
-      return await boardRepository.update(id, updates)
+      return await boardRepository.update(id, normalizedUpdates)
     } catch (error: any) {
       // Handle MongoDB duplicate key error
       if (error.code === 11000 || error.message?.includes('duplicate')) {
-        const currentBoard = await this.findById(id)
-        if (currentBoard && updates.prefix) {
-          const validation = await validatePrefixUniqueness(
-            currentBoard.workspaceId,
-            updates.prefix,
-            id
-          )
+        currentBoard = currentBoard ?? await this.findById(id)
+        if (currentBoard && normalizedUpdates.prefix) {
+          const validation = await validatePrefixUniqueness(normalizedUpdates.prefix, id)
           const err = new Error(
             validation.isDeleted
-              ? `A deleted board with key "${updates.prefix.toUpperCase()}" exists. Please choose a different key.`
-              : `A board with key "${updates.prefix.toUpperCase()}" already exists`
+              ? `A deleted board with key "${normalizedUpdates.prefix.toUpperCase()}" exists. Please choose a different key.`
+              : `A board with key "${normalizedUpdates.prefix.toUpperCase()}" already exists`
           )
           ;(err as any).statusCode = 409
           ;(err as any).isDeleted = validation.isDeleted
