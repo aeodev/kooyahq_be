@@ -3,15 +3,14 @@ import { Schema, model, models, type Document } from 'mongoose'
 export interface UserDocument extends Document {
   email: string
   name: string
-  isAdmin: boolean
   userType: 'employee' | 'client'
+  permissions: string[]
   position?: string
   birthday?: Date
   profilePic?: string
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
-  clientCompanyId?: string
   deletedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -30,10 +29,9 @@ const userSchema = new Schema<UserDocument>(
       required: true,
       trim: true,
     },
-    isAdmin: {
-      type: Boolean,
-      default: false,
-      index: true,
+    permissions: {
+      type: [String],
+      default: [],
     },
     userType: {
       type: String,
@@ -41,11 +39,6 @@ const userSchema = new Schema<UserDocument>(
       default: 'employee',
       required: true,
       index: true,
-    },
-    clientCompanyId: {
-      type: String,
-      index: true,
-      sparse: true,
     },
     profilePic: {
       type: String,
@@ -86,7 +79,6 @@ const userSchema = new Schema<UserDocument>(
 
 // Indexes for search/filter queries
 userSchema.index({ name: 'text', email: 'text', position: 'text' })
-userSchema.index({ isAdmin: 1, deletedAt: 1 })
 userSchema.index({ createdAt: -1 })
 
 export const UserModel = models.User ?? model<UserDocument>('User', userSchema)
@@ -95,15 +87,14 @@ export type User = {
   id: string
   email: string
   name: string
-  isAdmin: boolean
   userType: 'employee' | 'client'
+  permissions: string[]
   position?: string
   birthday?: string
   profilePic?: string
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
-  clientCompanyId?: string
   deletedAt?: string
   createdAt: string
   updatedAt: string
@@ -116,15 +107,14 @@ export function toUser(doc: UserDocument): User {
     id: doc.id,
     email: doc.email,
     name: doc.name,
-    isAdmin: doc.isAdmin ?? false,
     userType: (doc.userType as 'employee' | 'client') || 'employee',
+    permissions: Array.isArray(doc.permissions) ? doc.permissions : [],
     position: doc.position,
     birthday: doc.birthday?.toISOString(),
     profilePic: doc.profilePic,
     banner: doc.banner,
     bio: doc.bio,
     status: doc.status || 'online',
-    clientCompanyId: doc.clientCompanyId,
     deletedAt: doc.deletedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

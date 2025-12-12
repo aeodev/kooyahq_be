@@ -4,7 +4,7 @@ export type CreateUserInput = {
   email: string
   name: string
   userType?: 'employee' | 'client'
-  clientCompanyId?: string
+  permissions?: string[]
 }
 
 export const userRepository = {
@@ -23,7 +23,7 @@ export const userRepository = {
       email: input.email.toLowerCase(),
       name: input.name,
       userType: input.userType || 'employee',
-      clientCompanyId: input.clientCompanyId,
+      permissions: Array.isArray(input.permissions) ? input.permissions : [],
     })
 
     return toPublicUser(toUser(doc))
@@ -38,20 +38,12 @@ export const userRepository = {
     page?: number
     limit?: number
     search?: string
-    role?: 'admin' | 'user'
   }): Promise<{ data: PublicUser[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const page = params.page || 1
     const limit = params.limit || 50
     const skip = (page - 1) * limit
 
     const query: Record<string, unknown> = { deletedAt: undefined }
-
-    // Role filter
-    if (params.role === 'admin') {
-      query.isAdmin = true
-    } else if (params.role === 'user') {
-      query.isAdmin = false
-    }
 
     // Search filter
     if (params.search && params.search.trim()) {
@@ -102,7 +94,7 @@ export const userRepository = {
     return doc ? toPublicUser(toUser(doc)) : undefined
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; isAdmin?: boolean }): Promise<PublicUser | undefined> {
+  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string }): Promise<PublicUser | undefined> {
     const updateData: Record<string, unknown> = {}
 
     if (updates.name !== undefined) {
@@ -116,9 +108,6 @@ export const userRepository = {
     }
     if (updates.birthday !== undefined) {
       updateData.birthday = updates.birthday ? new Date(updates.birthday) : undefined
-    }
-    if (updates.isAdmin !== undefined) {
-      updateData.isAdmin = updates.isAdmin
     }
 
     const doc = await UserModel.findByIdAndUpdate(

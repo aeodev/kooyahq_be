@@ -6,7 +6,7 @@ let isConnecting = false
 
 export async function getRedisClient(): Promise<RedisClientType> {
   if (!client) {
-    client = createClient({ url: env.redisUrl })
+    client = createClient({ url: env.redis.url })
     client.on('error', (err) => console.error('Redis error:', err))
     client.on('end', () => {
       isConnecting = false
@@ -39,7 +39,7 @@ export async function getJson<T>(key: string): Promise<T | null> {
   }
 }
 
-export async function setJson<T>(key: string, value: T, ttlSeconds = env.redisTtlSeconds): Promise<void> {
+export async function setJson<T>(key: string, value: T, ttlSeconds = env.redis.ttlSeconds): Promise<void> {
   try {
     const redis = await getRedisClient()
     await redis.set(key, JSON.stringify(value), { EX: ttlSeconds })

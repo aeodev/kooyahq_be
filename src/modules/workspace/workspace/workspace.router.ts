@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
+import { requirePermission } from '../../../middleware/require-permission'
+import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createWorkspace,
   deleteWorkspace,
@@ -35,7 +37,12 @@ export const workspaceRouter = Router()
  *       201:
  *         description: Workspace created successfully
  */
-workspaceRouter.post('/', authenticate, createWorkspace)
+workspaceRouter.post(
+  '/',
+  authenticate,
+  requirePermission(PERMISSIONS.WORKSPACE_CREATE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
+  createWorkspace
+)
 
 /**
  * @swagger
@@ -49,7 +56,12 @@ workspaceRouter.post('/', authenticate, createWorkspace)
  *       200:
  *         description: List of workspaces
  */
-workspaceRouter.get('/', authenticate, getWorkspaces)
+workspaceRouter.get(
+  '/',
+  authenticate,
+  requirePermission(PERMISSIONS.WORKSPACE_READ, PERMISSIONS.WORKSPACE_FULL_ACCESS),
+  getWorkspaces
+)
 
 /**
  * @swagger
@@ -69,7 +81,12 @@ workspaceRouter.get('/', authenticate, getWorkspaces)
  *       200:
  *         description: Workspace details
  */
-workspaceRouter.get('/:id', authenticate, getWorkspaceById)
+workspaceRouter.get(
+  '/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.WORKSPACE_READ, PERMISSIONS.WORKSPACE_FULL_ACCESS),
+  getWorkspaceById
+)
 
 /**
  * @swagger
@@ -104,7 +121,12 @@ workspaceRouter.get('/:id', authenticate, getWorkspaceById)
  *       200:
  *         description: Workspace updated
  */
-workspaceRouter.put('/:id', authenticate, updateWorkspace)
+workspaceRouter.put(
+  '/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.WORKSPACE_UPDATE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
+  updateWorkspace
+)
 
 /**
  * @swagger
@@ -124,5 +146,10 @@ workspaceRouter.put('/:id', authenticate, updateWorkspace)
  *       200:
  *         description: Workspace deleted
  */
-workspaceRouter.delete('/:id', authenticate, deleteWorkspace)
+workspaceRouter.delete(
+  '/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.WORKSPACE_DELETE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
+  deleteWorkspace
+)
 

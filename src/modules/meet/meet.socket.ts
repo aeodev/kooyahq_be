@@ -1,6 +1,8 @@
 import type { AuthenticatedSocket } from '../../lib/socket'
 import { meetRoom } from '../../utils/socket-rooms'
 import { SocketEmitter } from '../../utils/socket-emitter'
+import { PERMISSIONS } from '../auth/rbac/permissions'
+import { socketHasPermission } from '../auth/rbac/socket-permissions'
 
 /**
  * Register socket handlers for meet module
@@ -15,6 +17,7 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
 
   // Join a meeting room (for chat coordination)
   socket.on('meet:join', (meetId: string) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
     const room = meetRoom(meetId)
     socket.join(room)
     console.log(`User ${userId} joined meet ${meetId}`)
@@ -22,12 +25,14 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
 
   // Leave a meeting room
   socket.on('meet:leave', (meetId: string) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
     socket.leave(meetRoom(meetId))
     console.log(`User ${userId} left meet ${meetId}`)
   })
 
   // Handle chat messages
   socket.on('meet:chat-message', (data: { meetId: string; message: string }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
     const { meetId, message } = data
     
     // Broadcast chat message to all participants in the room (including sender)
@@ -40,4 +45,3 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
     })
   })
 }
-

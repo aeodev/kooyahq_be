@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
-import { requireAdmin } from '../../middleware/require-admin'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 import {
   createAnnouncement,
   getAnnouncements,
@@ -11,51 +12,7 @@ import {
 
 export const announcementRouter = Router()
 
-// Public routes - anyone authenticated can view
 announcementRouter.use(authenticate)
-
-/**
- * @swagger
- * /announcements:
- *   get:
- *     summary: Get all announcements
- *     tags: [Announcements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: onlyActive
- *         schema:
- *           type: boolean
- *           default: true
- *     responses:
- *       200:
- *         description: List of announcements
- */
-announcementRouter.get('/', getAnnouncements)
-
-/**
- * @swagger
- * /announcements/{id}:
- *   get:
- *     summary: Get announcement by ID
- *     tags: [Announcements]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Announcement details
- */
-announcementRouter.get('/:id', getAnnouncement)
-
-// Admin-only routes - creating, updating, deleting
-announcementRouter.use(requireAdmin)
 
 /**
  * @swagger
@@ -86,7 +43,17 @@ announcementRouter.use(requireAdmin)
  *       201:
  *         description: Announcement created
  */
-announcementRouter.post('/', createAnnouncement)
+announcementRouter.get('/', requirePermission(PERMISSIONS.ANNOUNCEMENT_READ, PERMISSIONS.ANNOUNCEMENT_FULL_ACCESS), getAnnouncements)
+announcementRouter.get(
+  '/:id',
+  requirePermission(PERMISSIONS.ANNOUNCEMENT_READ, PERMISSIONS.ANNOUNCEMENT_FULL_ACCESS),
+  getAnnouncement
+)
+announcementRouter.post(
+  '/',
+  requirePermission(PERMISSIONS.ANNOUNCEMENT_CREATE, PERMISSIONS.ANNOUNCEMENT_FULL_ACCESS),
+  createAnnouncement
+)
 
 /**
  * @swagger
@@ -118,7 +85,11 @@ announcementRouter.post('/', createAnnouncement)
  *       200:
  *         description: Announcement updated
  */
-announcementRouter.patch('/:id', updateAnnouncement)
+announcementRouter.patch(
+  '/:id',
+  requirePermission(PERMISSIONS.ANNOUNCEMENT_UPDATE, PERMISSIONS.ANNOUNCEMENT_FULL_ACCESS),
+  updateAnnouncement
+)
 
 /**
  * @swagger
@@ -138,5 +109,8 @@ announcementRouter.patch('/:id', updateAnnouncement)
  *       200:
  *         description: Announcement deleted
  */
-announcementRouter.delete('/:id', deleteAnnouncement)
-
+announcementRouter.delete(
+  '/:id',
+  requirePermission(PERMISSIONS.ANNOUNCEMENT_DELETE, PERMISSIONS.ANNOUNCEMENT_FULL_ACCESS),
+  deleteAnnouncement
+)

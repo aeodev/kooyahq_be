@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 import {
   getAllTodayEntries,
   getMyEntries,
@@ -34,7 +36,11 @@ timeEntryRouter.use(authenticate)
  *       200:
  *         description: List of today's time entries
  */
-timeEntryRouter.get('/', getAllTodayEntries)
+timeEntryRouter.get(
+  '/',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getAllTodayEntries
+)
 
 /**
  * @swagger
@@ -48,7 +54,11 @@ timeEntryRouter.get('/', getAllTodayEntries)
  *       200:
  *         description: User's time entries
  */
-timeEntryRouter.get('/me', getMyEntries)
+timeEntryRouter.get(
+  '/me',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getMyEntries
+)
 
 /**
  * @swagger
@@ -73,7 +83,11 @@ timeEntryRouter.get('/me', getMyEntries)
  *       200:
  *         description: Time entries in range
  */
-timeEntryRouter.get('/me/range', getMyEntriesByDateRange)
+timeEntryRouter.get(
+  '/me/range',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getMyEntriesByDateRange
+)
 
 /**
  * @swagger
@@ -102,7 +116,11 @@ timeEntryRouter.get('/me/range', getMyEntriesByDateRange)
  *       200:
  *         description: Analytics data
  */
-timeEntryRouter.get('/analytics', getAnalytics)
+timeEntryRouter.get(
+  '/analytics',
+  requirePermission(PERMISSIONS.TIME_ENTRY_ANALYTICS, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getAnalytics
+)
 
 /**
  * @swagger
@@ -116,7 +134,11 @@ timeEntryRouter.get('/analytics', getAnalytics)
  *       200:
  *         description: Active timer data
  */
-timeEntryRouter.get('/timer/active', getActiveTimer)
+timeEntryRouter.get(
+  '/timer/active',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getActiveTimer
+)
 
 /**
  * @swagger
@@ -130,7 +152,11 @@ timeEntryRouter.get('/timer/active', getActiveTimer)
  *       200:
  *         description: Day ended status
  */
-timeEntryRouter.get('/timer/day-ended-status', getDayEndedStatus)
+timeEntryRouter.get(
+  '/timer/day-ended-status',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getDayEndedStatus
+)
 
 /**
  * @swagger
@@ -160,7 +186,11 @@ timeEntryRouter.get('/timer/day-ended-status', getDayEndedStatus)
  *       200:
  *         description: Timer started
  */
-timeEntryRouter.post('/timer/start', startTimer)
+timeEntryRouter.post(
+  '/timer/start',
+  requirePermission(PERMISSIONS.TIME_ENTRY_CREATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  startTimer
+)
 
 /**
  * @swagger
@@ -185,7 +215,11 @@ timeEntryRouter.post('/timer/start', startTimer)
  *       200:
  *         description: Task added to active timer
  */
-timeEntryRouter.post('/timer/add-task', addTask)
+timeEntryRouter.post(
+  '/timer/add-task',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  addTask
+)
 
 /**
  * @swagger
@@ -199,7 +233,11 @@ timeEntryRouter.post('/timer/add-task', addTask)
  *       200:
  *         description: Timer paused
  */
-timeEntryRouter.post('/timer/pause', pauseTimer)
+timeEntryRouter.post(
+  '/timer/pause',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  pauseTimer
+)
 
 /**
  * @swagger
@@ -213,7 +251,11 @@ timeEntryRouter.post('/timer/pause', pauseTimer)
  *       200:
  *         description: Timer resumed
  */
-timeEntryRouter.post('/timer/resume', resumeTimer)
+timeEntryRouter.post(
+  '/timer/resume',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  resumeTimer
+)
 
 /**
  * @swagger
@@ -227,7 +269,11 @@ timeEntryRouter.post('/timer/resume', resumeTimer)
  *       200:
  *         description: Timer stopped
  */
-timeEntryRouter.post('/timer/stop', stopTimer)
+timeEntryRouter.post(
+  '/timer/stop',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  stopTimer
+)
 
 /**
  * @swagger
@@ -241,7 +287,11 @@ timeEntryRouter.post('/timer/stop', stopTimer)
  *       200:
  *         description: Day ended
  */
-timeEntryRouter.post('/timer/end-day', endDay)
+timeEntryRouter.post(
+  '/timer/end-day',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  endDay
+)
 
 /**
  * @swagger
@@ -275,7 +325,11 @@ timeEntryRouter.post('/timer/end-day', endDay)
  *       201:
  *         description: Time entry logged
  */
-timeEntryRouter.post('/manual', logManualEntry)
+timeEntryRouter.post(
+  '/manual',
+  requirePermission(PERMISSIONS.TIME_ENTRY_CREATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  logManualEntry
+)
 
 /**
  * @swagger
@@ -295,7 +349,11 @@ timeEntryRouter.post('/manual', logManualEntry)
  *       200:
  *         description: Time entry updated
  */
-timeEntryRouter.put('/:id', updateEntry)
+timeEntryRouter.put(
+  '/:id',
+  requirePermission(PERMISSIONS.TIME_ENTRY_UPDATE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  updateEntry
+)
 
 /**
  * @swagger
@@ -315,5 +373,8 @@ timeEntryRouter.put('/:id', updateEntry)
  *       200:
  *         description: Time entry deleted
  */
-timeEntryRouter.delete('/:id', deleteEntry)
-
+timeEntryRouter.delete(
+  '/:id',
+  requirePermission(PERMISSIONS.TIME_ENTRY_DELETE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  deleteEntry
+)

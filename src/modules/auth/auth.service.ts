@@ -4,6 +4,7 @@ import { createAccessToken } from '../../utils/token'
 import { toPublicUser } from '../users/user.model'
 import { userService } from '../users/user.service'
 import { authRepository } from './auth.repository'
+import { buildAuthUser, type AuthUser, type Permission } from './rbac/permissions'
 
 const MIN_PASSWORD_LENGTH = 8
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -12,6 +13,7 @@ type RegisterInput = {
   email: string
   password: string
   name: string
+  permissions?: Permission[]
 }
 
 type LoginInput = {
@@ -38,7 +40,7 @@ function validatePassword(password: string) {
   }
 }
 
-export async function registerUser(input: RegisterInput) {
+export async function registerUser(input: RegisterInput): Promise<{ user: AuthUser; token: string }> {
   const email = normalizeEmail(input.email)
   const name = input.name.trim()
   const password = input.password
@@ -62,6 +64,7 @@ export async function registerUser(input: RegisterInput) {
   const user = await userService.create({
     email,
     name,
+    permissions: Array.isArray(input.permissions) ? input.permissions : [],
   })
 
   // Create Auth credentials with reference to User
@@ -71,15 +74,16 @@ export async function registerUser(input: RegisterInput) {
     userId: user.id,
   })
 
-  const token = createAccessToken(user)
+  const authUser = buildAuthUser(user)
+  const token = createAccessToken(authUser)
 
   return {
-    user,
+    user: authUser,
     token,
   }
 }
 
-export async function authenticateUser(input: LoginInput) {
+export async function authenticateUser(input: LoginInput): Promise<{ user: AuthUser; token: string }> {
   const email = normalizeEmail(input.email)
   const password = input.password
 
@@ -110,10 +114,11 @@ export async function authenticateUser(input: LoginInput) {
     throw createHttpError(401, 'User not found')
   }
 
-  const token = createAccessToken(user)
+  const authUser = buildAuthUser(user)
+  const token = createAccessToken(authUser)
 
   return {
-    user,
+    user: authUser,
     token,
   }
 }

@@ -4,6 +4,7 @@ import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
 import { hashPassword } from '../../utils/password'
+import { buildAuthUser } from '../auth/rbac/permissions'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -26,15 +27,14 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 
 export async function getAllUsers(req: Request, res: Response, next: NextFunction) {
   try {
-    const { page, limit, search, role } = req.query
+    const { page, limit, search } = req.query
 
     // If pagination/search params provided, use searchUsers
-    if (page || limit || search || role) {
+    if (page || limit || search) {
       const result = await userService.searchUsers({
         page: page ? parseInt(page as string, 10) : undefined,
         limit: limit ? parseInt(limit as string, 10) : undefined,
         search: search as string | undefined,
-        role: role as 'admin' | 'user' | undefined,
       })
 
       res.json({
@@ -63,10 +63,11 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
   }
 
   try {
-    const user = await userService.getPublicProfile(userId)
-    if (!user) {
+    const userProfile = await userService.getPublicProfile(userId)
+    if (!userProfile) {
       return next(createHttpError(404, 'User not found'))
     }
+    const user = buildAuthUser(userProfile)
     res.json({
       status: 'success',
       data: user,
@@ -133,10 +134,10 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
 export async function updateEmployee(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
-  const { name, email, position, birthday, isAdmin } = req.body
+  const { name, email, position, birthday } = req.body
 
   try {
-    const updates: { name?: string; email?: string; position?: string; birthday?: string; isAdmin?: boolean } = {}
+    const updates: { name?: string; email?: string; position?: string; birthday?: string } = {}
 
     if (name !== undefined) {
       if (!name.trim()) {
@@ -170,10 +171,6 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
         }
       }
       updates.birthday = birthday?.trim() || undefined
-    }
-
-    if (isAdmin !== undefined) {
-      updates.isAdmin = Boolean(isAdmin)
     }
 
     if (Object.keys(updates).length === 0) {
@@ -246,7 +243,10 @@ export async function deleteEmployee(req: Request, res: Response, next: NextFunc
 }
 
 export async function createClient(req: Request, res: Response, next: NextFunction) {
-  const { name, email, password, clientCompanyId } = req.body
+  const { name, email, password } = req.body
+  const permissions = Array.isArray(req.body.permissions)
+    ? (req.body.permissions.filter((p: unknown) => typeof p === 'string') as string[])
+    : []
 
   try {
     // Validate required fields
@@ -279,7 +279,7 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
       email: email.trim(),
       name: name.trim(),
       userType: 'client',
-      clientCompanyId: clientCompanyId?.trim() || undefined,
+      permissions,
     })
 
     // Create auth credentials

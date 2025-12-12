@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
+import { requirePermission } from '../../../middleware/require-permission'
+import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createTicket,
   deleteTicket,
@@ -56,7 +58,12 @@ export const ticketRouter = Router()
  *       201:
  *         description: Ticket created successfully
  */
-ticketRouter.post('/boards/:boardId/tickets', authenticate, createTicket)
+ticketRouter.post(
+  '/boards/:boardId/tickets',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_CREATE, PERMISSIONS.TICKET_FULL_ACCESS),
+  createTicket
+)
 
 /**
  * @swagger
@@ -76,7 +83,12 @@ ticketRouter.post('/boards/:boardId/tickets', authenticate, createTicket)
  *       200:
  *         description: List of tickets
  */
-ticketRouter.get('/boards/:boardId/tickets', authenticate, getTicketsByBoard)
+ticketRouter.get(
+  '/boards/:boardId/tickets',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_READ, PERMISSIONS.TICKET_FULL_ACCESS),
+  getTicketsByBoard
+)
 
 /**
  * @swagger
@@ -96,7 +108,12 @@ ticketRouter.get('/boards/:boardId/tickets', authenticate, getTicketsByBoard)
  *       200:
  *         description: Ticket details
  */
-ticketRouter.get('/tickets/:id', authenticate, getTicketById)
+ticketRouter.get(
+  '/tickets/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_READ, PERMISSIONS.TICKET_FULL_ACCESS),
+  getTicketById
+)
 
 /**
  * @swagger
@@ -172,7 +189,12 @@ ticketRouter.get('/tickets/:id', authenticate, getTicketById)
  *       200:
  *         description: Ticket updated
  */
-ticketRouter.put('/tickets/:id', authenticate, updateTicket)
+ticketRouter.put(
+  '/tickets/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_UPDATE, PERMISSIONS.TICKET_FULL_ACCESS),
+  updateTicket
+)
 
 /**
  * @swagger
@@ -192,7 +214,12 @@ ticketRouter.put('/tickets/:id', authenticate, updateTicket)
  *       200:
  *         description: Ticket deleted
  */
-ticketRouter.delete('/tickets/:id', authenticate, deleteTicket)
+ticketRouter.delete(
+  '/tickets/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_DELETE, PERMISSIONS.TICKET_FULL_ACCESS),
+  deleteTicket
+)
 
 /**
  * @swagger
@@ -223,7 +250,12 @@ ticketRouter.delete('/tickets/:id', authenticate, deleteTicket)
  *       200:
  *         description: Related ticket added
  */
-ticketRouter.post('/tickets/:id/related-tickets', authenticate, addRelatedTicket)
+ticketRouter.post(
+  '/tickets/:id/related-tickets',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_RELATION, PERMISSIONS.TICKET_FULL_ACCESS),
+  addRelatedTicket
+)
 
 /**
  * @swagger
@@ -248,7 +280,12 @@ ticketRouter.post('/tickets/:id/related-tickets', authenticate, addRelatedTicket
  *       200:
  *         description: Related ticket removed
  */
-ticketRouter.delete('/tickets/:id/related-tickets/:relatedTicketId', authenticate, removeRelatedTicket)
+ticketRouter.delete(
+  '/tickets/:id/related-tickets/:relatedTicketId',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_RELATION, PERMISSIONS.TICKET_FULL_ACCESS),
+  removeRelatedTicket
+)
 
 
 /**
@@ -290,7 +327,12 @@ ticketRouter.delete('/tickets/:id/related-tickets/:relatedTicketId', authenticat
  *       200:
  *         description: Ranks updated successfully
  */
-ticketRouter.post('/boards/:boardId/tickets/bulk-rank', authenticate, bulkUpdateRanks)
+ticketRouter.post(
+  '/boards/:boardId/tickets/bulk-rank',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_RANK, PERMISSIONS.TICKET_FULL_ACCESS),
+  bulkUpdateRanks
+)
 
 
 /**
@@ -322,7 +364,12 @@ ticketRouter.post('/boards/:boardId/tickets/bulk-rank', authenticate, bulkUpdate
  *       201:
  *         description: Comment created
  */
-ticketRouter.post('/tickets/:ticketId/comments', authenticate, createComment)
+ticketRouter.post(
+  '/tickets/:ticketId/comments',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_COMMENT_CREATE, PERMISSIONS.TICKET_FULL_ACCESS),
+  createComment
+)
 
 /**
  * @swagger
@@ -342,7 +389,12 @@ ticketRouter.post('/tickets/:ticketId/comments', authenticate, createComment)
  *       200:
  *         description: List of comments
  */
-ticketRouter.get('/tickets/:ticketId/comments', authenticate, getCommentsByTicket)
+ticketRouter.get(
+  '/tickets/:ticketId/comments',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_COMMENT_READ, PERMISSIONS.TICKET_FULL_ACCESS),
+  getCommentsByTicket
+)
 
 /**
  * @swagger
@@ -370,7 +422,12 @@ ticketRouter.get('/tickets/:ticketId/comments', authenticate, getCommentsByTicke
  *       200:
  *         description: Comment updated
  */
-ticketRouter.put('/comments/:id', authenticate, updateComment)
+ticketRouter.put(
+  '/comments/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_COMMENT_UPDATE, PERMISSIONS.TICKET_FULL_ACCESS),
+  updateComment
+)
 
 /**
  * @swagger
@@ -390,6 +447,10 @@ ticketRouter.put('/comments/:id', authenticate, updateComment)
  *       200:
  *         description: Comment deleted
  */
-ticketRouter.delete('/comments/:id', authenticate, deleteComment)
-
+ticketRouter.delete(
+  '/comments/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_COMMENT_DELETE, PERMISSIONS.TICKET_FULL_ACCESS),
+  deleteComment
+)
 

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { uploadMedia } from './media.controller'
 import { uploadMedia as uploadMediaMiddleware } from '../../middleware/upload-media'
 import { authenticate } from '../../middleware/authenticate'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 
 export const mediaRouter = Router()
 
@@ -50,5 +52,10 @@ export const mediaRouter = Router()
  *                     size:
  *                       type: number
  */
-mediaRouter.post('/upload', authenticate, uploadMediaMiddleware.single('file'), uploadMedia)
-
+mediaRouter.post(
+  '/upload',
+  authenticate,
+  requirePermission(PERMISSIONS.MEDIA_UPLOAD, PERMISSIONS.MEDIA_FULL_ACCESS),
+  uploadMediaMiddleware.single('file'),
+  uploadMedia
+)

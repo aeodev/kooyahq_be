@@ -2,7 +2,6 @@ import { Server as HttpServer } from 'node:http'
 import { Server as SocketServer, type Socket } from 'socket.io'
 import { verifyAccessToken } from '../utils/token'
 import { userService } from '../modules/users/user.service'
-import type { AccessTokenPayload } from '../utils/token'
 import { env } from '../config/env'
 import { socketHandlerRegistry } from './socket-manager'
 import { userRoom } from '../utils/socket-rooms'
@@ -14,14 +13,12 @@ import { registerBoardHandlers } from '../modules/workspace/boards/board.socket'
 import { activeUsersManager } from './active-users'
 import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
 import { presenceManager } from '../modules/presence/presence.manager'
+import { buildAuthUser, type AuthUser } from '../modules/auth/rbac/permissions'
 
 export type AuthenticatedSocket = Socket & {
   userId?: string
-  user?: AccessTokenPayload & { 
-    id: string
-    name: string
-    profilePic?: string
-  }
+  user?: AuthUser
+  authUser?: AuthUser
 }
 
 let io: SocketServer | null = null
@@ -71,8 +68,10 @@ export function initializeSocket(server: HttpServer): SocketServer {
         return next(new Error('User not found'))
       }
 
-      socket.userId = user.id
-      socket.user = { ...payload, id: user.id, name: user.name, profilePic: user.profilePic }
+      const authUser = buildAuthUser(user)
+      socket.userId = authUser.id
+      socket.user = authUser
+      socket.authUser = authUser
       next()
     } catch (error) {
       next(new Error('Invalid or expired token'))

@@ -1,14 +1,14 @@
 import { Router } from 'express'
-import { getLinkPreview } from './link-preview.controller'
 import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
+import { getCesiumIonToken } from './cesium.controller'
 
-export const linkPreviewRouter = Router()
+export const cesiumRouter = Router()
 
-linkPreviewRouter.get(
-  '/',
+cesiumRouter.get(
+  '/token',
   authenticate,
-  requirePermission(PERMISSIONS.LINK_PREVIEW_FETCH, PERMISSIONS.SYSTEM_FULL_ACCESS),
-  getLinkPreview
+  requirePermission(PERMISSIONS.CESIUM_TOKEN, PERMISSIONS.SYSTEM_FULL_ACCESS),
+  getCesiumIonToken
 )

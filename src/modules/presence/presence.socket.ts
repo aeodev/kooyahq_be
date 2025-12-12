@@ -1,5 +1,7 @@
 import type { AuthenticatedSocket } from '../../lib/socket'
 import { presenceManager, type PresenceCoordinates } from './presence.manager'
+import { PERMISSIONS } from '../auth/rbac/permissions'
+import { socketHasPermission } from '../auth/rbac/socket-permissions'
 
 type LocationPayload = PresenceCoordinates
 
@@ -19,10 +21,12 @@ export function registerPresenceHandlers(socket: AuthenticatedSocket): void {
   }
 
   socket.on('presence:request-sync', () => {
+    if (!socketHasPermission(socket, PERMISSIONS.PRESENCE_READ, PERMISSIONS.PRESENCE_FULL_ACCESS)) return
     void emitSnapshot()
   })
 
   socket.on('presence:update-location', async (payload: LocationPayload) => {
+    if (!socketHasPermission(socket, PERMISSIONS.PRESENCE_UPDATE, PERMISSIONS.PRESENCE_FULL_ACCESS)) return
     if (!payload) return
 
     const { lat, lng, accuracy } = payload
@@ -49,4 +53,3 @@ export function registerPresenceHandlers(socket: AuthenticatedSocket): void {
   // Send snapshot immediately after handler registration
   void emitSnapshot()
 }
-

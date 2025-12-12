@@ -8,7 +8,7 @@ export const CACHE_KEY = 'ai-news:items'
 
 async function getRedisClient() {
   if (!client) {
-    client = createClient({ url: env.redisUrl })
+    client = createClient({ url: env.redis.url })
     client.on('error', err => console.error('Redis error:', err))
     client.on('connect', () => {
       isConnecting = false
@@ -59,7 +59,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
 export async function setCached<T>(key: string, data: T): Promise<void> {
   try {
     const redis = await getRedisClient()
-    await redis.set(key, JSON.stringify(data), { EX: env.redisTtlSeconds })
+    await redis.set(key, JSON.stringify(data), { EX: env.redis.ttlSeconds })
   } catch (error) {
     console.error('Redis set error:', error)
   }

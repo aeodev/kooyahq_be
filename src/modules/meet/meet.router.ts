@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { generateToken } from './meet.controller'
 import { authenticate } from '../../middleware/authenticate'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 
 export const meetRouter = Router()
 
@@ -51,7 +53,11 @@ export const meetRouter = Router()
  *       500:
  *         description: LiveKit server not configured
  */
-meetRouter.post('/token', authenticate, generateToken)
-
+meetRouter.post(
+  '/token',
+  authenticate,
+  requirePermission(PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS),
+  generateToken
+)
 
 

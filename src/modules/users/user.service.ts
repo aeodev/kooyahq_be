@@ -22,7 +22,6 @@ export const userService = {
     page?: number
     limit?: number
     search?: string
-    role?: 'admin' | 'user'
   }) {
     return userRepository.searchUsers(params)
   },
@@ -35,7 +34,7 @@ export const userService = {
     return userRepository.updateProfile(id, updates)
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; isAdmin?: boolean }) {
+  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string }) {
     return userRepository.updateEmployee(id, updates)
   },
 }

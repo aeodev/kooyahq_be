@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
-import { requireAdmin } from '../../middleware/require-admin'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 import { upload } from '../../middleware/upload'
 import {
   createGalleryItem,
@@ -13,15 +14,33 @@ import {
 
 export const galleryRouter = Router()
 
-// Viewing routes - require authentication but not admin
 galleryRouter.use(authenticate)
-galleryRouter.get('/', getGalleryItems)
-galleryRouter.get('/:id', getGalleryItem)
 
-// Modification routes - require admin access
-galleryRouter.use(requireAdmin)
-galleryRouter.post('/', upload.single('image'), createGalleryItem)
-galleryRouter.post('/multiple', upload.array('images', 20), createMultipleGalleryItems)
-galleryRouter.put('/:id', updateGalleryItem)
-galleryRouter.delete('/:id', deleteGalleryItem)
-
+galleryRouter.get('/', requirePermission(PERMISSIONS.GALLERY_READ, PERMISSIONS.GALLERY_FULL_ACCESS), getGalleryItems)
+galleryRouter.get(
+  '/:id',
+  requirePermission(PERMISSIONS.GALLERY_READ, PERMISSIONS.GALLERY_FULL_ACCESS),
+  getGalleryItem
+)
+galleryRouter.post(
+  '/',
+  requirePermission(PERMISSIONS.GALLERY_CREATE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  upload.single('image'),
+  createGalleryItem
+)
+galleryRouter.post(
+  '/multiple',
+  requirePermission(PERMISSIONS.GALLERY_BULK_CREATE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  upload.array('images', 20),
+  createMultipleGalleryItems
+)
+galleryRouter.put(
+  '/:id',
+  requirePermission(PERMISSIONS.GALLERY_UPDATE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  updateGalleryItem
+)
+galleryRouter.delete(
+  '/:id',
+  requirePermission(PERMISSIONS.GALLERY_DELETE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  deleteGalleryItem
+)

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
-import { requireAdmin } from '../../middleware/require-admin'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 import {
   createProject,
   getProjects,
@@ -11,7 +12,6 @@ import {
 
 export const projectRouter = Router()
 
-// All authenticated users can view projects
 projectRouter.use(authenticate)
 
 /**
@@ -26,7 +26,7 @@ projectRouter.use(authenticate)
  *       200:
  *         description: List of projects
  */
-projectRouter.get('/', getProjects)
+projectRouter.get('/', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSIONS.PROJECT_FULL_ACCESS), getProjects)
 
 /**
  * @swagger
@@ -46,10 +46,7 @@ projectRouter.get('/', getProjects)
  *       200:
  *         description: Project details
  */
-projectRouter.get('/:id', getProject)
-
-// Admin-only routes - creating, updating, deleting
-projectRouter.use(requireAdmin)
+projectRouter.get('/:id', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSIONS.PROJECT_FULL_ACCESS), getProject)
 
 /**
  * @swagger
@@ -74,7 +71,11 @@ projectRouter.use(requireAdmin)
  *       201:
  *         description: Project created
  */
-projectRouter.post('/', createProject)
+projectRouter.post(
+  '/',
+  requirePermission(PERMISSIONS.PROJECT_CREATE, PERMISSIONS.PROJECT_FULL_ACCESS),
+  createProject
+)
 
 /**
  * @swagger
@@ -102,7 +103,7 @@ projectRouter.post('/', createProject)
  *       200:
  *         description: Project updated
  */
-projectRouter.put('/:id', updateProject)
+projectRouter.put('/:id', requirePermission(PERMISSIONS.PROJECT_UPDATE, PERMISSIONS.PROJECT_FULL_ACCESS), updateProject)
 
 /**
  * @swagger
@@ -122,8 +123,11 @@ projectRouter.put('/:id', updateProject)
  *       200:
  *         description: Project deleted
  */
-projectRouter.delete('/:id', deleteProject)
-
+projectRouter.delete(
+  '/:id',
+  requirePermission(PERMISSIONS.PROJECT_DELETE, PERMISSIONS.PROJECT_FULL_ACCESS),
+  deleteProject
+)
 
 
 

@@ -8,7 +8,7 @@ const CACHE_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
 
 async function getRedisClient() {
   if (!client) {
-    client = createClient({ url: env.redisUrl })
+    client = createClient({ url: env.redis.url })
     client.on('error', err => console.error('Redis error:', err))
   }
   if (!client.isOpen) {

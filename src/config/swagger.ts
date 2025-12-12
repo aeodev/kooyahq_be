@@ -70,9 +70,6 @@ const options: swaggerJsdoc.Options = {
             name: {
               type: 'string',
             },
-            isAdmin: {
-              type: 'boolean',
-            },
             profilePic: {
               type: 'string',
             },
@@ -101,4 +98,3 @@ const options: swaggerJsdoc.Options = {
 }
 
 export const swaggerSpec = swaggerJsdoc(options)
-

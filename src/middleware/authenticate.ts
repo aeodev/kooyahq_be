@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { userService } from '../modules/users/user.service'
 import { createHttpError } from '../utils/http-error'
 import { verifyAccessToken } from '../utils/token'
+import { buildAuthUser } from '../modules/auth/rbac/permissions'
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization
@@ -20,7 +21,13 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       return next(createHttpError(401, 'User not found'))
     }
 
-    req.user = user
+    const authUser = buildAuthUser(user)
+
+    req.user = authUser
+    req.auth = {
+      user: authUser,
+      permissions: authUser.permissions,
+    }
     return next()
   } catch (error) {
     return next(createHttpError(401, 'Invalid or expired token'))

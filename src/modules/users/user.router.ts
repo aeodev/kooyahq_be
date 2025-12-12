@@ -1,18 +1,55 @@
 import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
-import { requireAdmin } from '../../middleware/require-admin'
+import { requirePermission } from '../../middleware/require-permission'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 import { uploadProfile } from '../../middleware/upload-profile'
-import { getUserById, getAllUsers, getProfile, updateProfile, updateEmployee, deleteEmployee, createClient } from './user.controller'
+import {
+  getUserById,
+  getAllUsers,
+  getProfile,
+  updateProfile,
+  updateEmployee,
+  deleteEmployee,
+  createClient,
+} from './user.controller'
 
 export const userRouter = Router()
 
-userRouter.get('/profile', authenticate, getProfile)
-userRouter.put('/profile', authenticate, uploadProfile.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'banner', maxCount: 1 }]), updateProfile)
+userRouter.get(
+  '/profile',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS),
+  getProfile
+)
+userRouter.put(
+  '/profile',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_UPDATE, PERMISSIONS.USER_FULL_ACCESS),
+  uploadProfile.fields([
+    { name: 'profilePic', maxCount: 1 },
+    { name: 'banner', maxCount: 1 },
+  ]),
+  updateProfile
+)
 
-userRouter.get('/', authenticate, getAllUsers)
-userRouter.get('/:id', authenticate, getUserById)
+userRouter.get('/', authenticate, requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS), getAllUsers)
+userRouter.get('/:id', authenticate, requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS), getUserById)
 
-// Admin routes - require admin access
-userRouter.post('/clients', authenticate, requireAdmin, createClient)
-userRouter.put('/:id', authenticate, requireAdmin, updateEmployee)
-userRouter.delete('/:id', authenticate, requireAdmin, deleteEmployee)
+userRouter.post(
+  '/clients',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_CREATE, PERMISSIONS.USER_FULL_ACCESS),
+  createClient
+)
+userRouter.put(
+  '/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_UPDATE, PERMISSIONS.USER_FULL_ACCESS),
+  updateEmployee
+)
+userRouter.delete(
+  '/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_DELETE, PERMISSIONS.USER_FULL_ACCESS),
+  deleteEmployee
+)

@@ -25,6 +25,7 @@ import { presenceRouter } from './modules/presence/presence.router'
 import { meetRouter } from './modules/meet/meet.router'
 import { mediaRouter } from './modules/media/media.router'
 import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
+import { cesiumRouter } from './modules/cesium/cesium.router'
 
 export function createApp() {
   const app = express()
@@ -84,6 +85,7 @@ export function createApp() {
   app.use('/api/announcements', announcementRouter)
   app.use('/api/projects', projectRouter)
   app.use('/api/media', mediaRouter)
+  app.use('/api/cesium', cesiumRouter)
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)
   app.use('/api/admin', adminRouter)

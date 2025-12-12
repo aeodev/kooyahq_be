@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
+import { requirePermission } from '../../../middleware/require-permission'
+import { PERMISSIONS } from '../../auth/rbac/permissions'
 import { getTicketActivities, getBoardActivities } from './activity.controller'
 
 export const activityRouter = Router()
@@ -22,7 +24,12 @@ export const activityRouter = Router()
  *       200:
  *         description: List of activities
  */
-activityRouter.get('/tickets/:ticketId/activities', authenticate, getTicketActivities)
+activityRouter.get(
+  '/tickets/:ticketId/activities',
+  authenticate,
+  requirePermission(PERMISSIONS.TICKET_ACTIVITY_READ, PERMISSIONS.TICKET_FULL_ACCESS),
+  getTicketActivities
+)
 
 /**
  * @swagger
@@ -42,5 +49,10 @@ activityRouter.get('/tickets/:ticketId/activities', authenticate, getTicketActiv
  *       200:
  *         description: List of activities
  */
-activityRouter.get('/boards/:boardId/activities', authenticate, getBoardActivities)
+activityRouter.get(
+  '/boards/:boardId/activities',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_ACTIVITY_READ, PERMISSIONS.BOARD_FULL_ACCESS),
+  getBoardActivities
+)
 

@@ -1,6 +1,17 @@
 import { userRepository } from '../users/user.repository'
 import { projectRepository } from '../projects/project.repository'
 import type { PublicUser } from '../users/user.model'
+import { PERMISSIONS, type Permission } from '../auth/rbac/permissions'
+
+const ADMIN_LIKE: Permission[] = [
+  PERMISSIONS.SYSTEM_FULL_ACCESS,
+  PERMISSIONS.ADMIN_FULL_ACCESS,
+  PERMISSIONS.ADMIN_READ,
+]
+
+function isAdminLike(user: PublicUser) {
+  return Array.isArray(user.permissions) && user.permissions.some((perm) => ADMIN_LIKE.includes(perm as Permission))
+}
 
 export const adminService = {
   async getStats() {
@@ -10,7 +21,7 @@ export const adminService = {
     ])
 
     const totalUsers = users.length
-    const totalAdmins = users.filter((u) => u.isAdmin).length
+    const totalAdmins = users.filter(isAdminLike).length
     const totalRegularUsers = totalUsers - totalAdmins
     const totalProjects = projects.length
 
@@ -49,13 +60,13 @@ export const adminService = {
     }
 
     // CSV format
-    const headers = ['ID', 'Name', 'Email', 'Position', 'Is Admin', 'Status', 'Created At']
+    const headers = ['ID', 'Name', 'Email', 'Position', 'Has Admin Access', 'Status', 'Created At']
     const rows = users.map((user) => [
       user.id,
       user.name,
       user.email,
       user.position || '',
-      user.isAdmin ? 'Yes' : 'No',
+      isAdminLike(user) ? 'Yes' : 'No',
       user.status || 'online',
       user.createdAt,
     ])
@@ -68,7 +79,6 @@ export const adminService = {
     return csvContent
   },
 }
-
 
 
 

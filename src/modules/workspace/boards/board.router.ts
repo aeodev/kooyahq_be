@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
+import { requirePermission } from '../../../middleware/require-permission'
+import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createBoard,
   deleteBoard,
@@ -51,7 +53,12 @@ export const boardRouter = Router()
  *       201:
  *         description: Board created successfully
  */
-boardRouter.post('/workspaces/:workspaceId/boards', authenticate, createBoard)
+boardRouter.post(
+  '/workspaces/:workspaceId/boards',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_CREATE, PERMISSIONS.BOARD_FULL_ACCESS),
+  createBoard
+)
 
 /**
  * @swagger
@@ -76,7 +83,12 @@ boardRouter.post('/workspaces/:workspaceId/boards', authenticate, createBoard)
  *       200:
  *         description: List of boards
  */
-boardRouter.get('/workspaces/:workspaceId/boards', authenticate, getBoards)
+boardRouter.get(
+  '/workspaces/:workspaceId/boards',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
+  getBoards
+)
 
 /**
  * @swagger
@@ -98,7 +110,12 @@ boardRouter.get('/workspaces/:workspaceId/boards', authenticate, getBoards)
  *       404:
  *         description: Board not found
  */
-boardRouter.get('/boards/:id', authenticate, getBoardById)
+boardRouter.get(
+  '/boards/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
+  getBoardById
+)
 
 /**
  * @swagger
@@ -120,7 +137,12 @@ boardRouter.get('/boards/:id', authenticate, getBoardById)
  *       404:
  *         description: Board not found
  */
-boardRouter.get('/boards/key/:key', authenticate, getBoardByKey)
+boardRouter.get(
+  '/boards/key/:key',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
+  getBoardByKey
+)
 
 /**
  * @swagger
@@ -170,7 +192,12 @@ boardRouter.get('/boards/key/:key', authenticate, getBoardByKey)
  *       200:
  *         description: Board updated
  */
-boardRouter.put('/boards/:id', authenticate, updateBoard)
+boardRouter.put(
+  '/boards/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_UPDATE, PERMISSIONS.BOARD_FULL_ACCESS),
+  updateBoard
+)
 
 /**
  * @swagger
@@ -190,7 +217,12 @@ boardRouter.put('/boards/:id', authenticate, updateBoard)
  *       200:
  *         description: Board deleted
  */
-boardRouter.delete('/boards/:id', authenticate, deleteBoard)
+boardRouter.delete(
+  '/boards/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_DELETE, PERMISSIONS.BOARD_FULL_ACCESS),
+  deleteBoard
+)
 
 /**
  * @swagger
@@ -222,4 +254,9 @@ boardRouter.delete('/boards/:id', authenticate, deleteBoard)
  *                     isFavorite:
  *                       type: boolean
  */
-boardRouter.post('/boards/:boardId/favorite', authenticate, toggleFavoriteBoard)
+boardRouter.post(
+  '/boards/:boardId/favorite',
+  authenticate,
+  requirePermission(PERMISSIONS.BOARD_FAVORITE, PERMISSIONS.BOARD_FULL_ACCESS),
+  toggleFavoriteBoard
+)
