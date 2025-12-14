@@ -13,6 +13,14 @@ export const userRepository = {
     return doc ? toUser(doc) : undefined
   },
 
+  async findByEmail(email: string): Promise<PublicUser | undefined> {
+    const doc = await UserModel.findOne({
+      email: email.toLowerCase(),
+      deletedAt: undefined,
+    }).exec()
+    return doc ? toPublicUser(toUser(doc)) : undefined
+  },
+
   async getPublicProfile(id: string): Promise<PublicUser | undefined> {
     const doc = await UserModel.findById(id).exec()
     return doc ? toPublicUser(toUser(doc)) : undefined

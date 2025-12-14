@@ -6,6 +6,10 @@ export const userService = {
     return userRepository.findById(id)
   },
 
+  async findByEmail(email: string): Promise<PublicUser | undefined> {
+    return userRepository.findByEmail(email)
+  },
+
   async getPublicProfile(id: string): Promise<PublicUser | undefined> {
     return userRepository.getPublicProfile(id)
   },

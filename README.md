@@ -11,6 +11,13 @@ npm run dev
 
 By default the server listens on `http://localhost:5001`. Configure variables in `.env` (see `.env.example`).
 
+### Google Sign-In
+
+Set the following variables to enable Google login:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
 ## Scripts
 
 - `npm run dev` – Start the API in watch mode with `ts-node-dev`

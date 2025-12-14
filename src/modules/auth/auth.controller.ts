@@ -1,11 +1,12 @@
 import type { NextFunction, Request, Response } from 'express'
-import { authenticateUser, registerUser } from './auth.service'
+import { authenticateUser, authenticateWithGoogle, registerUser } from './auth.service'
 
 type AuthRequestBody = {
   email?: unknown
   password?: unknown
   name?: unknown
   permissions?: unknown
+  credential?: unknown
 }
 
 function parseString(value: unknown) {
@@ -59,6 +60,25 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       email,
       password,
     })
+
+    res.json({
+      status: 'success',
+      data: {
+        user,
+        token,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function loginWithGoogle(req: Request, res: Response, next: NextFunction) {
+  const body = req.body as AuthRequestBody
+  const credential = parseString(body.credential)
+
+  try {
+    const { user, token } = await authenticateWithGoogle(credential)
 
     res.json({
       status: 'success',

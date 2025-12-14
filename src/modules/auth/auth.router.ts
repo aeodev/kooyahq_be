@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { currentUser, login, register } from './auth.controller'
+import { currentUser, login, loginWithGoogle, register } from './auth.controller'
 import { authenticate } from '../../middleware/authenticate'
 
 export const authRouter = Router()
@@ -82,6 +82,28 @@ authRouter.post('/register', register)
  *         description: Invalid credentials
  */
 authRouter.post('/login', login)
+
+/**
+ * @swagger
+ * /auth/google:
+ *   post:
+ *     summary: Login with Google ID token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               credential:
+ *                 type: string
+ *                 description: Google ID token
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
+authRouter.post('/google', loginWithGoogle)
 
 /**
  * @swagger
