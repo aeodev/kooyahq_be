@@ -7,12 +7,35 @@ import { commentService } from '../comments/comment.service'
 import { notificationService } from '../../notifications/notification.service'
 import { notificationRepository } from '../../notifications/notification.repository'
 import { createHttpError } from '../../../utils/http-error'
-import { workspaceService } from '../workspace/workspace.service'
+import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
 import { SocketEmitter } from '../../../utils/socket-emitter'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
 import { ticketCache } from '../cache/ticket.cache'
+
+type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
+
+const getBoardRole = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, userId?: string): BoardRole => {
+  if (!userId) return 'none'
+  if (board.createdBy === userId) return 'owner'
+  const member = (board.members ?? []).find((m) => m.userId === userId)
+  return (member?.role as BoardRole | undefined) ?? 'none'
+}
+
+const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_FULL_ACCESS)
+
+const canViewBoard = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, user: any) => {
+  if (hasFullBoardAccess(user)) return true
+  const role = getBoardRole(board, user?.id)
+  return role !== 'none'
+}
+
+const canModifyTickets = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, user: any) => {
+  if (hasFullBoardAccess(user)) return true
+  const role = getBoardRole(board, user?.id)
+  return role === 'owner' || role === 'admin' || role === 'member'
+}
 
 export async function createTicket(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
@@ -61,13 +84,7 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -177,13 +194,7 @@ export async function getTicketsByBoard(req: Request, res: Response, next: NextF
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -230,13 +241,7 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -356,13 +361,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -668,11 +667,6 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  // Clients cannot delete tickets
-  if (req.user?.userType === 'client') {
-    return next(createHttpError(403, 'Clients cannot delete tickets'))
-  }
-
   try {
     const ticket = await ticketService.findById(id)
 
@@ -686,13 +680,7 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -772,12 +760,7 @@ export async function addRelatedTicket(req: Request, res: Response, next: NextFu
       return next(createHttpError(404, 'Board not found'))
     }
 
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -843,12 +826,7 @@ export async function removeRelatedTicket(req: Request, res: Response, next: Nex
       return next(createHttpError(404, 'Board not found'))
     }
 
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -890,13 +868,7 @@ export async function bulkUpdateRanks(req: Request, res: Response, next: NextFun
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspace = await workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyTickets(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 

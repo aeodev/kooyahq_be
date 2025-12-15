@@ -15,21 +15,21 @@ export function registerBoardHandlers(socket: AuthenticatedSocket): void {
   }
 
   // Auto-join the global boards room for real-time updates
-  if (socketHasPermission(socket, PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS)) {
+  if (socketHasPermission(socket, PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_FULL_ACCESS)) {
     socket.join(workspaceRoom(DEFAULT_WORKSPACE_ID))
     console.log(`User ${userId} joined default boards room`)
   }
 
   // Join a workspace room to receive board updates
   socket.on('workspace:join', (workspaceId: string) => {
-    if (!socketHasPermission(socket, PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS)) return
+    if (!socketHasPermission(socket, PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_FULL_ACCESS)) return
     socket.join(workspaceRoom(workspaceId))
     console.log(`User ${userId} joined workspace ${workspaceId}`)
   })
 
   // Leave a workspace room
   socket.on('workspace:leave', (workspaceId: string) => {
-    if (!socketHasPermission(socket, PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS)) return
+    if (!socketHasPermission(socket, PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_FULL_ACCESS)) return
     socket.leave(workspaceRoom(workspaceId))
     console.log(`User ${userId} left workspace ${workspaceId}`)
   })

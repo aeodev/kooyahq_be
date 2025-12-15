@@ -68,6 +68,17 @@ export class BoardRepository {
     return boards.map(toBoard)
   }
 
+  async findAll(type?: 'kanban' | 'sprint'): Promise<Board[]> {
+    const query: any = {
+      deletedAt: { $exists: false },
+    }
+    if (type) {
+      query.type = type
+    }
+    const boards = await BoardModel.find(query).sort({ updatedAt: -1 })
+    return boards.map(toBoard)
+  }
+
   async findByIdIncludingDeleted(id: string): Promise<Board | null> {
     const board = await BoardModel.findById(id)
     return board ? toBoard(board) : null

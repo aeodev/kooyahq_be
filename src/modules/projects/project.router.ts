@@ -26,7 +26,14 @@ projectRouter.use(authenticate)
  *       200:
  *         description: List of projects
  */
-projectRouter.get('/', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSIONS.PROJECT_FULL_ACCESS), getProjects)
+projectRouter.get(
+  '/',
+  requirePermission(
+    PERMISSIONS.PROJECTS_VIEW,
+    PERMISSIONS.PROJECTS_MANAGE,
+  ),
+  getProjects
+)
 
 /**
  * @swagger
@@ -46,7 +53,14 @@ projectRouter.get('/', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSIONS.P
  *       200:
  *         description: Project details
  */
-projectRouter.get('/:id', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSIONS.PROJECT_FULL_ACCESS), getProject)
+projectRouter.get(
+  '/:id',
+  requirePermission(
+    PERMISSIONS.PROJECTS_VIEW,
+    PERMISSIONS.PROJECTS_MANAGE,
+  ),
+  getProject
+)
 
 /**
  * @swagger
@@ -73,7 +87,7 @@ projectRouter.get('/:id', requirePermission(PERMISSIONS.PROJECT_READ, PERMISSION
  */
 projectRouter.post(
   '/',
-  requirePermission(PERMISSIONS.PROJECT_CREATE, PERMISSIONS.PROJECT_FULL_ACCESS),
+  requirePermission(PERMISSIONS.PROJECTS_MANAGE),
   createProject
 )
 
@@ -103,7 +117,11 @@ projectRouter.post(
  *       200:
  *         description: Project updated
  */
-projectRouter.put('/:id', requirePermission(PERMISSIONS.PROJECT_UPDATE, PERMISSIONS.PROJECT_FULL_ACCESS), updateProject)
+projectRouter.put(
+  '/:id',
+  requirePermission(PERMISSIONS.PROJECTS_MANAGE),
+  updateProject
+)
 
 /**
  * @swagger
@@ -125,10 +143,8 @@ projectRouter.put('/:id', requirePermission(PERMISSIONS.PROJECT_UPDATE, PERMISSI
  */
 projectRouter.delete(
   '/:id',
-  requirePermission(PERMISSIONS.PROJECT_DELETE, PERMISSIONS.PROJECT_FULL_ACCESS),
+  requirePermission(PERMISSIONS.PROJECTS_MANAGE),
   deleteProject
 )
-
-
 
 

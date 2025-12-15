@@ -1,4 +1,4 @@
-import { TicketModel, toTicket, type Ticket } from './ticket.model'
+import { TicketModel, toTicket, type Ticket, type TicketGithubStatus } from './ticket.model'
 import { boardService } from '../boards/board.service'
 
 export type CreateTicketInput = {
@@ -38,7 +38,7 @@ export type CreateTicketInput = {
   github?: {
     branchName?: string
     pullRequestUrl?: string
-    status?: 'open' | 'merged' | 'closed'
+    status?: TicketGithubStatus
   }
   relatedTickets?: string[]
 }
@@ -78,7 +78,7 @@ export type UpdateTicketInput = {
   github?: {
     branchName?: string
     pullRequestUrl?: string
-    status?: 'open' | 'merged' | 'closed'
+    status?: TicketGithubStatus
   }
   relatedTickets?: string[]
 }
@@ -247,6 +247,15 @@ export const ticketRepository = {
       finalUpdate,
       { new: true },
     ).exec()
+    return doc ? toTicket(doc) : undefined
+  },
+
+  async findByGithubBranchName(branchName: string): Promise<Ticket | undefined> {
+    const doc = await TicketModel.findOne({
+      'github.branchName': branchName,
+      deletedAt: { $exists: false },
+    }).exec()
+
     return doc ? toTicket(doc) : undefined
   },
 

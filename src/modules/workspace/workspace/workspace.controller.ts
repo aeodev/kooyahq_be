@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { workspaceService } from './workspace.service'
 import { createHttpError } from '../../../utils/http-error'
 import { workspaceCache } from '../cache/workspace.cache'
+import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
 
 export async function createWorkspace(req: Request, res: Response, next: NextFunction) {
   const { name, slug, members } = req.body
@@ -11,9 +12,10 @@ export async function createWorkspace(req: Request, res: Response, next: NextFun
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  // Clients cannot create workspaces
-  if (req.user?.userType === 'client') {
-    return next(createHttpError(403, 'Clients cannot create workspaces'))
+  const authUser = req.user ?? { permissions: [] }
+  // Reuse board permissions for workspace lifecycle
+  if (!hasPermission(authUser, PERMISSIONS.BOARD_CREATE) && !hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)) {
+    return next(createHttpError(403, 'You do not have permission to create workspaces'))
   }
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -110,6 +112,7 @@ export async function updateWorkspace(req: Request, res: Response, next: NextFun
   const { id } = req.params
   const { timestamp, data } = req.body
   const userId = req.user?.id
+  const authUser = req.user ?? { permissions: [] }
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
@@ -126,15 +129,18 @@ export async function updateWorkspace(req: Request, res: Response, next: NextFun
       return next(createHttpError(404, 'Workspace not found'))
     }
 
-    // Clients cannot update workspace settings
-    if (req.user?.userType === 'client') {
-      return next(createHttpError(403, 'Clients cannot update workspace settings'))
-    }
-
     // Check permissions - user must be owner or admin
     const userMember = workspace.members.find((m) => m.userId === userId)
     if (!userMember || userMember.role === 'member') {
       return next(createHttpError(403, 'Forbidden'))
+    }
+
+    if (
+      !hasPermission(authUser, PERMISSIONS.BOARD_UPDATE) &&
+      !hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS) &&
+      userMember.role !== 'owner'
+    ) {
+      return next(createHttpError(403, 'You do not have permission to update workspaces'))
     }
 
     const updates: any = {}
@@ -173,14 +179,10 @@ export async function updateWorkspace(req: Request, res: Response, next: NextFun
 export async function deleteWorkspace(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
   const userId = req.user?.id
+  const authUser = req.user ?? { permissions: [] }
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
-  }
-
-  // Clients cannot delete workspaces
-  if (req.user?.userType === 'client') {
-    return next(createHttpError(403, 'Clients cannot delete workspaces'))
   }
 
   try {
@@ -194,6 +196,13 @@ export async function deleteWorkspace(req: Request, res: Response, next: NextFun
     const userMember = workspace.members.find((m) => m.userId === userId)
     if (!userMember || userMember.role !== 'owner') {
       return next(createHttpError(403, 'Forbidden'))
+    }
+
+    if (
+      !hasPermission(authUser, PERMISSIONS.BOARD_DELETE) &&
+      !hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)
+    ) {
+      return next(createHttpError(403, 'You do not have permission to delete workspaces'))
     }
 
     await workspaceService.delete(id)

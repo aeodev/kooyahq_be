@@ -18,13 +18,11 @@ export const userRouter = Router()
 userRouter.get(
   '/profile',
   authenticate,
-  requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS),
   getProfile
 )
 userRouter.put(
   '/profile',
   authenticate,
-  requirePermission(PERMISSIONS.USER_UPDATE, PERMISSIONS.USER_FULL_ACCESS),
   uploadProfile.fields([
     { name: 'profilePic', maxCount: 1 },
     { name: 'banner', maxCount: 1 },
@@ -32,24 +30,24 @@ userRouter.put(
   updateProfile
 )
 
-userRouter.get('/', authenticate, requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS), getAllUsers)
-userRouter.get('/:id', authenticate, requirePermission(PERMISSIONS.USER_READ, PERMISSIONS.USER_FULL_ACCESS), getUserById)
+userRouter.get('/', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getAllUsers)
+userRouter.get('/:id', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getUserById)
 
 userRouter.post(
   '/clients',
   authenticate,
-  requirePermission(PERMISSIONS.USER_CREATE, PERMISSIONS.USER_FULL_ACCESS),
+  requirePermission(PERMISSIONS.USERS_MANAGE),
   createClient
 )
 userRouter.put(
   '/:id',
   authenticate,
-  requirePermission(PERMISSIONS.USER_UPDATE, PERMISSIONS.USER_FULL_ACCESS),
+  requirePermission(PERMISSIONS.USERS_MANAGE),
   updateEmployee
 )
 userRouter.delete(
   '/:id',
   authenticate,
-  requirePermission(PERMISSIONS.USER_DELETE, PERMISSIONS.USER_FULL_ACCESS),
+  requirePermission(PERMISSIONS.USERS_MANAGE),
   deleteEmployee
 )

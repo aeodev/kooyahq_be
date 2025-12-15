@@ -58,4 +58,9 @@ export const env = {
     clientId: requireEnv('GOOGLE_CLIENT_ID'),
     clientSecret: requireEnv('GOOGLE_CLIENT_SECRET'),
   },
+  gateways: {
+    github: {
+      secret: process.env.GITHUB_GATEWAY_SECRET,
+    },
+  },
 }

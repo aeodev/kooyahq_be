@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { boardService, normalizeBoardMembers } from './board.service'
 import { boardFavoriteService } from './board-favorite.service'
 import { createHttpError } from '../../../utils/http-error'
+import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
 import { SocketEmitter } from '../../../utils/socket-emitter'
 import { workspaceRoom } from '../../../utils/socket-rooms'
 import type { Board } from './board.model'
@@ -10,11 +11,45 @@ import { boardCache } from '../cache/board.cache'
 import { ticketCache } from '../cache/ticket.cache'
 import { notificationService } from '../../notifications/notification.service'
 
-const isBoardMember = (board: Board, userId: string) =>
-  board.createdBy === userId || (board.members ?? []).some((m) => m.userId === userId)
+type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
 
-const isBoardAdmin = (board: Board, userId: string) =>
-  board.createdBy === userId || (board.members ?? []).some((m) => m.userId === userId && m.role === 'admin')
+const getBoardRole = (board: Board, userId?: string): BoardRole => {
+  if (!userId) return 'none'
+  if (board.createdBy === userId) return 'owner'
+  const member = (board.members ?? []).find((m) => m.userId === userId)
+  if (!member) return 'none'
+  return member.role
+}
+
+const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_FULL_ACCESS)
+
+const canViewBoard = (board: Board, user: any): boolean => {
+  if (hasFullBoardAccess(user)) return true
+  const role = getBoardRole(board, user?.id)
+  if (role !== 'none') return true
+  return hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW)
+}
+
+const canUpdateBoard = (board: Board, user: any): boolean => {
+  const role = getBoardRole(board, user?.id)
+  if (hasFullBoardAccess(user)) return true
+  if (role === 'owner' || role === 'admin') return true
+  return role !== 'none' && hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_UPDATE)
+}
+
+const canDeleteBoard = (board: Board, user: any): boolean => {
+  if (hasFullBoardAccess(user)) return true
+  if (board.createdBy === user?.id) return true
+  const role = getBoardRole(board, user?.id)
+  return role !== 'none' && hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_DELETE)
+}
+
+const isBoardMember = (board: Board, userId: string) => getBoardRole(board, userId) !== 'none'
+
+const isBoardAdmin = (board: Board, userId: string) => {
+  const role = getBoardRole(board, userId)
+  return role === 'owner' || role === 'admin'
+}
 
 export async function createBoard(req: Request, res: Response, next: NextFunction) {
   const { name, type, description, prefix, emoji, columns, settings, members } = req.body
@@ -25,9 +60,9 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  // Clients cannot create boards
-  if (req.user?.userType === 'client') {
-    return next(createHttpError(403, 'Clients cannot create boards'))
+  const authUser = req.user ?? { permissions: [] }
+  if (!hasPermission(authUser, PERMISSIONS.BOARD_CREATE) && !hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)) {
+    return next(createHttpError(403, 'You do not have permission to create boards'))
   }
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -109,7 +144,8 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
   }
 
   try {
-    const boards = await boardService.findByUserId(userId)
+    const hasFullAccess = hasFullBoardAccess(req.user)
+    const boards = hasFullAccess ? await boardService.findAll() : await boardService.findByUserId(userId)
 
     // Get favorite board IDs for the user
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
@@ -118,13 +154,14 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
     // Add isFavorite property to each board
     const boardsWithFavorites = boards
       .filter((board) => !type || board.type === type)
-      .map(board => ({
+      .map((board) => ({
         ...board,
         isFavorite: favoriteSet.has(board.id),
       }))
 
-    // Only allow boards where the user is a member or creator
-    const accessibleBoards = boardsWithFavorites.filter((board) => isBoardMember(board, userId))
+    const accessibleBoards = hasFullAccess
+      ? boardsWithFavorites
+      : boardsWithFavorites.filter((board) => isBoardMember(board, userId))
 
     res.json({
       success: true,
@@ -149,7 +186,8 @@ export async function getBoardsForUser(req: Request, res: Response, next: NextFu
   }
 
   try {
-    const boards = await boardService.findByUserId(userId)
+    const hasFullAccess = hasFullBoardAccess(req.user)
+    const boards = hasFullAccess ? await boardService.findAll() : await boardService.findByUserId(userId)
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
     const favoriteSet = new Set(favoriteBoardIds)
 
@@ -191,8 +229,8 @@ export async function getBoardById(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Allow board access only if user is a board member or creator
-    if (!isBoardMember(board, userId)) {
+    // Allow board access only if user is allowed to view
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -234,8 +272,8 @@ export async function getBoardByKey(req: Request, res: Response, next: NextFunct
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Final access check: require board membership or creator
-    if (!isBoardMember(board, userId)) {
+    // Final access check: require view permission or membership
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -270,8 +308,8 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check permissions - board admins can update
-    if (!isBoardAdmin(board, userId)) {
+    // Check permissions - board admins/owners or users with update permission
+    if (!canUpdateBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -382,11 +420,6 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  // Clients cannot delete boards
-  if (req.user?.userType === 'client') {
-    return next(createHttpError(403, 'Clients cannot delete boards'))
-  }
-
   try {
     const board = await boardService.findById(id)
 
@@ -394,8 +427,8 @@ export async function deleteBoard(req: Request, res: Response, next: NextFunctio
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check permissions - board admins can delete
-    if (!isBoardAdmin(board, userId)) {
+    // Check permissions - only owner, users with Board:Delete, or full access
+    if (!canDeleteBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -439,8 +472,8 @@ export async function toggleFavoriteBoard(req: Request, res: Response, next: Nex
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is allowed: board member or creator
-    if (!isBoardMember(board, userId)) {
+    // Check if user is allowed: anyone who can view the board can favorite it
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 

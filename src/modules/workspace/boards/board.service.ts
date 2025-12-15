@@ -213,6 +213,10 @@ export class BoardService {
     return boardRepository.findByUserId(userId)
   }
 
+  async findAll(type?: 'kanban' | 'sprint'): Promise<Board[]> {
+    return boardRepository.findAll(type)
+  }
+
   async update(
     id: string,
     updates: Partial<{

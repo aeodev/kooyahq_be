@@ -16,6 +16,17 @@ export interface DocumentLink {
   type: 'doc' | 'sheet' | 'slide' | 'figma' | 'other'
 }
 
+export type TicketGithubStatus =
+  | 'open'
+  | 'merged'
+  | 'closed'
+  | 'requested_pr'
+  | 'merging_pr'
+  | 'merged_pr'
+  | 'deploying'
+  | 'deployed'
+  | 'failed'
+
 export interface ChecklistItem {
   id: string
   text: string
@@ -25,7 +36,7 @@ export interface ChecklistItem {
 export interface TicketGithub {
   branchName?: string
   pullRequestUrl?: string
-  status?: 'open' | 'merged' | 'closed'
+  status?: TicketGithubStatus
 }
 
 export interface TicketViewer {
@@ -103,7 +114,7 @@ const ticketGithubSchema = new Schema<TicketGithub>(
     pullRequestUrl: { type: String },
     status: {
       type: String,
-      enum: ['open', 'merged', 'closed'],
+      enum: ['open', 'merged', 'closed', 'requested_pr', 'merging_pr', 'merged_pr', 'deploying', 'deployed', 'failed'],
     },
   },
   { _id: false },
@@ -270,7 +281,7 @@ export type Ticket = {
   github?: {
     branchName?: string
     pullRequestUrl?: string
-    status?: 'open' | 'merged' | 'closed'
+    status?: TicketGithubStatus
   }
   viewedBy: Array<{
     userId: string
@@ -325,7 +336,7 @@ export function toTicket(doc: TicketDocument): Ticket {
       ? {
           branchName: doc.github.branchName,
           pullRequestUrl: doc.github.pullRequestUrl,
-          status: doc.github.status as 'open' | 'merged' | 'closed' | undefined,
+          status: doc.github.status as TicketGithubStatus | undefined,
         }
       : undefined,
     viewedBy: (doc.viewedBy || []).map((viewer) => ({

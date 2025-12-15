@@ -17,7 +17,8 @@ import { notificationRouter } from './modules/notifications/notification.router'
 import { gameRouter } from './modules/games/game.router'
 import { announcementRouter } from './modules/announcements/announcement.router'
 import { projectRouter } from './modules/projects/project.router'
-import { adminRouter } from './modules/admin/admin.router'
+import { userManagementRouter } from './modules/user-management/user-management.router'
+import { githubGatewayRouter } from './modules/gateways/github/github.router'
 import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './config/swagger'
@@ -86,9 +87,10 @@ export function createApp() {
   app.use('/api/projects', projectRouter)
   app.use('/api/media', mediaRouter)
   app.use('/api/cesium', cesiumRouter)
+  app.use('/api/gateways/github', githubGatewayRouter)
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)
-  app.use('/api/admin', adminRouter)
+  app.use('/api/user-management', userManagementRouter)
   // Board routes must come before ticket routes to ensure correct matching
   app.use('/api', boardRouter)
   // Ticket router routes (/api/boards/:boardId/tickets and /api/tickets/:id) come after

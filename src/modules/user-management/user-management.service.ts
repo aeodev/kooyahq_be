@@ -3,17 +3,20 @@ import { projectRepository } from '../projects/project.repository'
 import type { PublicUser } from '../users/user.model'
 import { PERMISSIONS, type Permission } from '../auth/rbac/permissions'
 
-const ADMIN_LIKE: Permission[] = [
+const USER_MANAGEMENT_PERMS: Permission[] = [
   PERMISSIONS.SYSTEM_FULL_ACCESS,
-  PERMISSIONS.ADMIN_FULL_ACCESS,
-  PERMISSIONS.ADMIN_READ,
+  PERMISSIONS.USERS_VIEW,
+  PERMISSIONS.USERS_MANAGE,
+  PERMISSIONS.PROJECTS_VIEW,
+  PERMISSIONS.PROJECTS_MANAGE,
+  PERMISSIONS.SYSTEM_LOGS,
 ]
 
-function isAdminLike(user: PublicUser) {
-  return Array.isArray(user.permissions) && user.permissions.some((perm) => ADMIN_LIKE.includes(perm as Permission))
+function hasUserManagementAccess(user: PublicUser) {
+  return Array.isArray(user.permissions) && user.permissions.some((perm) => USER_MANAGEMENT_PERMS.includes(perm as Permission))
 }
 
-export const adminService = {
+export const userManagementService = {
   async getStats() {
     const [users, projects] = await Promise.all([
       userRepository.findAll(),
@@ -21,7 +24,7 @@ export const adminService = {
     ])
 
     const totalUsers = users.length
-    const totalAdmins = users.filter(isAdminLike).length
+    const totalAdmins = users.filter(hasUserManagementAccess).length
     const totalRegularUsers = totalUsers - totalAdmins
     const totalProjects = projects.length
 
@@ -66,7 +69,7 @@ export const adminService = {
       user.name,
       user.email,
       user.position || '',
-      isAdminLike(user) ? 'Yes' : 'No',
+      hasUserManagementAccess(user) ? 'Yes' : 'No',
       user.status || 'online',
       user.createdAt,
     ])
@@ -79,9 +82,5 @@ export const adminService = {
     return csvContent
   },
 }
-
-
-
-
 
 

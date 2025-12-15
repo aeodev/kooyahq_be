@@ -39,3 +39,20 @@ src/
 ## Health check
 
 The frontend expects a health check endpoint at `/api/health`. It returns uptime and environment metadata.
+
+## GitHub Gateway (GitHub Actions)
+
+Set `GITHUB_GATEWAY_SECRET` in your environment. GitHub Actions should `POST` to `/api/gateways/github/actions` with either `x-github-gateway-secret`, `x-gateway-secret`, or `Authorization: Bearer <secret>`.
+
+Example payload:
+
+```json
+{
+  "branch": "feature/ENG-123-awesome",
+  "column": "Deploying",
+  "status": "deploying",
+  "prLink": "https://github.com/org/repo/pull/123"
+}
+```
+
+Accepted statuses: `open`, `requested_pr`, `merging_pr`, `merged_pr`, `merged`, `deploying`, `deployed`, `failed`, `closed`. The service also accepts space or dash separated variants (e.g., `requested pr`, `merging pr`).

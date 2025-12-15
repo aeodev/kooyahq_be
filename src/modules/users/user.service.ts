@@ -38,7 +38,7 @@ export const userService = {
     return userRepository.updateProfile(id, updates)
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string }) {
+  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string }) {
     return userRepository.updateEmployee(id, updates)
   },
 }

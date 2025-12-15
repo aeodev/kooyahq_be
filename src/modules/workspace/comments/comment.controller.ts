@@ -5,6 +5,25 @@ import { boardService } from '../boards/board.service'
 import { activityRepository } from '../activities/activity.repository'
 import { notificationService } from '../../notifications/notification.service'
 import { createHttpError } from '../../../utils/http-error'
+import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
+
+type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
+
+const getBoardRole = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, userId?: string): BoardRole => {
+  if (!userId) return 'none'
+  if (board.createdBy === userId) return 'owner'
+  const member = (board.members ?? []).find((m) => m.userId === userId)
+  return (member?.role as BoardRole | undefined) ?? 'none'
+}
+
+const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_FULL_ACCESS)
+const canViewBoard = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, user: any) =>
+  hasFullBoardAccess(user) || getBoardRole(board, user?.id) !== 'none'
+const canModifyBoardContent = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, user: any) => {
+  if (hasFullBoardAccess(user)) return true
+  const role = getBoardRole(board, user?.id)
+  return role === 'owner' || role === 'admin' || role === 'member'
+}
 
 export async function createComment(req: Request, res: Response, next: NextFunction) {
   const { ticketId } = req.params
@@ -30,14 +49,7 @@ export async function createComment(req: Request, res: Response, next: NextFunct
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canModifyBoardContent(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -109,14 +121,7 @@ export async function getCommentsByTicket(req: Request, res: Response, next: Nex
       return next(createHttpError(404, 'Board not found'))
     }
 
-    // Check if user is a member of the workspace (boards use workspace membership)
-    const workspaceServiceModule = await import('../workspace/workspace.service')
-    const workspace = await workspaceServiceModule.workspaceService.findById(board.workspaceId)
-    if (!workspace) {
-      return next(createHttpError(404, 'Workspace not found'))
-    }
-    const isWorkspaceMember = workspace.members.some((m) => m.userId === userId)
-    if (!isWorkspaceMember) {
+    if (!canViewBoard(board, req.user)) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -159,6 +164,10 @@ export async function updateComment(req: Request, res: Response, next: NextFunct
     const board = await boardService.findById(ticket.boardId)
     if (!board) {
       return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (!canModifyBoardContent(board, req.user)) {
+      return next(createHttpError(403, 'Forbidden'))
     }
 
     const updated = await commentService.update(id, userId, content)
@@ -216,6 +225,20 @@ export async function deleteComment(req: Request, res: Response, next: NextFunct
       return next(createHttpError(404, 'Comment not found'))
     }
 
+    const ticket = await ticketService.findById(comment.ticketId)
+    if (!ticket) {
+      return next(createHttpError(404, 'Ticket not found'))
+    }
+
+    const board = await boardService.findById(ticket.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (!canModifyBoardContent(board, req.user)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
     await commentService.delete(id, userId)
 
     res.json({
@@ -230,4 +253,3 @@ export async function deleteComment(req: Request, res: Response, next: NextFunct
     next(error)
   }
 }
-

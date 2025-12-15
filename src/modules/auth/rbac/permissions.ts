@@ -3,52 +3,20 @@ import type { PublicUser } from '../../users/user.model'
 // New granular permission catalog (backend source of truth)
 export const PERMISSIONS = {
   SYSTEM_FULL_ACCESS: 'system:fullAccess',
-  ADMIN_FULL_ACCESS: 'admin:fullAccess',
-  ADMIN_READ: 'admin:read',
-  ADMIN_EXPORT: 'admin:export',
-  ADMIN_ACTIVITY_READ: 'admin-activity:read',
 
-  USER_FULL_ACCESS: 'user:fullAccess',
-  USER_READ: 'user:read',
-  USER_CREATE: 'user:create',
-  USER_UPDATE: 'user:update',
-  USER_DELETE: 'user:delete',
+  USERS_VIEW: 'users:view',
+  USERS_MANAGE: 'users:manage',
 
-  WORKSPACE_FULL_ACCESS: 'workspace:fullAccess',
-  WORKSPACE_READ: 'workspace:read',
-  WORKSPACE_CREATE: 'workspace:create',
-  WORKSPACE_UPDATE: 'workspace:update',
-  WORKSPACE_DELETE: 'workspace:delete',
-  WORKSPACE_MANAGE_MEMBERS: 'workspace:manageMembers',
+  PROJECTS_VIEW: 'projects:view',
+  PROJECTS_MANAGE: 'projects:manage',
+
+  SYSTEM_LOGS: 'system:logs',
 
   BOARD_FULL_ACCESS: 'board:fullAccess',
-  BOARD_READ: 'board:read',
+  BOARD_VIEW: 'board:view',
   BOARD_CREATE: 'board:create',
   BOARD_UPDATE: 'board:update',
   BOARD_DELETE: 'board:delete',
-  BOARD_FAVORITE: 'board:favorite',
-  BOARD_ACTIVITY_READ: 'board-activity:read',
-  WORKSPACE_ACTIVITY_READ: 'workspace-activity:read',
-  SPRINT_MANAGE: 'sprint:manage',
-
-  TICKET_FULL_ACCESS: 'ticket:fullAccess',
-  TICKET_READ: 'ticket:read',
-  TICKET_CREATE: 'ticket:create',
-  TICKET_UPDATE: 'ticket:update',
-  TICKET_DELETE: 'ticket:delete',
-  TICKET_RANK: 'ticket:rank',
-  TICKET_RELATION: 'ticket:relation',
-  TICKET_COMMENT_READ: 'ticket-comment:read',
-  TICKET_COMMENT_CREATE: 'ticket-comment:create',
-  TICKET_COMMENT_UPDATE: 'ticket-comment:update',
-  TICKET_COMMENT_DELETE: 'ticket-comment:delete',
-  TICKET_ACTIVITY_READ: 'ticket-activity:read',
-
-  PROJECT_FULL_ACCESS: 'project:fullAccess',
-  PROJECT_READ: 'project:read',
-  PROJECT_CREATE: 'project:create',
-  PROJECT_UPDATE: 'project:update',
-  PROJECT_DELETE: 'project:delete',
 
   ANNOUNCEMENT_FULL_ACCESS: 'announcement:fullAccess',
   ANNOUNCEMENT_READ: 'announcement:read',
@@ -119,7 +87,7 @@ export type AuthUser = PublicUser & {
   permissions: Permission[]
 }
 
-const SUPER_PERMISSIONS: Permission[] = [PERMISSIONS.SYSTEM_FULL_ACCESS, PERMISSIONS.ADMIN_FULL_ACCESS]
+const SUPER_PERMISSIONS: Permission[] = [PERMISSIONS.SYSTEM_FULL_ACCESS]
 
 // Map of prefix -> fullAccess permission for that prefix
 const FULL_ACCESS_BY_PREFIX: Record<string, Permission> = Object.values(PERMISSIONS).reduce((acc, perm) => {

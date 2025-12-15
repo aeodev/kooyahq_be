@@ -3,7 +3,6 @@ import { UserModel, toPublicUser, toUser, type PublicUser, type User } from './u
 export type CreateUserInput = {
   email: string
   name: string
-  userType?: 'employee' | 'client'
   permissions?: string[]
 }
 
@@ -30,7 +29,6 @@ export const userRepository = {
     const doc = await UserModel.create({
       email: input.email.toLowerCase(),
       name: input.name,
-      userType: input.userType || 'employee',
       permissions: Array.isArray(input.permissions) ? input.permissions : [],
     })
 
@@ -102,7 +100,7 @@ export const userRepository = {
     return doc ? toPublicUser(toUser(doc)) : undefined
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string }): Promise<PublicUser | undefined> {
+  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string }): Promise<PublicUser | undefined> {
     const updateData: Record<string, unknown> = {}
 
     if (updates.name !== undefined) {
@@ -116,6 +114,15 @@ export const userRepository = {
     }
     if (updates.birthday !== undefined) {
       updateData.birthday = updates.birthday ? new Date(updates.birthday) : undefined
+    }
+    if (updates.status !== undefined) {
+      updateData.status = updates.status
+    }
+    if (updates.bio !== undefined) {
+      updateData.bio = updates.bio
+    }
+    if (updates.permissions !== undefined) {
+      updateData.permissions = updates.permissions
     }
 
     const doc = await UserModel.findByIdAndUpdate(

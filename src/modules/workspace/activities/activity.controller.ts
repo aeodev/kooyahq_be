@@ -3,6 +3,7 @@ import { activityRepository } from './activity.repository'
 import { boardService } from '../boards/board.service'
 import { ticketService } from '../tickets/ticket.service'
 import { createHttpError } from '../../../utils/http-error'
+import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
 
 /**
  * Get activities for a ticket
@@ -28,8 +29,10 @@ export async function getTicketActivities(req: Request, res: Response, next: Nex
     }
 
     // Check if user is a member of the board
+    const authUser = req.user ?? { permissions: [] }
+    const hasFullAccess = hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)
     const isMember = board.members.some((m) => m.userId === userId)
-    if (!isMember) {
+    if (!isMember && !hasFullAccess) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -64,8 +67,10 @@ export async function getBoardActivities(req: Request, res: Response, next: Next
     }
 
     // Check if user is a member of the board
+    const authUser = req.user ?? { permissions: [] }
+    const hasFullAccess = hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)
     const isMember = board.members.some((m) => m.userId === userId)
-    if (!isMember) {
+    if (!isMember && !hasFullAccess) {
       return next(createHttpError(403, 'Forbidden'))
     }
 

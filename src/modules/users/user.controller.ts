@@ -4,7 +4,7 @@ import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
 import { hashPassword } from '../../utils/password'
-import { buildAuthUser } from '../auth/rbac/permissions'
+import { buildAuthUser, PERMISSIONS } from '../auth/rbac/permissions'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -134,10 +134,21 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
 export async function updateEmployee(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
-  const { name, email, position, birthday } = req.body
+  const { name, email, position, birthday, status, permissions, bio } = req.body
+
+  const validStatuses = ['online', 'busy', 'away', 'offline']
+  const validPermissions = new Set(Object.values(PERMISSIONS))
 
   try {
-    const updates: { name?: string; email?: string; position?: string; birthday?: string } = {}
+    const updates: {
+      name?: string
+      email?: string
+      position?: string
+      birthday?: string
+      status?: string
+      permissions?: string[]
+      bio?: string
+    } = {}
 
     if (name !== undefined) {
       if (!name.trim()) {
@@ -171,6 +182,25 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
         }
       }
       updates.birthday = birthday?.trim() || undefined
+    }
+
+    if (status !== undefined) {
+      if (!validStatuses.includes(status)) {
+        return next(createHttpError(400, 'Invalid status value'))
+      }
+      updates.status = status
+    }
+
+    if (bio !== undefined) {
+      updates.bio = typeof bio === 'string' ? bio.trim() : ''
+    }
+
+    if (permissions !== undefined) {
+      if (!Array.isArray(permissions)) {
+        return next(createHttpError(400, 'Permissions must be an array'))
+      }
+      const sanitized = permissions.filter((p: unknown) => typeof p === 'string' && validPermissions.has(p as any))
+      updates.permissions = Array.from(new Set(sanitized))
     }
 
     if (Object.keys(updates).length === 0) {
@@ -278,7 +308,6 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
     const user = await userService.create({
       email: email.trim(),
       name: name.trim(),
-      userType: 'client',
       permissions,
     })
 
@@ -298,7 +327,7 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
           action: 'create_client',
           targetType: 'user',
           targetId: user.id,
-          changes: { name: user.name, email: user.email, userType: 'client' },
+          changes: { name: user.name, email: user.email },
         })
       } catch (logError) {
         console.error('Failed to log admin activity:', logError)

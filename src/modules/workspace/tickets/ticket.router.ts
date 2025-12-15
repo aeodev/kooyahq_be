@@ -1,7 +1,5 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
-import { requirePermission } from '../../../middleware/require-permission'
-import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createTicket,
   deleteTicket,
@@ -61,7 +59,6 @@ export const ticketRouter = Router()
 ticketRouter.post(
   '/boards/:boardId/tickets',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_CREATE, PERMISSIONS.TICKET_FULL_ACCESS),
   createTicket
 )
 
@@ -86,7 +83,6 @@ ticketRouter.post(
 ticketRouter.get(
   '/boards/:boardId/tickets',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_READ, PERMISSIONS.TICKET_FULL_ACCESS),
   getTicketsByBoard
 )
 
@@ -111,7 +107,6 @@ ticketRouter.get(
 ticketRouter.get(
   '/tickets/:id',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_READ, PERMISSIONS.TICKET_FULL_ACCESS),
   getTicketById
 )
 
@@ -192,7 +187,6 @@ ticketRouter.get(
 ticketRouter.put(
   '/tickets/:id',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_UPDATE, PERMISSIONS.TICKET_FULL_ACCESS),
   updateTicket
 )
 
@@ -217,7 +211,6 @@ ticketRouter.put(
 ticketRouter.delete(
   '/tickets/:id',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_DELETE, PERMISSIONS.TICKET_FULL_ACCESS),
   deleteTicket
 )
 
@@ -253,7 +246,6 @@ ticketRouter.delete(
 ticketRouter.post(
   '/tickets/:id/related-tickets',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_RELATION, PERMISSIONS.TICKET_FULL_ACCESS),
   addRelatedTicket
 )
 
@@ -283,7 +275,6 @@ ticketRouter.post(
 ticketRouter.delete(
   '/tickets/:id/related-tickets/:relatedTicketId',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_RELATION, PERMISSIONS.TICKET_FULL_ACCESS),
   removeRelatedTicket
 )
 
@@ -330,7 +321,6 @@ ticketRouter.delete(
 ticketRouter.post(
   '/boards/:boardId/tickets/bulk-rank',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_RANK, PERMISSIONS.TICKET_FULL_ACCESS),
   bulkUpdateRanks
 )
 
@@ -367,7 +357,6 @@ ticketRouter.post(
 ticketRouter.post(
   '/tickets/:ticketId/comments',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_COMMENT_CREATE, PERMISSIONS.TICKET_FULL_ACCESS),
   createComment
 )
 
@@ -392,7 +381,6 @@ ticketRouter.post(
 ticketRouter.get(
   '/tickets/:ticketId/comments',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_COMMENT_READ, PERMISSIONS.TICKET_FULL_ACCESS),
   getCommentsByTicket
 )
 
@@ -425,7 +413,6 @@ ticketRouter.get(
 ticketRouter.put(
   '/comments/:id',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_COMMENT_UPDATE, PERMISSIONS.TICKET_FULL_ACCESS),
   updateComment
 )
 
@@ -450,7 +437,5 @@ ticketRouter.put(
 ticketRouter.delete(
   '/comments/:id',
   authenticate,
-  requirePermission(PERMISSIONS.TICKET_COMMENT_DELETE, PERMISSIONS.TICKET_FULL_ACCESS),
   deleteComment
 )
-

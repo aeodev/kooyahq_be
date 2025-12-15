@@ -1,5 +1,6 @@
 import { boardService } from '../boards/board.service'
 import { ticketRepository, type CreateTicketInput } from './ticket.repository'
+import type { TicketGithubStatus } from './ticket.model'
 
 function generateRank(): string {
   return `rank_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -126,6 +127,10 @@ export const ticketService = {
     return ticketRepository.findByTicketKey(ticketKey)
   },
 
+  async findByGithubBranchName(branchName: string) {
+    return ticketRepository.findByGithubBranchName(branchName)
+  },
+
   async findByParentTicketId(parentTicketId: string) {
     return ticketRepository.findByParentTicketId(parentTicketId)
   },
@@ -172,7 +177,7 @@ export const ticketService = {
       github?: {
         branchName?: string
         pullRequestUrl?: string
-        status?: 'open' | 'merged' | 'closed'
+        status?: TicketGithubStatus
       }
     },
     userId: string,

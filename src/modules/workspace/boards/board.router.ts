@@ -1,7 +1,5 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
-import { requirePermission } from '../../../middleware/require-permission'
-import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createBoard,
   deleteBoard,
@@ -57,7 +55,6 @@ export const boardRouter = Router()
 boardRouter.post(
   '/workspaces/:workspaceId/boards',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_CREATE, PERMISSIONS.BOARD_FULL_ACCESS),
   createBoard
 )
 
@@ -65,7 +62,6 @@ boardRouter.post(
 boardRouter.post(
   '/boards',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_CREATE, PERMISSIONS.BOARD_FULL_ACCESS),
   createBoard
 )
 
@@ -95,7 +91,6 @@ boardRouter.post(
 boardRouter.get(
   '/workspaces/:workspaceId/boards',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
   getBoards
 )
 
@@ -103,7 +98,6 @@ boardRouter.get(
 boardRouter.get(
   '/boards',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
   getBoardsForUser
 )
 
@@ -130,7 +124,6 @@ boardRouter.get(
 boardRouter.get(
   '/boards/:id',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
   getBoardById
 )
 
@@ -157,7 +150,6 @@ boardRouter.get(
 boardRouter.get(
   '/boards/key/:key',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_READ, PERMISSIONS.BOARD_FULL_ACCESS),
   getBoardByKey
 )
 
@@ -212,7 +204,6 @@ boardRouter.get(
 boardRouter.put(
   '/boards/:id',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_UPDATE, PERMISSIONS.BOARD_FULL_ACCESS),
   updateBoard
 )
 
@@ -237,7 +228,6 @@ boardRouter.put(
 boardRouter.delete(
   '/boards/:id',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_DELETE, PERMISSIONS.BOARD_FULL_ACCESS),
   deleteBoard
 )
 
@@ -274,6 +264,5 @@ boardRouter.delete(
 boardRouter.post(
   '/boards/:boardId/favorite',
   authenticate,
-  requirePermission(PERMISSIONS.BOARD_FAVORITE, PERMISSIONS.BOARD_FULL_ACCESS),
   toggleFavoriteBoard
 )

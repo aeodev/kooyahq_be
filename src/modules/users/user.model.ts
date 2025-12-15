@@ -3,7 +3,6 @@ import { Schema, model, models, type Document } from 'mongoose'
 export interface UserDocument extends Document {
   email: string
   name: string
-  userType: 'employee' | 'client'
   permissions: string[]
   position?: string
   birthday?: Date
@@ -32,13 +31,6 @@ const userSchema = new Schema<UserDocument>(
     permissions: {
       type: [String],
       default: [],
-    },
-    userType: {
-      type: String,
-      enum: ['employee', 'client'],
-      default: 'employee',
-      required: true,
-      index: true,
     },
     profilePic: {
       type: String,
@@ -87,7 +79,6 @@ export type User = {
   id: string
   email: string
   name: string
-  userType: 'employee' | 'client'
   permissions: string[]
   position?: string
   birthday?: string
@@ -107,7 +98,6 @@ export function toUser(doc: UserDocument): User {
     id: doc.id,
     email: doc.email,
     name: doc.name,
-    userType: (doc.userType as 'employee' | 'client') || 'employee',
     permissions: Array.isArray(doc.permissions) ? doc.permissions : [],
     position: doc.position,
     birthday: doc.birthday?.toISOString(),

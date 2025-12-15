@@ -1,7 +1,5 @@
 import { Router } from 'express'
 import { authenticate } from '../../../middleware/authenticate'
-import { requirePermission } from '../../../middleware/require-permission'
-import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createWorkspace,
   deleteWorkspace,
@@ -40,7 +38,6 @@ export const workspaceRouter = Router()
 workspaceRouter.post(
   '/',
   authenticate,
-  requirePermission(PERMISSIONS.WORKSPACE_CREATE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
   createWorkspace
 )
 
@@ -59,7 +56,6 @@ workspaceRouter.post(
 workspaceRouter.get(
   '/',
   authenticate,
-  requirePermission(PERMISSIONS.WORKSPACE_READ, PERMISSIONS.WORKSPACE_FULL_ACCESS),
   getWorkspaces
 )
 
@@ -84,7 +80,6 @@ workspaceRouter.get(
 workspaceRouter.get(
   '/:id',
   authenticate,
-  requirePermission(PERMISSIONS.WORKSPACE_READ, PERMISSIONS.WORKSPACE_FULL_ACCESS),
   getWorkspaceById
 )
 
@@ -124,7 +119,6 @@ workspaceRouter.get(
 workspaceRouter.put(
   '/:id',
   authenticate,
-  requirePermission(PERMISSIONS.WORKSPACE_UPDATE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
   updateWorkspace
 )
 
@@ -149,7 +143,5 @@ workspaceRouter.put(
 workspaceRouter.delete(
   '/:id',
   authenticate,
-  requirePermission(PERMISSIONS.WORKSPACE_DELETE, PERMISSIONS.WORKSPACE_FULL_ACCESS),
   deleteWorkspace
 )
-
