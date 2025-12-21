@@ -10,6 +10,7 @@ import {
   updateProfile,
   updateEmployee,
   deleteEmployee,
+  createUser,
   createClient,
 } from './user.controller'
 
@@ -33,6 +34,12 @@ userRouter.put(
 userRouter.get('/', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getAllUsers)
 userRouter.get('/:id', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getUserById)
 
+userRouter.post(
+  '/',
+  authenticate,
+  requirePermission(PERMISSIONS.USERS_MANAGE),
+  createUser
+)
 userRouter.post(
   '/clients',
   authenticate,

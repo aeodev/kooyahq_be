@@ -132,6 +132,89 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function createUser(req: Request, res: Response, next: NextFunction) {
+  const { name, email, password, position, birthday, status, permissions, bio } = req.body
+  const validStatuses = ['online', 'busy', 'away', 'offline']
+  const validPermissions = new Set(Object.values(PERMISSIONS))
+
+  try {
+    if (!name || !name.trim()) {
+      return next(createHttpError(400, 'Name is required'))
+    }
+    if (!email || !email.trim()) {
+      return next(createHttpError(400, 'Email is required'))
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      return next(createHttpError(400, 'Invalid email format'))
+    }
+    if (!password || password.length < 8) {
+      return next(createHttpError(400, 'Password must be at least 8 characters long'))
+    }
+
+    const birthdayStr = typeof birthday === 'string' ? birthday.trim() : ''
+    if (birthdayStr) {
+      const birthdayDate = new Date(birthdayStr)
+      const today = new Date()
+      if (birthdayDate > today) {
+        return next(createHttpError(400, 'Birthday cannot be in the future'))
+      }
+    }
+
+    const sanitizedPermissions = Array.isArray(permissions)
+      ? (permissions.filter((p: unknown) => typeof p === 'string' && validPermissions.has(p as any)) as string[])
+      : []
+
+    if (status && !validStatuses.includes(status)) {
+      return next(createHttpError(400, 'Invalid status value'))
+    }
+
+    const existingAuth = await authRepository.findByEmail(email.trim().toLowerCase())
+    if (existingAuth) {
+      return next(createHttpError(409, 'Email already in use'))
+    }
+
+    const user = await userService.create({
+      email: email.trim(),
+      name: name.trim(),
+      position: typeof position === 'string' ? position.trim() : undefined,
+      birthday: birthdayStr || undefined,
+      status: status || 'online',
+      permissions: sanitizedPermissions,
+      bio: typeof bio === 'string' ? bio.trim() : undefined,
+    })
+
+    const passwordHash = await hashPassword(password)
+    await authRepository.create({
+      email: email.trim().toLowerCase(),
+      passwordHash,
+      userId: user.id,
+    })
+
+    if (req.user?.id) {
+      try {
+        await adminActivityService.logActivity({
+          adminId: req.user.id,
+          action: 'create_user',
+          targetType: 'user',
+          targetId: user.id,
+          changes: { name: user.name, email: user.email },
+        })
+      } catch (logError) {
+        console.error('Failed to log admin activity:', logError)
+      }
+    }
+
+    res.status(201).json({
+      status: 'success',
+      data: user,
+      message: 'User created successfully',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 export async function updateEmployee(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
   const { name, email, position, birthday, status, permissions, bio } = req.body

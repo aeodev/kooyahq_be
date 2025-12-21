@@ -4,6 +4,10 @@ export type CreateUserInput = {
   email: string
   name: string
   permissions?: string[]
+  position?: string
+  birthday?: string
+  status?: 'online' | 'busy' | 'away' | 'offline'
+  bio?: string
 }
 
 export const userRepository = {
@@ -30,6 +34,10 @@ export const userRepository = {
       email: input.email.toLowerCase(),
       name: input.name,
       permissions: Array.isArray(input.permissions) ? input.permissions : [],
+      position: input.position?.trim() || undefined,
+      birthday: input.birthday ? new Date(input.birthday) : undefined,
+      status: input.status || 'online',
+      bio: input.bio ?? '',
     })
 
     return toPublicUser(toUser(doc))
