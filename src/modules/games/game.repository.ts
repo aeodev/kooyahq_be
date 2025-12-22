@@ -5,6 +5,7 @@ export type CreateGameMatchInput = {
   players: string[]
   status?: GameStatus
   metadata?: Record<string, unknown>
+  startedAt?: Date
 }
 
 export type UpdateGameMatchInput = {
@@ -21,6 +22,7 @@ export class GameRepository {
     const doc = new GameMatchModel({
       ...input,
       status: input.status || 'waiting',
+      startedAt: input.startedAt,
     })
     await doc.save()
     return toGameMatch(doc)
@@ -83,7 +85,7 @@ export class GameRepository {
 
         // For reaction-test, track scores
         if (gameType === 'reaction-test' && scores[playerId] !== undefined) {
-          playerStats.scores.push(scores[playerId] as number)
+          playerStats.scores.push(Number(scores[playerId]))
         }
 
         if (!winner) {
@@ -144,4 +146,3 @@ export class GameRepository {
 }
 
 export const gameRepository = new GameRepository()
-

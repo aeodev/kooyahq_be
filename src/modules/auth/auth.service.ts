@@ -5,13 +5,11 @@ import { hashPassword, verifyPassword } from '../../utils/password'
 import { createAccessToken } from '../../utils/token'
 import { userService } from '../users/user.service'
 import { authRepository } from './auth.repository'
-import { buildAuthUser, PERMISSIONS, type AuthUser, type Permission } from './rbac/permissions'
+import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, type AuthUser, type Permission } from './rbac/permissions'
 
 const MIN_PASSWORD_LENGTH = 8
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const googleClient = new OAuth2Client(env.googleOAuth.clientId, env.googleOAuth.clientSecret)
-const DEFAULT_GOOGLE_PERMISSIONS: Permission[] = [PERMISSIONS.SYSTEM_FULL_ACCESS]
-
 type RegisterInput = {
   email: string
   password: string
@@ -104,10 +102,15 @@ export async function registerUser(input: RegisterInput): Promise<{ user: AuthUs
   const passwordHash = await hashPassword(password)
 
   // Create User profile first
+  const permissions =
+    Array.isArray(input.permissions) && input.permissions.length > 0
+      ? input.permissions
+      : DEFAULT_NEW_USER_PERMISSIONS
+
   const user = await userService.create({
     email,
     name,
-    permissions: Array.isArray(input.permissions) ? input.permissions : [],
+    permissions,
   })
 
   // Create Auth credentials with reference to User
@@ -176,7 +179,7 @@ export async function authenticateWithGoogle(idToken: string): Promise<{ user: A
     user = await userService.create({
       email: profile.email,
       name,
-      permissions: DEFAULT_GOOGLE_PERMISSIONS,
+      permissions: DEFAULT_NEW_USER_PERMISSIONS,
     })
   } else {
     if (profile.name && profile.name.trim() && profile.name !== user.name) {

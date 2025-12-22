@@ -4,7 +4,7 @@ import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
 import { hashPassword } from '../../utils/password'
-import { buildAuthUser, PERMISSIONS } from '../auth/rbac/permissions'
+import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS } from '../auth/rbac/permissions'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
@@ -163,7 +163,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
     const sanitizedPermissions = Array.isArray(permissions)
       ? (permissions.filter((p: unknown) => typeof p === 'string' && validPermissions.has(p as any)) as string[])
-      : []
+      : DEFAULT_NEW_USER_PERMISSIONS
 
     if (status && !validStatuses.includes(status)) {
       return next(createHttpError(400, 'Invalid status value'))

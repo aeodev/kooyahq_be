@@ -30,6 +30,9 @@ export function workspaceRoom(workspaceId: string): string {
   return `workspace:${workspaceId}`
 }
 
+export function serverManagementRunRoom(runId: string): string {
+  return `server-management:run:${runId}`
+}
 
 
 

@@ -93,5 +93,3 @@ export function toGameMatch(doc: GameMatchDocument): GameMatch {
 
 
 
-
-

@@ -94,4 +94,5 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
     // For now, just acknowledge the request
     socket.emit('game:state-requested', { gameId })
   })
+
 }

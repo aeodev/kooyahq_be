@@ -1,6 +1,7 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
 export type AdminAction =
+  | 'create_user'
   | 'update_user'
   | 'delete_user'
   | 'create_client'
@@ -30,7 +31,15 @@ const adminActivitySchema = new Schema<AdminActivityDocument>(
     },
     action: {
       type: String,
-      enum: ['update_user', 'delete_user', 'create_client', 'create_project', 'update_project', 'delete_project'],
+      enum: [
+        'create_user',
+        'update_user',
+        'delete_user',
+        'create_client',
+        'create_project',
+        'update_project',
+        'delete_project',
+      ],
       required: true,
       index: true,
     },
@@ -95,7 +104,6 @@ export function toAdminActivity(doc: AdminActivityDocument): AdminActivity {
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-
 
 
 
