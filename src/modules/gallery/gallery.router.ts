@@ -10,6 +10,7 @@ import {
   getGalleryItem,
   updateGalleryItem,
   deleteGalleryItem,
+  deleteMultipleGalleryItems,
 } from './gallery.controller'
 
 export const galleryRouter = Router()
@@ -38,6 +39,11 @@ galleryRouter.put(
   '/:id',
   requirePermission(PERMISSIONS.GALLERY_UPDATE, PERMISSIONS.GALLERY_FULL_ACCESS),
   updateGalleryItem
+)
+galleryRouter.delete(
+  '/batch',
+  requirePermission(PERMISSIONS.GALLERY_DELETE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  deleteMultipleGalleryItems
 )
 galleryRouter.delete(
   '/:id',

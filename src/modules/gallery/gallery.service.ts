@@ -19,6 +19,19 @@ export class GalleryService {
     return items.map(item => toGalleryItem(item as any, baseUrl))
   }
 
+  async search(params: {
+    page?: number
+    limit?: number
+    search?: string
+    sort?: string
+  }, baseUrl: string = ''): Promise<{ data: GalleryItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+    const result = await this.galleryRepo.searchGalleryItems(params)
+    return {
+      data: result.data.map(item => toGalleryItem(item as any, baseUrl)),
+      pagination: result.pagination,
+    }
+  }
+
   async findById(id: string, baseUrl: string = ''): Promise<GalleryItem> {
     const item = await this.galleryRepo.findById(id)
     if (!item) {

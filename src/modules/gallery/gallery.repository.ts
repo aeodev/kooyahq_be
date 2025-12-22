@@ -32,6 +32,52 @@ export class GalleryRepository {
     return docs.map((doc) => toGalleryItem(doc as any, ''))
   }
 
+  async searchGalleryItems(params: {
+    page?: number
+    limit?: number
+    search?: string
+    sort?: string
+  }): Promise<{ data: GalleryItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+    const page = params.page || 1
+    const limit = params.limit || 20
+    const skip = (page - 1) * limit
+
+    const query: Record<string, unknown> = {}
+
+    // Search filter
+    if (params.search && params.search.trim()) {
+      const searchRegex = new RegExp(params.search.trim(), 'i')
+      query.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+      ]
+    }
+
+    // Sort options
+    let sortOption: Record<string, 1 | -1> = { createdAt: -1 }
+    if (params.sort) {
+      if (params.sort === 'title-asc') sortOption = { title: 1 }
+      else if (params.sort === 'title-desc') sortOption = { title: -1 }
+      else if (params.sort === 'date-asc') sortOption = { createdAt: 1 }
+      else if (params.sort === 'date-desc') sortOption = { createdAt: -1 }
+    }
+
+    const [docs, total] = await Promise.all([
+      GalleryModel.find(query).sort(sortOption).skip(skip).limit(limit).exec(),
+      GalleryModel.countDocuments(query),
+    ])
+
+    return {
+      data: docs.map((doc) => toGalleryItem(doc as any, '')),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }
+  }
+
   async update(id: string, updates: UpdateGalleryInput): Promise<GalleryItem> {
     const doc = await GalleryModel.findByIdAndUpdate(id, updates, { new: true })
     if (!doc) {

@@ -75,8 +75,27 @@ export async function createMultipleGalleryItems(req: Request, res: Response) {
 }
 
 export async function getGalleryItems(req: Request, res: Response) {
-  const items = await service.findAll('')
-  res.json({ status: 'success', data: items })
+  const { page, limit, search, sort } = req.query
+
+  // If pagination/search params provided, use search
+  if (page || limit || search || sort) {
+    const result = await service.search({
+      page: page ? parseInt(page as string, 10) : undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      search: search as string | undefined,
+      sort: sort as string | undefined,
+    }, '')
+
+    res.json({
+      status: 'success',
+      data: result.data,
+      pagination: result.pagination,
+    })
+  } else {
+    // Otherwise, return all items (backward compatibility)
+    const items = await service.findAll('')
+    res.json({ status: 'success', data: items })
+  }
 }
 
 export async function getGalleryItem(req: Request, res: Response) {
@@ -99,5 +118,14 @@ export async function deleteGalleryItem(req: Request, res: Response) {
   const { id } = req.params
   await service.delete(id)
   res.json({ status: 'success', message: 'Gallery item deleted' })
+}
+
+export async function deleteMultipleGalleryItems(req: Request, res: Response) {
+  const { ids } = req.body
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ status: 'error', message: 'ids array is required' })
+  }
+  await Promise.all(ids.map((id: string) => service.delete(id)))
+  res.json({ status: 'success', message: 'Gallery items deleted' })
 }
 
