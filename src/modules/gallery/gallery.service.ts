@@ -10,13 +10,23 @@ export class GalleryService {
     const item = await this.galleryRepo.create({
       ...input,
       uploadedBy: userId,
+      status: 'pending',
     })
     return toGalleryItem(item as any, baseUrl)
   }
 
-  async findAll(baseUrl: string = ''): Promise<GalleryItem[]> {
+  async approve(id: string, approvedBy: string, baseUrl: string = ''): Promise<GalleryItem> {
+    const item = await this.galleryRepo.update(id, {
+      status: 'approved',
+      approvedBy,
+    })
+    return toGalleryItem(item as any, baseUrl)
+  }
+
+  async findAll(baseUrl: string = '', status?: 'pending' | 'approved'): Promise<GalleryItem[]> {
     const items = await this.galleryRepo.findAll()
-    return items.map(item => toGalleryItem(item as any, baseUrl))
+    const filtered = status ? items.filter(item => (item as any).status === status) : items
+    return filtered.map(item => toGalleryItem(item as any, baseUrl))
   }
 
   async search(params: {
@@ -24,6 +34,7 @@ export class GalleryService {
     limit?: number
     search?: string
     sort?: string
+    status?: 'pending' | 'approved'
   }, baseUrl: string = ''): Promise<{ data: GalleryItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const result = await this.galleryRepo.searchGalleryItems(params)
     return {

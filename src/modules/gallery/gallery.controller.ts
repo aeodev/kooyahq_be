@@ -1,6 +1,8 @@
 import { Request, Response } from 'express'
 import { GalleryService } from './gallery.service'
 import type { CreateGalleryInput, UpdateGalleryInput } from './gallery.repository'
+import { hasPermission } from '../auth/rbac/permissions'
+import { PERMISSIONS } from '../auth/rbac/permissions'
 
 const service = new GalleryService()
 
@@ -76,14 +78,21 @@ export async function createMultipleGalleryItems(req: Request, res: Response) {
 
 export async function getGalleryItems(req: Request, res: Response) {
   const { page, limit, search, sort } = req.query
+  const user = req.user!
+
+  // Check if user can approve
+  const canApprove = hasPermission(user, PERMISSIONS.GALLERY_APPROVE) || 
+                     hasPermission(user, PERMISSIONS.GALLERY_FULL_ACCESS)
 
   // If pagination/search params provided, use search
   if (page || limit || search || sort) {
+    const statusFilter = canApprove ? undefined : 'approved'
     const result = await service.search({
       page: page ? parseInt(page as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       search: search as string | undefined,
       sort: sort as string | undefined,
+      status: statusFilter,
     }, '')
 
     res.json({
@@ -92,8 +101,9 @@ export async function getGalleryItems(req: Request, res: Response) {
       pagination: result.pagination,
     })
   } else {
-    // Otherwise, return all items (backward compatibility)
-    const items = await service.findAll('')
+    // Otherwise, return all items (filtered by status for regular users)
+    const statusFilter = canApprove ? undefined : 'approved'
+    const items = await service.findAll('', statusFilter)
     res.json({ status: 'success', data: items })
   }
 }
@@ -127,5 +137,12 @@ export async function deleteMultipleGalleryItems(req: Request, res: Response) {
   }
   await Promise.all(ids.map((id: string) => service.delete(id)))
   res.json({ status: 'success', message: 'Gallery items deleted' })
+}
+
+export async function approveGalleryItem(req: Request, res: Response) {
+  const { id } = req.params
+  const userId = req.user!.id
+  const item = await service.approve(id, userId, '')
+  res.json({ status: 'success', data: item })
 }
 

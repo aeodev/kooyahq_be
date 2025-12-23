@@ -8,11 +8,14 @@ export type CreateGalleryInput = {
   mimetype: string
   size: number
   uploadedBy: string
+  status?: 'pending' | 'approved'
 }
 
 export type UpdateGalleryInput = {
   title?: string
   description?: string
+  status?: 'pending' | 'approved'
+  approvedBy?: string
 }
 
 export class GalleryRepository {
@@ -37,12 +40,18 @@ export class GalleryRepository {
     limit?: number
     search?: string
     sort?: string
+    status?: 'pending' | 'approved'
   }): Promise<{ data: GalleryItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const page = params.page || 1
     const limit = params.limit || 20
     const skip = (page - 1) * limit
 
     const query: Record<string, unknown> = {}
+
+    // Status filter
+    if (params.status) {
+      query.status = params.status
+    }
 
     // Search filter
     if (params.search && params.search.trim()) {

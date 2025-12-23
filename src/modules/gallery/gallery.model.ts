@@ -8,6 +8,8 @@ export interface GalleryDocument extends Document {
   mimetype: string
   size: number
   uploadedBy: string
+  status: 'pending' | 'approved'
+  approvedBy?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -44,6 +46,15 @@ const gallerySchema = new Schema<GalleryDocument>(
       required: true,
       index: true,
     },
+    status: {
+      type: String,
+      enum: ['pending', 'approved'],
+      default: 'pending',
+      index: true,
+    },
+    approvedBy: {
+      type: String,
+    },
   },
   {
     timestamps: true,
@@ -51,6 +62,7 @@ const gallerySchema = new Schema<GalleryDocument>(
 )
 
 gallerySchema.index({ createdAt: -1 })
+gallerySchema.index({ status: 1, createdAt: -1 })
 
 export const GalleryModel = models.Gallery ?? model<GalleryDocument>('Gallery', gallerySchema)
 
@@ -64,6 +76,8 @@ export type GalleryItem = {
   mimetype: string
   size: number
   uploadedBy: string
+  status: 'pending' | 'approved'
+  approvedBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -90,6 +104,8 @@ export function toGalleryItem(doc: GalleryDocument, baseUrl: string = ''): Galle
     mimetype: doc.mimetype,
     size: doc.size,
     uploadedBy: doc.uploadedBy,
+    status: doc.status || 'pending',
+    approvedBy: doc.approvedBy,
     createdAt,
     updatedAt,
   }

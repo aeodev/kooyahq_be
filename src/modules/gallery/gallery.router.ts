@@ -11,6 +11,7 @@ import {
   updateGalleryItem,
   deleteGalleryItem,
   deleteMultipleGalleryItems,
+  approveGalleryItem,
 } from './gallery.controller'
 
 export const galleryRouter = Router()
@@ -49,4 +50,9 @@ galleryRouter.delete(
   '/:id',
   requirePermission(PERMISSIONS.GALLERY_DELETE, PERMISSIONS.GALLERY_FULL_ACCESS),
   deleteGalleryItem
+)
+galleryRouter.patch(
+  '/:id/approve',
+  requirePermission(PERMISSIONS.GALLERY_APPROVE, PERMISSIONS.GALLERY_FULL_ACCESS),
+  approveGalleryItem
 )

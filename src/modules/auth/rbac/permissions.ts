@@ -12,10 +12,10 @@ export const PERMISSIONS = {
 
   SYSTEM_LOGS: 'system:logs',
 
-  SERVER_MANAGEMENT_VIEW: 'servermanamget:view',
-  SERVER_MANAGEMENT_USE: 'servermanamget:use',
+  SERVER_MANAGEMENT_VIEW: 'serverManagement:view',
+  SERVER_MANAGEMENT_USE: 'serverManagement:use',
   SERVER_MANAGEMENT_ELEVATED_USE: 'serverManagement:elevatedUse',
-  SERVER_MANAGEMENT_MANAGE: 'servermanagementt:manage',
+  SERVER_MANAGEMENT_MANAGE: 'serverManagement:manage',
 
   BOARD_FULL_ACCESS: 'board:fullAccess',
   BOARD_VIEW: 'board:view',
@@ -39,6 +39,7 @@ export const PERMISSIONS = {
   GALLERY_BULK_CREATE: 'gallery:bulkCreate',
   GALLERY_UPDATE: 'gallery:update',
   GALLERY_DELETE: 'gallery:delete',
+  GALLERY_APPROVE: 'gallery:approve',
 
   MEDIA_FULL_ACCESS: 'media:fullAccess',
   MEDIA_UPLOAD: 'media:upload',
