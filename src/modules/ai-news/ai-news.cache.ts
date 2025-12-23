@@ -1,10 +1,15 @@
 import { createClient } from 'redis'
 import { env } from '../../config/env'
+import type { NewsFilter } from './ai-news.types'
 
 let client: ReturnType<typeof createClient> | null = null
 let isConnecting = false
 
-export const CACHE_KEY = 'ai-news:items'
+const CACHE_TTL_SECONDS = 5 * 60 // 5 minutes
+
+function getCacheKey(filter: NewsFilter, offset: number, limit: number): string {
+  return `ai-news:${filter}:${offset}:${limit}`
+}
 
 async function getRedisClient() {
   if (!client) {
@@ -56,10 +61,11 @@ export async function getCached<T>(key: string): Promise<T | null> {
   }
 }
 
-export async function setCached<T>(key: string, data: T): Promise<void> {
+export async function setCached<T>(key: string, data: T, ttlSeconds?: number): Promise<void> {
   try {
     const redis = await getRedisClient()
-    await redis.set(key, JSON.stringify(data), { EX: env.redis.ttlSeconds })
+    const ttl = ttlSeconds ?? CACHE_TTL_SECONDS
+    await redis.set(key, JSON.stringify(data), { EX: ttl })
   } catch (error) {
     console.error('Redis set error:', error)
   }
@@ -68,10 +74,30 @@ export async function setCached<T>(key: string, data: T): Promise<void> {
 export async function clearCache(): Promise<void> {
   try {
     const redis = await getRedisClient()
-    await redis.del(CACHE_KEY)
+    const keys = await redis.keys('ai-news:*')
+    if (keys.length > 0) {
+      await redis.del(keys)
+    }
   } catch (error) {
     console.error('Redis clear error:', error)
   }
 }
 
-// Image caching is now handled by the link-preview module
+export async function getCachedQuery<T>(
+  filter: NewsFilter,
+  offset: number,
+  limit: number
+): Promise<T | null> {
+  const key = getCacheKey(filter, offset, limit)
+  return getCached<T>(key)
+}
+
+export async function setCachedQuery<T>(
+  filter: NewsFilter,
+  offset: number,
+  limit: number,
+  data: T
+): Promise<void> {
+  const key = getCacheKey(filter, offset, limit)
+  await setCached(key, data)
+}

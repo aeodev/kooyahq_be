@@ -11,6 +11,7 @@ import { registerPresenceHandlers } from '../modules/presence/presence.socket'
 import { registerMeetHandlers } from '../modules/meet/meet.socket'
 import { registerBoardHandlers } from '../modules/workspace/boards/board.socket'
 import { registerServerManagementHandlers } from '../modules/server-managmenet/server-management/server-management.socket'
+import { registerAINewsHandlers } from '../modules/ai-news/ai-news.socket'
 import { activeUsersManager } from './active-users'
 import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
 import { presenceManager } from '../modules/presence/presence.manager'
@@ -86,6 +87,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
   socketHandlerRegistry.registerHandler(registerMeetHandlers)
   socketHandlerRegistry.registerHandler(registerBoardHandlers)
   socketHandlerRegistry.registerHandler(registerServerManagementHandlers)
+  socketHandlerRegistry.registerHandler(registerAINewsHandlers)
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.userId

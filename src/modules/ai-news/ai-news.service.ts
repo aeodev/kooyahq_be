@@ -5,6 +5,8 @@ import { isGifUrl, normalizeImageUrl } from '../../utils/image.utils'
 import { cleanHtml, cleanTitle } from '../../utils/text.utils'
 import { generateNewsId } from '../../utils/id.utils'
 import { isSpam } from '../../utils/spam-filter.utils'
+import { NewsItemModel } from './ai-news.model'
+import { connectToDatabase } from '../../lib/mongo'
 
 const parser = new Parser({
   timeout: 10000,
@@ -141,21 +143,39 @@ const extractImageUrl = (item: any): string | undefined => {
 // Image fetching is now handled by the link-preview module
 
 async function fetchFeed(source: NewsSource, url: string): Promise<NewsItem[]> {
-  const feed = await parser.parseURL(url)
+  try {
+    const feed = await parser.parseURL(url)
 
   const items = (feed.items || [])
     .filter(item => item.link && item.title)
-    .map(item => {
+    .map(async (item) => {
       const rawTitle = item.title!
       const cleanedTitle = cleanTitle(rawTitle)
       
-      // Extract image URL and validate it's not a GIF
+      // Extract image URL from RSS content and validate it's not a GIF
       let imageUrl = undefined
       if (source !== 'reddit' && source !== 'reddit-artificial') {
         const extracted = extractImageUrl(item)
         // Final validation: ensure it's not a GIF
         if (extracted && !isGifUrl(extracted)) {
           imageUrl = extracted
+        }
+        
+        // If no image found in RSS, fetch from URL (with timeout)
+        if (!imageUrl) {
+          try {
+            // Use a timeout wrapper to prevent hanging
+            const imagePromise = fetchImageFromUrl(item.link!)
+            const timeoutPromise = new Promise<undefined>((resolve) => 
+              setTimeout(() => resolve(undefined), 5000)
+            )
+            const fetchedImage = await Promise.race([imagePromise, timeoutPromise])
+            if (fetchedImage && !isGifUrl(fetchedImage)) {
+              imageUrl = fetchedImage
+            }
+          } catch {
+            // Silent fail - continue without image
+          }
         }
       }
       
@@ -173,15 +193,51 @@ async function fetchFeed(source: NewsSource, url: string): Promise<NewsItem[]> {
         imageUrl,
       }
     })
+  
+  // Wait for all items to be processed (including image fetching)
+  const resolvedItems = await Promise.allSettled(items)
+  const newsItems = resolvedItems
+    .filter((r): r is PromiseFulfilledResult<NewsItem> => r.status === 'fulfilled')
+    .map(r => r.value)
 
-  return items
-    .filter(item => {
-      const isSpamContent = isSpam(item.title, item.content, item.url)
-      if (isSpamContent) {
-        console.log(`Filtered spam: ${item.title} (${item.url})`)
+  const filteredItems = newsItems.filter(item => {
+    const isSpamContent = isSpam(item.title, item.content, item.url)
+    if (isSpamContent) {
+      console.log(`Filtered spam: ${item.title} (${item.url})`)
+    }
+    return !isSpamContent
+  })
+
+  // Save to MongoDB using upsert by URL
+  await Promise.allSettled(
+    filteredItems.map(async (item) => {
+      try {
+        await NewsItemModel.findOneAndUpdate(
+          { url: item.url },
+          {
+            id: item.id,
+            type: item.type,
+            title: item.title,
+            content: item.content,
+            author: item.author,
+            source: item.source,
+            url: item.url,
+            publishedAt: new Date(item.publishedAt),
+            imageUrl: item.imageUrl,
+          },
+          { upsert: true, new: true }
+        )
+      } catch (error) {
+        console.error(`Failed to save news item ${item.url}:`, error)
       }
-      return !isSpamContent
     })
+  )
+
+  return filteredItems
+  } catch (error) {
+    console.error(`Error fetching feed ${source} from ${url}:`, error)
+    return []
+  }
 }
 
 export async function fetchAllNews(): Promise<NewsItem[]> {

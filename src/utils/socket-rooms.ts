@@ -34,6 +34,10 @@ export function serverManagementRunRoom(runId: string): string {
   return `server-management:run:${runId}`
 }
 
+export function aiNewsRoom(): string {
+  return 'ai-news:all'
+}
+
 
 
 
