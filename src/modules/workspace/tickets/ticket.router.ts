@@ -9,6 +9,7 @@ import {
   bulkUpdateRanks,
   addRelatedTicket,
   removeRelatedTicket,
+  getAssignedTickets,
 } from './ticket.controller'
 import { createComment, deleteComment, getCommentsByTicket, updateComment } from '../comments/comment.controller'
 
@@ -84,6 +85,24 @@ ticketRouter.get(
   '/boards/:boardId/tickets',
   authenticate,
   getTicketsByBoard
+)
+
+/**
+ * @swagger
+ * /tickets/assigned:
+ *   get:
+ *     summary: Get tickets assigned to current user
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of assigned tickets
+ */
+ticketRouter.get(
+  '/tickets/assigned',
+  authenticate,
+  getAssignedTickets
 )
 
 /**

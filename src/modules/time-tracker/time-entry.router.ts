@@ -11,6 +11,7 @@ import {
   pauseTimer,
   resumeTimer,
   stopTimer,
+  emergencyStopTimer,
   endDay,
   logManualEntry,
   updateEntry,
@@ -378,3 +379,9 @@ timeEntryRouter.delete(
   requirePermission(PERMISSIONS.TIME_ENTRY_DELETE, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
   deleteEntry
 )
+
+/**
+ * Emergency stop endpoint - no authentication required for sendBeacon compatibility
+ * Used by client-side auto-stop during page unload
+ */
+timeEntryRouter.post('/timer/stop-emergency', emergencyStopTimer)

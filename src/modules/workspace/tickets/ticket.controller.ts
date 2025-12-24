@@ -889,3 +889,23 @@ export async function bulkUpdateRanks(req: Request, res: Response, next: NextFun
     next(error)
   }
 }
+
+export async function getAssignedTickets(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const tickets = await ticketRepository.findByAssigneeId(userId)
+
+    res.json({
+      success: true,
+      data: tickets,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    next(error)
+  }
+}

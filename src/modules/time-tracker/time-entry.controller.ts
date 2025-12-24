@@ -95,12 +95,43 @@ export async function resumeTimer(req: Request, res: Response) {
 export async function stopTimer(req: Request, res: Response) {
   const userId = req.user!.id
   const entry = await service.stopTimer(userId)
-  
+
   if (!entry) {
     return res.status(404).json({ status: 'error', message: 'No active timer found' })
   }
 
   res.json({ status: 'success', data: entry })
+}
+
+/**
+ * Emergency stop endpoint for client-side auto-stop during page unload
+ * Uses sendBeacon which may not include auth headers, so we get userId from body
+ */
+export async function emergencyStopTimer(req: Request, res: Response) {
+  try {
+    const { userId } = req.body
+
+    if (!userId) {
+      return res.status(400).json({ status: 'error', message: 'User ID required' })
+    }
+
+    // Validate userId format (basic check)
+    if (typeof userId !== 'string' || userId.length !== 24) {
+      return res.status(400).json({ status: 'error', message: 'Invalid user ID format' })
+    }
+
+    const entry = await service.stopTimer(userId)
+
+    if (!entry) {
+      return res.status(404).json({ status: 'error', message: 'No active timer found' })
+    }
+
+    res.json({ status: 'success', data: entry })
+  } catch (error) {
+    // Emergency endpoint - don't fail loudly, just log and return success
+    console.error('Emergency stop timer error:', error)
+    res.status(200).json({ status: 'success', message: 'Emergency stop processed' })
+  }
 }
 
 export async function endDay(req: Request, res: Response) {

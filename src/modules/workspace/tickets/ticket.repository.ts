@@ -318,6 +318,17 @@ export const ticketRepository = {
     return docs.map((doc) => toTicket(doc))
   },
 
+  async findByAssigneeId(userId: string): Promise<Ticket[]> {
+    const docs = await TicketModel.find({
+      assigneeId: userId,
+      deletedAt: { $exists: false },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(10)
+      .exec()
+    return docs.map((doc) => toTicket(doc))
+  },
+
   async addViewer(ticketId: string, userId: string): Promise<Ticket | null> {
     const doc = await TicketModel.findById(ticketId).exec()
     if (!doc) {
