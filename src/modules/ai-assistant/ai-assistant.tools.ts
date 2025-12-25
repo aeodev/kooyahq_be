@@ -233,15 +233,73 @@ export const AI_TOOLS: AITool[] = [
     },
   },
   {
+    name: 'get_board_by_name',
+    description: 'Find a board by its name. Use this when the user specifies a board by name instead of ID. Returns the board ID if found.',
+    requiredPermission: PERMISSIONS.BOARD_VIEW,
+    parameters: {
+      type: 'object',
+      properties: {
+        boardName: {
+          type: 'string',
+          description: 'The name of the board to find (case-insensitive partial match)',
+        },
+      },
+      required: ['boardName'],
+    },
+    execute: async (params, user) => {
+      const { boardName } = params as { boardName: string }
+      const boards = await boardService.findByUserId(user.id)
+      
+      // Case-insensitive partial match
+      const searchTerm = boardName.toLowerCase()
+      const matchingBoards = boards.filter((b) => 
+        b.name.toLowerCase().includes(searchTerm)
+      )
+      
+      if (matchingBoards.length === 0) {
+        return {
+          success: false,
+          message: `No board found matching "${boardName}"`,
+          availableBoards: boards.map((b) => ({ id: b.id, name: b.name, type: b.type })),
+        }
+      }
+      
+      if (matchingBoards.length === 1) {
+        const board = matchingBoards[0]
+        return {
+          success: true,
+          board: {
+            id: board.id,
+            name: board.name,
+            prefix: board.prefix,
+            type: board.type,
+          },
+        }
+      }
+      
+      // Multiple matches - return all
+      return {
+        success: true,
+        message: `Found ${matchingBoards.length} boards matching "${boardName}"`,
+        boards: matchingBoards.map((b) => ({
+          id: b.id,
+          name: b.name,
+          prefix: b.prefix,
+          type: b.type,
+        })),
+      }
+    },
+  },
+  {
     name: 'create_ticket',
-    description: 'Create a new ticket on a board. Use this when the user wants to create a task, bug, story, or epic.',
+    description: 'Create a new ticket on a board. IMPORTANT: Before calling this, you MUST first call get_my_boards or get_board_by_name to get the board ID. Never ask the user for a board ID directly - always fetch boards first and let them choose by name.',
     requiredPermission: PERMISSIONS.BOARD_CREATE,
     parameters: {
       type: 'object',
       properties: {
         boardId: {
           type: 'string',
-          description: 'The ID of the board to create the ticket on',
+          description: 'The ID of the board (get this from get_my_boards or get_board_by_name, never ask user for ID)',
         },
         title: {
           type: 'string',

@@ -85,6 +85,7 @@ export interface AIErrorPayload {
   conversationId?: string
   message: string
   code?: string
+  errors?: Array<{ field: string; message: string; code: string }>
 }
 
 // OpenAI function format (used by OpenRouter)
