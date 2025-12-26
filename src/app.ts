@@ -28,6 +28,7 @@ import { meetRouter } from './modules/meet/meet.router'
 import { mediaRouter } from './modules/media/media.router'
 import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 import { cesiumRouter } from './modules/cesium/cesium.router'
+import { settingsRouter } from './modules/settings/settings.router'
 
 export function createApp() {
   const app = express()
@@ -88,6 +89,7 @@ export function createApp() {
   app.use('/api/projects', projectRouter)
   app.use('/api/media', mediaRouter)
   app.use('/api/cesium', cesiumRouter)
+  app.use('/api/settings', settingsRouter)
   app.use('/api/gateways/github', githubGatewayRouter)
   app.use('/api/server-management', serverManagementRouter)
   // Workspace module routes
