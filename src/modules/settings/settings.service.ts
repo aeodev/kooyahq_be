@@ -1,4 +1,5 @@
-import { settingsRepository, type ThemeSettings } from './settings.repository'
+import { settingsRepository } from './settings.repository'
+import type { ThemeSettings } from './settings.model'
 
 export const settingsService = {
   async getThemeSettings(): Promise<ThemeSettings> {

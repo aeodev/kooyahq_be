@@ -191,14 +191,14 @@ async function fetchFeed(source: NewsSource, url: string): Promise<NewsItem[]> {
           ? new Date(item.pubDate).toISOString()
           : new Date().toISOString(),
         imageUrl,
-      }
+      } as NewsItem
     })
   
   // Wait for all items to be processed (including image fetching)
   const resolvedItems = await Promise.allSettled(items)
-  const newsItems = resolvedItems
+  const newsItems: NewsItem[] = resolvedItems
     .filter((r): r is PromiseFulfilledResult<NewsItem> => r.status === 'fulfilled')
-    .map(r => r.value)
+    .map((r) => r.value)
 
   const filteredItems = newsItems.filter(item => {
     const isSpamContent = isSpam(item.title, item.content, item.url)

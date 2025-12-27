@@ -1,5 +1,8 @@
 import { SettingsModel, type ThemeSettings, toSettings, type Settings } from './settings.model'
 
+// Re-export ThemeSettings for use in other modules
+export type { ThemeSettings }
+
 // Default theme values matching current index.css
 const DEFAULT_LIGHT_THEME = {
   primary: '142 71% 29%',
