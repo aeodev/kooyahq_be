@@ -6,7 +6,15 @@ let isConnecting = false
 
 export async function getRedisClient(): Promise<RedisClientType> {
   if (!client) {
-    client = createClient({ url: env.redis.url })
+    client = createClient({
+      url: env.redis.url,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) return new Error('Max retries reached')
+          return Math.min(retries * 100, 3000) 
+        }
+      }
+    })
     client.on('error', (err) => console.error('Redis error:', err))
     client.on('end', () => {
       isConnecting = false
