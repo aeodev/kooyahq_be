@@ -4,17 +4,61 @@ import { ticketService } from '../workspace/tickets/ticket.service'
 import { ticketRepository } from '../workspace/tickets/ticket.repository'
 import { boardService } from '../workspace/boards/board.service'
 import { userService } from '../users/user.service'
+import { projectService } from '../projects/project.service'
 import type { AITool, OpenAITool } from './ai-assistant.types'
 
-// Instantiate services
 const timeEntryService = new TimeEntryService()
 
-// Tool definitions
+function validateProjects(projects: unknown): string[] {
+  const validProjects = (Array.isArray(projects) ? projects : [projects])
+    .filter((p): p is string => p != null && typeof p === 'string' && p.trim().length > 0)
+    .map(p => p.trim())
+  return validProjects
+}
+
+async function startTimerWithFirstProject(
+  userId: string,
+  projects: unknown,
+  task: string | undefined,
+  isOvertime: boolean | undefined
+) {
+  const validProjects = validateProjects(projects)
+  
+  if (validProjects.length === 0) {
+    return {
+      success: false,
+      error: 'At least one valid project name is required',
+    }
+  }
+
+  const firstProject = validProjects[0]
+  const finalTask = task?.trim() || 'Started working'
+  const entry = await timeEntryService.startTimer(userId, {
+    projects: [firstProject],
+    task: finalTask,
+    isOvertime: isOvertime ?? false,
+  })
+
+  const additionalProjectsText = validProjects.length > 1 
+    ? ` (${validProjects.length - 1} more project${validProjects.length > 2 ? 's' : ''} available)`
+    : ''
+
+  return {
+    success: true,
+    message: `Timer started for ${firstProject}${additionalProjectsText}`,
+    entry: {
+      id: entry.id,
+      projects: entry.projects,
+      task: entry.tasks?.[0]?.text || '',
+      startTime: entry.startTime,
+    },
+  }
+}
+
 export const AI_TOOLS: AITool[] = [
-  // Time tracking tools
   {
     name: 'start_timer',
-    description: 'Start a time tracking timer for one or more projects. Call this when the user wants to begin tracking time.',
+    description: 'Start a time tracking timer for one or more projects. Call this when the user specifies projects in their message (e.g., "start timer for project X").',
     requiredPermission: PERMISSIONS.TIME_ENTRY_CREATE,
     parameters: {
       type: 'object',
@@ -41,23 +85,7 @@ export const AI_TOOLS: AITool[] = [
         task?: string
         isOvertime?: boolean
       }
-      
-      const entry = await timeEntryService.startTimer(user.id, {
-        projects: Array.isArray(projects) ? projects : [projects],
-        task: task || '',
-        isOvertime: isOvertime ?? false,
-      })
-      
-      return {
-        success: true,
-        message: `Timer started for ${projects.join(', ')}`,
-        entry: {
-          id: entry.id,
-          projects: entry.projects,
-          task: entry.tasks?.[0]?.text || '',
-          startTime: entry.startTime,
-        },
-      }
+      return startTimerWithFirstProject(user.id, projects, task, isOvertime)
     },
   },
   {
@@ -470,6 +498,62 @@ export const AI_TOOLS: AITool[] = [
           assignee: assignee.name,
         },
       }
+    },
+  },
+  {
+    name: 'get_projects_for_timer',
+    description: 'Get all available projects that can be selected when starting a timer. Use this to show clickable project options to the user.',
+    requiredPermission: PERMISSIONS.TIME_ENTRY_CREATE,
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+    execute: async (_params, _user) => {
+      const projects = await projectService.findAll()
+
+      return {
+        success: true,
+        projects: projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
+        count: projects.length,
+        message: projects.length > 0
+          ? `Found ${projects.length} available projects for time tracking`
+          : 'No projects available. You may need to create some projects first.',
+      }
+    },
+  },
+  {
+    name: 'start_timer_with_projects',
+    description: 'Start a timer with selected projects. Use this when the user provides project names in a structured format.',
+    requiredPermission: PERMISSIONS.TIME_ENTRY_CREATE,
+    parameters: {
+      type: 'object',
+      properties: {
+        projects: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of selected project names',
+        },
+        task: {
+          type: 'string',
+          description: 'Description of the task being worked on',
+        },
+        isOvertime: {
+          type: 'boolean',
+          description: 'Whether this is overtime work (default: false)',
+        },
+      },
+      required: ['projects'],
+    },
+    execute: async (params, user) => {
+      const { projects, task, isOvertime } = params as {
+        projects: string[]
+        task?: string
+        isOvertime?: boolean
+      }
+      return startTimerWithFirstProject(user.id, projects, task, isOvertime)
     },
   },
   {

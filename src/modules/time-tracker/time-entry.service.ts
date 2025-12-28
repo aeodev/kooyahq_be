@@ -81,13 +81,15 @@ export class TimeEntryService {
   }
 
   async startTimer(userId: string, input: StartTimerInput): Promise<PublicTimeEntry> {
-    // Stop any existing active timer for this user
     await this.timeEntryRepo.stopActiveTimer(userId)
 
+    const taskText = (input.task !== undefined && input.task !== null) ? String(input.task).trim() : ''
+    const finalTask = taskText || 'Started working'
+    
     const entry = await this.timeEntryRepo.create({
       userId,
       projects: input.projects,
-      task: (input.task !== undefined && input.task !== null) ? String(input.task).trim() : '', // Ensure task is always a string, even if empty
+      task: finalTask,
       isOvertime: input.isOvertime ?? false,
     })
 
@@ -97,8 +99,6 @@ export class TimeEntryService {
     })
 
     const publicEntry = await this.toPublicTimeEntry(entry, userId)
-    
-    // Emit socket event for real-time updates
     SocketEmitter.emitTimeEntryUpdate(TimeEntrySocketEvents.TIMER_STARTED, publicEntry, userId)
 
     return publicEntry
