@@ -86,9 +86,7 @@ export const PERMISSIONS = {
   LINK_PREVIEW_FETCH: 'link-preview:fetch',
   CESIUM_TOKEN: 'cesium:token',
 
-  SETTINGS_FULL_ACCESS: 'settings:fullAccess',
-  SETTINGS_VIEW: 'settings:view',
-  SETTINGS_MANAGE: 'settings:manage',
+  AI_ASSISTANT_ACCESS: 'ai-assistant:access',
 } as const
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

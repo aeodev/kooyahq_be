@@ -63,4 +63,5 @@ export const env = {
       secret: process.env.GITHUB_GATEWAY_SECRET,
     },
   },
+  openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
 }
