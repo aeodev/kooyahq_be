@@ -59,6 +59,57 @@ function parseStatusOutput(rawOutput: string): Record<string, string> {
   return status
 }
 
+const STRIPPED_STATUS_KEYS = new Set(['ports', 'image', 'host', 'hostname'])
+
+function sanitizeStatusMap(status: Record<string, string>): Record<string, string> {
+  const sanitized = { ...status }
+  Object.keys(sanitized).forEach((key) => {
+    if (STRIPPED_STATUS_KEYS.has(key.trim().toLowerCase())) {
+      delete sanitized[key]
+    }
+  })
+  return sanitized
+}
+
+function sanitizeStatusOutput(rawOutput: string): string {
+  const trimmed = rawOutput.trim()
+  if (!trimmed) return rawOutput
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return rawOutput
+    }
+    const payload = parsed as Record<string, unknown>
+    const docker = payload.docker
+    if (docker && typeof docker === 'object' && !Array.isArray(docker)) {
+      const dockerObject = docker as Record<string, unknown>
+      const containers = dockerObject.containers
+      if (containers && typeof containers === 'object' && !Array.isArray(containers)) {
+        Object.values(containers as Record<string, unknown>).forEach((container) => {
+          if (container && typeof container === 'object' && !Array.isArray(container)) {
+            delete (container as Record<string, unknown>).image
+            delete (container as Record<string, unknown>).ports
+          }
+        })
+      }
+      delete dockerObject.image
+      delete dockerObject.ports
+    }
+    const instance = payload.instance
+    if (instance && typeof instance === 'object' && !Array.isArray(instance)) {
+      delete (instance as Record<string, unknown>).hostname
+      delete (instance as Record<string, unknown>).host
+    }
+    delete payload.image
+    delete payload.ports
+    delete payload.hostname
+    delete payload.host
+    return JSON.stringify(payload)
+  } catch {
+    return rawOutput
+  }
+}
+
 function buildRemoteCommand(server: ServerManagementServer, command: string): string {
   const trimmed = command.trim()
   const appDirectory = server.appDirectory?.trim()
@@ -127,7 +178,7 @@ function executeStatusCommand(server: ServerManagementServer, command: string) {
             stderr += chunk
           })
 
-          stream.on('error', (streamError) => {
+          stream.on('error', (streamError: unknown) => {
             connection.end()
             reject(new Error(formatErrorMessage(streamError, 'Status stream error')))
           })
@@ -185,9 +236,10 @@ export const serverManagementService = {
     }
 
     const rawOutput = result.stdout || result.stderr
+    const sanitizedRawOutput = sanitizeStatusOutput(rawOutput)
     return {
-      status: parseStatusOutput(rawOutput),
-      rawOutput,
+      status: sanitizeStatusMap(parseStatusOutput(sanitizedRawOutput)),
+      rawOutput: sanitizedRawOutput,
       exitCode: result.exitCode,
       signal: result.signal,
     }
@@ -279,7 +331,7 @@ export const serverManagementService = {
             })
           })
 
-          stream.on('error', (streamError) => {
+          stream.on('error', (streamError: unknown) => {
             emit(ServerManagementSocketEvents.RUN_ERROR, {
               runId,
               serverId: server.id,

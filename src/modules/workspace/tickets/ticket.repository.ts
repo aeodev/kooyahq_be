@@ -75,6 +75,8 @@ export type UpdateTicketInput = {
   endDate?: Date | null
   dueDate?: Date | null
   completedAt?: Date | null
+  archivedAt?: Date | null
+  archivedBy?: string | null
   github?: {
     branchName?: string
     pullRequestUrl?: string
@@ -155,8 +157,20 @@ export const ticketRepository = {
     const docs = await TicketModel.find({
       boardId,
       deletedAt: { $exists: false },
+      $or: [{ archivedAt: { $exists: false } }, { archivedAt: null }],
     })
       .sort({ rank: 1, createdAt: -1 })
+      .exec()
+    return docs.map((doc) => toTicket(doc))
+  },
+
+  async findArchivedByBoardId(boardId: string): Promise<Ticket[]> {
+    const docs = await TicketModel.find({
+      boardId,
+      deletedAt: { $exists: false },
+      archivedAt: { $exists: true, $ne: null },
+    })
+      .sort({ archivedAt: -1 })
       .exec()
     return docs.map((doc) => toTicket(doc))
   },
@@ -195,6 +209,9 @@ export const ticketRepository = {
     if (updates.attachments !== undefined) updateData.attachments = updates.attachments
     if (updates.github !== undefined) updateData.github = updates.github
     if (updates.relatedTickets !== undefined) updateData.relatedTickets = updates.relatedTickets
+    if (updates.archivedBy !== undefined && updates.archivedBy !== null) {
+      updateData.archivedBy = updates.archivedBy
+    }
 
     // Handle nullable fields
     if (updates.points === null) {
@@ -231,6 +248,16 @@ export const ticketRepository = {
       unsetFields.completedAt = ''
     } else if (updates.completedAt !== undefined) {
       updateData.completedAt = updates.completedAt
+    }
+
+    if (updates.archivedAt === null) {
+      unsetFields.archivedAt = ''
+    } else if (updates.archivedAt !== undefined) {
+      updateData.archivedAt = updates.archivedAt
+    }
+
+    if (updates.archivedBy === null) {
+      unsetFields.archivedBy = ''
     }
 
     // Build final update object
@@ -284,10 +311,17 @@ export const ticketRepository = {
     return docs.map((doc) => toTicket(doc))
   },
 
-  async softDelete(id: string): Promise<boolean> {
+  async softDelete(id: string, deletedBy?: string, deletedAt?: Date): Promise<boolean> {
+    const updateData: Record<string, any> = {
+      deletedAt: deletedAt || new Date(),
+    }
+    if (deletedBy) {
+      updateData.deletedBy = deletedBy
+    }
+
     const result = await TicketModel.findByIdAndUpdate(
       id,
-      { deletedAt: new Date() },
+      updateData,
       { new: true },
     )
     return !!result
@@ -322,6 +356,7 @@ export const ticketRepository = {
     const docs = await TicketModel.find({
       assigneeId: userId,
       deletedAt: { $exists: false },
+      $or: [{ archivedAt: { $exists: false } }, { archivedAt: null }],
     })
       .sort({ updatedAt: -1 })
       .limit(10)

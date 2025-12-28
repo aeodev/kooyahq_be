@@ -182,6 +182,7 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
 export async function getTicketsByBoard(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
   const userId = req.user?.id
+  const archivedOnly = req.query.archived === 'true'
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
@@ -198,17 +199,23 @@ export async function getTicketsByBoard(req: Request, res: Response, next: NextF
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const cachedTickets = await ticketCache.getBoardTickets(boardId)
-    if (cachedTickets) {
-      return res.json({
-        success: true,
-        data: cachedTickets,
-        timestamp: new Date().toISOString(),
-      })
+    if (!archivedOnly) {
+      const cachedTickets = await ticketCache.getBoardTickets(boardId)
+      if (cachedTickets) {
+        return res.json({
+          success: true,
+          data: cachedTickets,
+          timestamp: new Date().toISOString(),
+        })
+      }
     }
 
-    const tickets = await ticketService.findByBoardId(boardId)
-    await ticketCache.setBoardTickets(boardId, tickets)
+    const tickets = archivedOnly
+      ? await ticketService.findArchivedByBoardId(boardId)
+      : await ticketService.findByBoardId(boardId)
+    if (!archivedOnly) {
+      await ticketCache.setBoardTickets(boardId, tickets)
+    }
 
     res.json({
       success: true,
@@ -507,6 +514,25 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     if (data.dueDate !== undefined) {
       updates.dueDate = data.dueDate ? new Date(data.dueDate) : null
     }
+    if (data.archivedAt !== undefined) {
+      const wasArchived = !!ticket.archivedAt
+      const nextArchivedAt = data.archivedAt ? new Date(data.archivedAt) : null
+      const isArchived = !!nextArchivedAt
+      updates.archivedAt = nextArchivedAt
+      if (wasArchived !== isArchived) {
+        updates.archivedBy = isArchived ? userId : null
+      }
+      if (wasArchived !== isArchived) {
+        changes.push({
+          field: 'archivedAt',
+          oldValue: ticket.archivedAt || null,
+          newValue: nextArchivedAt?.toISOString() || null,
+          text: isArchived
+            ? `archived ticket ${ticket.ticketKey}`
+            : `unarchived ticket ${ticket.ticketKey}`,
+        })
+      }
+    }
     if (data.github !== undefined) {
       updates.github = data.github
     }
@@ -684,7 +710,8 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    await ticketService.deleteTicket(id)
+    const deletedAt = new Date()
+    await ticketService.deleteTicket(id, userId, deletedAt)
     await ticketCache.invalidateBoardTickets(ticket.boardId)
 
     // Create activity log
@@ -701,6 +728,18 @@ export async function deleteTicket(req: Request, res: Response, next: NextFuncti
             oldValue: null,
             newValue: true,
             text: `deleted ticket ${ticket.ticketKey}`,
+          },
+          {
+            field: 'deletedAt',
+            oldValue: null,
+            newValue: deletedAt.toISOString(),
+            text: `deleted at ${deletedAt.toISOString()}`,
+          },
+          {
+            field: 'deletedBy',
+            oldValue: null,
+            newValue: userId,
+            text: `deleted by ${userId}`,
           },
         ],
       })

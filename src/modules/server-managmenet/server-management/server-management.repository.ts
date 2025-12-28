@@ -58,11 +58,14 @@ function trimValue(value?: string) {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
-function toServerSnapshot(server: ServerManagementServer): ServerManagementServer {
-  const source =
-    typeof (server as { toObject?: () => ServerManagementServer }).toObject === 'function'
-      ? (server as { toObject: () => ServerManagementServer }).toObject()
-      : server
+type ServerSnapshotSource = ServerManagementServer | { toObject: () => ServerManagementServer }
+
+function hasToObject(server: ServerSnapshotSource): server is { toObject: () => ServerManagementServer } {
+  return typeof (server as { toObject?: () => ServerManagementServer }).toObject === 'function'
+}
+
+function toServerSnapshot(server: ServerSnapshotSource): ServerManagementServer {
+  const source = hasToObject(server) ? server.toObject() : server
 
   return {
     id: source.id,

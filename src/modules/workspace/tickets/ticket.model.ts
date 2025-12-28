@@ -67,7 +67,10 @@ export interface TicketDocument extends Document {
   endDate?: Date
   dueDate?: Date
   completedAt?: Date
+  archivedAt?: Date
+  archivedBy?: string
   deletedAt?: Date
+  deletedBy?: string
   github?: TicketGithub
   viewedBy: TicketViewer[]
   relatedTickets: string[]
@@ -218,8 +221,17 @@ const ticketSchema = new Schema<TicketDocument>(
     completedAt: {
       type: Date,
     },
+    archivedAt: {
+      type: Date,
+    },
+    archivedBy: {
+      type: String,
+    },
     deletedAt: {
       type: Date,
+    },
+    deletedBy: {
+      type: String,
     },
     github: {
       type: ticketGithubSchema,
@@ -277,7 +289,10 @@ export type Ticket = {
   endDate?: string
   dueDate?: string
   completedAt?: string
+  archivedAt?: string
+  archivedBy?: string
   deletedAt?: string
+  deletedBy?: string
   github?: {
     branchName?: string
     pullRequestUrl?: string
@@ -331,7 +346,10 @@ export function toTicket(doc: TicketDocument): Ticket {
     endDate: doc.endDate?.toISOString(),
     dueDate: doc.dueDate?.toISOString(),
     completedAt: doc.completedAt?.toISOString(),
+    archivedAt: doc.archivedAt?.toISOString(),
+    archivedBy: doc.archivedBy,
     deletedAt: doc.deletedAt?.toISOString(),
+    deletedBy: doc.deletedBy,
     github: doc.github
       ? {
           branchName: doc.github.branchName,

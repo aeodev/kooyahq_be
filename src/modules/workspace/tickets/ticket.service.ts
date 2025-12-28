@@ -119,6 +119,10 @@ export const ticketService = {
     return ticketRepository.findByBoardId(boardId)
   },
 
+  async findArchivedByBoardId(boardId: string) {
+    return ticketRepository.findArchivedByBoardId(boardId)
+  },
+
   async findById(id: string) {
     return ticketRepository.findById(id)
   },
@@ -174,6 +178,8 @@ export const ticketService = {
       dueDate?: Date | null
       relatedTickets?: string[]
       completedAt?: Date | null
+      archivedAt?: Date | null
+      archivedBy?: string | null
       github?: {
         branchName?: string
         pullRequestUrl?: string
@@ -324,20 +330,22 @@ export const ticketService = {
     return updated
   },
 
-  async deleteTicket(ticketId: string) {
+  async deleteTicket(ticketId: string, userId: string, deletedAt?: Date) {
     const ticket = await ticketRepository.findById(ticketId)
     if (!ticket) {
       return false
     }
 
+    const deleteTimestamp = deletedAt || new Date()
+
     // Cascade delete: Find all subtasks and recursively delete them
     const subtasks = await ticketRepository.findByParentTicketId(ticketId)
     for (const subtask of subtasks) {
-      await this.deleteTicket(subtask.id)
+      await this.deleteTicket(subtask.id, userId, deleteTimestamp)
     }
 
     // Delete the parent ticket
-    return ticketRepository.softDelete(ticketId)
+    return ticketRepository.softDelete(ticketId, userId, deleteTimestamp)
   },
 
   async bulkUpdateRanks(
