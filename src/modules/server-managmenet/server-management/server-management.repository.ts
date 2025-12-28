@@ -7,6 +7,7 @@ import {
   type ServerManagementProjectDocument,
   type ServerManagementServer,
 } from './server-management.model'
+import { decryptSshKey, prepareSshKeyForStorage } from './server-management.ssh'
 
 export type CreateServerManagementProjectInput = {
   name: string
@@ -24,7 +25,7 @@ export type ServerManagementActionInput = {
   id?: string
   name: string
   description: string
-  path: string
+  command: string
   dangerous?: boolean
 }
 
@@ -35,9 +36,8 @@ export type CreateServerManagementServerInput = {
   port?: string
   user?: string
   sshKey?: string
-  statusPath?: string
-  ecsCluster?: string
-  ecsService?: string
+  statusCommand?: string
+  appDirectory?: string
   actions?: ServerManagementActionInput[]
 }
 
@@ -48,7 +48,7 @@ export type UpdateServerManagementServerInput = Partial<CreateServerManagementSe
 export type UpdateServerManagementActionInput = {
   name?: string
   description?: string
-  path?: string
+  command?: string
   dangerous?: boolean
 }
 
@@ -58,12 +58,54 @@ function trimValue(value?: string) {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function toServerSnapshot(server: ServerManagementServer): ServerManagementServer {
+  const source =
+    typeof (server as { toObject?: () => ServerManagementServer }).toObject === 'function'
+      ? (server as { toObject: () => ServerManagementServer }).toObject()
+      : server
+
+  return {
+    id: source.id,
+    name: source.name,
+    summary: source.summary,
+    host: source.host,
+    port: source.port,
+    user: source.user,
+    sshKey: source.sshKey,
+    statusCommand: source.statusCommand,
+    appDirectory: source.appDirectory,
+    actions: (source.actions || []).map((action) => ({
+      id: action.id,
+      name: action.name,
+      description: action.description,
+      command: action.command,
+      dangerous: action.dangerous ?? false,
+    })),
+  }
+}
+
+function toServerWithSshKey(server: ServerManagementServer): ServerManagementServer {
+  const snapshot = toServerSnapshot(server)
+  return {
+    ...snapshot,
+    sshKey: decryptSshKey(snapshot.sshKey),
+  }
+}
+
+function toServerWithoutSshKey(server: ServerManagementServer): ServerManagementServer {
+  const snapshot = toServerSnapshot(server)
+  return {
+    ...snapshot,
+    sshKey: undefined,
+  }
+}
+
 function buildAction(input: ServerManagementActionInput): ServerManagementAction {
   return {
     id: input.id?.trim() || randomUUID(),
     name: input.name.trim(),
     description: input.description.trim(),
-    path: input.path.trim(),
+    command: input.command.trim(),
     dangerous: input.dangerous ?? false,
   }
 }
@@ -122,6 +164,7 @@ export const serverManagementRepository = {
     const doc = await ServerManagementProjectModel.findById(projectId).exec()
     if (!doc) return undefined
 
+    const { stored: storedSshKey } = prepareSshKeyForStorage(input.sshKey)
     const server: ServerManagementServer = {
       id: randomUUID(),
       name: input.name.trim(),
@@ -129,10 +172,9 @@ export const serverManagementRepository = {
       host: input.host.trim(),
       port: trimValue(input.port),
       user: trimValue(input.user),
-      sshKey: input.sshKey ? input.sshKey.trim() : undefined,
-      statusPath: trimValue(input.statusPath),
-      ecsCluster: trimValue(input.ecsCluster),
-      ecsService: trimValue(input.ecsService),
+      sshKey: storedSshKey,
+      statusCommand: trimValue(input.statusCommand),
+      appDirectory: trimValue(input.appDirectory),
       actions: normalizeActions(input.actions),
     }
 
@@ -140,7 +182,7 @@ export const serverManagementRepository = {
     doc.markModified('servers')
     await doc.save()
 
-    return server
+    return toServerWithoutSshKey(server)
   },
 
   async updateServer(
@@ -170,16 +212,16 @@ export const serverManagementRepository = {
       server.user = trimValue(updates.user)
     }
     if (updates.sshKey !== undefined) {
-      server.sshKey = updates.sshKey ? updates.sshKey.trim() : undefined
+      const { stored: storedSshKey } = prepareSshKeyForStorage(updates.sshKey)
+      if (storedSshKey) {
+        server.sshKey = storedSshKey
+      }
     }
-    if (updates.statusPath !== undefined) {
-      server.statusPath = trimValue(updates.statusPath)
+    if (updates.statusCommand !== undefined) {
+      server.statusCommand = trimValue(updates.statusCommand)
     }
-    if (updates.ecsCluster !== undefined) {
-      server.ecsCluster = trimValue(updates.ecsCluster)
-    }
-    if (updates.ecsService !== undefined) {
-      server.ecsService = trimValue(updates.ecsService)
+    if (updates.appDirectory !== undefined) {
+      server.appDirectory = trimValue(updates.appDirectory)
     }
     if (updates.actions !== undefined) {
       server.actions = normalizeActions(updates.actions)
@@ -187,7 +229,7 @@ export const serverManagementRepository = {
 
     doc.markModified('servers')
     await doc.save()
-    return server
+    return toServerWithoutSshKey(server)
   },
 
   async deleteServer(projectId: string, serverId: string): Promise<boolean> {
@@ -246,8 +288,8 @@ export const serverManagementRepository = {
     if (updates.description !== undefined) {
       action.description = updates.description.trim()
     }
-    if (updates.path !== undefined) {
-      action.path = updates.path.trim()
+    if (updates.command !== undefined) {
+      action.command = updates.command.trim()
     }
     if (updates.dangerous !== undefined) {
       action.dangerous = updates.dangerous
@@ -286,7 +328,7 @@ export const serverManagementRepository = {
     const server = doc.servers.find((item: ServerManagementServer) => item.id === serverId)
     if (!server) return undefined
 
-    return { project: doc, server }
+    return { project: doc, server: toServerWithSshKey(server) }
   },
 
   async findActionByIds(
@@ -302,6 +344,6 @@ export const serverManagementRepository = {
     const action = server.actions.find((item: ServerManagementAction) => item.id === actionId)
     if (!action) return undefined
 
-    return { project: doc, server, action }
+    return { project: doc, server: toServerWithSshKey(server), action }
   },
 }

@@ -4,11 +4,23 @@ import { SocketEmitter } from '../../../utils/socket-emitter'
 import { serverManagementRunRoom } from '../../../utils/socket-rooms'
 import { ServerManagementSocketEvents } from './server-management.events'
 import { serverManagementRepository } from './server-management.repository'
+import { decryptSshKey, isEncryptedPrivateKey, normalizeSshKey } from './server-management.ssh'
 import type { ServerManagementAction, ServerManagementServer } from './server-management.model'
 
 function buildPrivateKey(sshKey: string): Buffer {
-  const normalizedKey = sshKey.includes('\\n') ? sshKey.replace(/\\n/g, '\n') : sshKey
-  return Buffer.from(normalizedKey)
+  const normalizedKey = normalizeSshKey(sshKey)
+  if (!normalizedKey) {
+    throw new Error('SSH key is missing')
+  }
+  const decryptedKey = decryptSshKey(normalizedKey)
+  const normalizedDecrypted = normalizeSshKey(decryptedKey)
+  if (!normalizedDecrypted) {
+    throw new Error('SSH key is missing')
+  }
+  if (isEncryptedPrivateKey(normalizedDecrypted)) {
+    throw new Error('Encrypted SSH keys are not supported')
+  }
+  return Buffer.from(normalizedDecrypted)
 }
 
 function parseStatusOutput(rawOutput: string): Record<string, string> {
@@ -47,6 +59,38 @@ function parseStatusOutput(rawOutput: string): Record<string, string> {
   return status
 }
 
+function buildRemoteCommand(server: ServerManagementServer, command: string): string {
+  const trimmed = command.trim()
+  const appDirectory = server.appDirectory?.trim()
+  if (!appDirectory) {
+    return trimmed
+  }
+  return `cd ${appDirectory} && ${trimmed}`
+}
+
+function formatErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'string') {
+    const trimmed = error.trim()
+    return trimmed.length > 0 ? trimmed : fallback
+  }
+  if (error && typeof error === 'object') {
+    const maybe = error as {
+      message?: string
+      code?: string
+      level?: string
+      reason?: string
+      description?: string
+    }
+    const message = maybe.message?.trim()
+    if (message) return message
+    const details = [maybe.code, maybe.level, maybe.reason, maybe.description].filter(Boolean)
+    if (details.length > 0) {
+      return details.join(' - ')
+    }
+  }
+  return fallback
+}
+
 function executeStatusCommand(server: ServerManagementServer, command: string) {
   return new Promise<{
     stdout: string
@@ -68,16 +112,24 @@ function executeStatusCommand(server: ServerManagementServer, command: string) {
         connection.exec(command, (execError, stream) => {
           if (execError) {
             connection.end()
-            reject(execError)
+            reject(new Error(formatErrorMessage(execError, 'Unable to start status command')))
             return
           }
 
-          stream.on('data', (chunk: Buffer) => {
-            stdout += chunk.toString()
+          stream.setEncoding('utf8')
+          stream.stderr.setEncoding('utf8')
+
+          stream.on('data', (chunk: string) => {
+            stdout += chunk
           })
 
-          stream.stderr.on('data', (chunk: Buffer) => {
-            stderr += chunk.toString()
+          stream.stderr.on('data', (chunk: string) => {
+            stderr += chunk
+          })
+
+          stream.on('error', (streamError) => {
+            connection.end()
+            reject(new Error(formatErrorMessage(streamError, 'Status stream error')))
           })
 
           stream.on('close', (code: number | null, signal: string | null) => {
@@ -93,7 +145,7 @@ function executeStatusCommand(server: ServerManagementServer, command: string) {
       })
       .on('error', (error) => {
         connection.end()
-        reject(error)
+        reject(new Error(formatErrorMessage(error, 'SSH connection error')))
       })
       .connect({
         host,
@@ -121,14 +173,14 @@ export const serverManagementService = {
   findActionByIds: serverManagementRepository.findActionByIds,
 
   async fetchServerStatus(server: ServerManagementServer) {
-    const command = server.statusPath?.trim()
+    const command = server.statusCommand?.trim()
     if (!command) {
-      throw new Error('Status script path is missing')
+      throw new Error('Status command is missing')
     }
 
-    const result = await executeStatusCommand(server, command)
+    const result = await executeStatusCommand(server, buildRemoteCommand(server, command))
     if (result.exitCode && result.exitCode !== 0) {
-      const message = result.stderr || result.stdout || `Status script failed with exit code ${result.exitCode}`
+      const message = result.stderr || result.stdout || `Status command failed with exit code ${result.exitCode}`
       throw new Error(message)
     }
 
@@ -148,7 +200,7 @@ export const serverManagementService = {
 
     const emit = (event: string, payload: Record<string, unknown>) => {
       SocketEmitter.emitToUser(userId, event, payload)
-      SocketEmitter.emitToRoom(serverManagementRunRoom(runId), event, payload)
+      SocketEmitter.emitToRoomExceptUser(serverManagementRunRoom(runId), event, payload, userId)
     }
 
     const sshKey = server.sshKey
@@ -162,7 +214,18 @@ export const serverManagementService = {
       return { runId }
     }
 
-    const privateKey = buildPrivateKey(sshKey)
+    let privateKey: Buffer
+    try {
+      privateKey = buildPrivateKey(sshKey)
+    } catch (error) {
+      emit(ServerManagementSocketEvents.RUN_ERROR, {
+        runId,
+        serverId: server.id,
+        actionId: action.id,
+        message: formatErrorMessage(error, 'Invalid SSH key'),
+      })
+      return { runId }
+    }
 
     const host = server.host
     const port = server.port ? Number.parseInt(server.port, 10) : 22
@@ -181,36 +244,49 @@ export const serverManagementService = {
           startedAt,
         })
 
-        connection.exec(action.path, (execError, stream) => {
+        connection.exec(buildRemoteCommand(server, action.command), (execError, stream) => {
           if (execError) {
             emit(ServerManagementSocketEvents.RUN_ERROR, {
               runId,
               serverId: server.id,
               actionId: action.id,
-              message: execError.message,
+              message: formatErrorMessage(execError, 'Unable to start command'),
             })
             connection.end()
             return
           }
 
-          stream.on('data', (chunk: Buffer) => {
+          stream.setEncoding('utf8')
+          stream.stderr.setEncoding('utf8')
+
+          stream.on('data', (chunk: string) => {
             emit(ServerManagementSocketEvents.RUN_OUTPUT, {
               runId,
               serverId: server.id,
               actionId: action.id,
               stream: 'stdout',
-              chunk: chunk.toString(),
+              chunk,
             })
           })
 
-          stream.stderr.on('data', (chunk: Buffer) => {
+          stream.stderr.on('data', (chunk: string) => {
             emit(ServerManagementSocketEvents.RUN_OUTPUT, {
               runId,
               serverId: server.id,
               actionId: action.id,
               stream: 'stderr',
-              chunk: chunk.toString(),
+              chunk,
             })
+          })
+
+          stream.on('error', (streamError) => {
+            emit(ServerManagementSocketEvents.RUN_ERROR, {
+              runId,
+              serverId: server.id,
+              actionId: action.id,
+              message: formatErrorMessage(streamError, 'Command stream error'),
+            })
+            connection.end()
           })
 
           stream.on('close', (code: number | null, signal: string | null) => {
@@ -232,7 +308,7 @@ export const serverManagementService = {
           runId,
           serverId: server.id,
           actionId: action.id,
-          message: error.message,
+          message: formatErrorMessage(error, 'SSH connection error'),
         })
         connection.end()
       })

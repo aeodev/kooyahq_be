@@ -4,7 +4,7 @@ export type ServerManagementAction = {
   id: string
   name: string
   description: string
-  path: string
+  command: string
   dangerous?: boolean
 }
 
@@ -16,9 +16,8 @@ export type ServerManagementServer = {
   port?: string
   user?: string
   sshKey?: string
-  statusPath?: string
-  ecsCluster?: string
-  ecsService?: string
+  statusCommand?: string
+  appDirectory?: string
   actions: ServerManagementAction[]
 }
 
@@ -48,7 +47,7 @@ const actionSchema = new Schema<ServerManagementAction>(
       required: true,
       trim: true,
     },
-    path: {
+    command: {
       type: String,
       required: true,
       trim: true,
@@ -94,15 +93,11 @@ const serverSchema = new Schema<ServerManagementServer>(
     sshKey: {
       type: String,
     },
-    statusPath: {
+    statusCommand: {
       type: String,
       trim: true,
     },
-    ecsCluster: {
-      type: String,
-      trim: true,
-    },
-    ecsService: {
+    appDirectory: {
       type: String,
       trim: true,
     },
@@ -170,15 +165,13 @@ export function toServerManagementProject(
       host: server.host,
       port: server.port,
       user: server.user,
-      sshKey: server.sshKey,
-      statusPath: server.statusPath,
-      ecsCluster: server.ecsCluster,
-      ecsService: server.ecsService,
+      statusCommand: server.statusCommand,
+      appDirectory: server.appDirectory,
       actions: (server.actions || []).map((action) => ({
         id: action.id,
         name: action.name,
         description: action.description,
-        path: action.path,
+        command: action.command,
         dangerous: action.dangerous ?? false,
       })),
     })),

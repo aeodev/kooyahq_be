@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { createHttpError } from '../../../utils/http-error'
 import { PERMISSIONS, hasPermission } from '../../auth/rbac/permissions'
 import { serverManagementService } from './server-management.service'
+import { hasSshKeyEncryptionSecret, isEncryptedPrivateKey, normalizeSshKey } from './server-management.ssh'
 import type {
   CreateServerManagementProjectInput,
   CreateServerManagementServerInput,
@@ -42,8 +43,19 @@ function validateActionPayload(action: Partial<ServerManagementActionInput>) {
   if (!action.description?.trim()) {
     throw createHttpError(400, 'Action description is required')
   }
-  if (!action.path?.trim()) {
-    throw createHttpError(400, 'Action path is required')
+  if (!action.command?.trim()) {
+    throw createHttpError(400, 'Action command is required')
+  }
+}
+
+function validateSshKeyInput(sshKey?: string) {
+  const normalized = normalizeSshKey(sshKey)
+  if (!normalized) return
+  if (!hasSshKeyEncryptionSecret()) {
+    throw createHttpError(500, 'SSH key encryption is not configured')
+  }
+  if (isEncryptedPrivateKey(normalized)) {
+    throw createHttpError(400, 'Encrypted SSH keys are not supported. Provide an unencrypted key.')
   }
 }
 
@@ -161,6 +173,11 @@ export async function createServerManagementServer(req: Request, res: Response, 
 
   try {
     validateServerPayload(req.body)
+    const sshKey =
+      typeof req.body.sshKey === 'string' && req.body.sshKey.trim().length > 0
+        ? req.body.sshKey
+        : undefined
+    validateSshKeyInput(sshKey)
     validateActions(req.body.actions)
 
     const server = await serverManagementService.addServer(projectId, {
@@ -169,10 +186,9 @@ export async function createServerManagementServer(req: Request, res: Response, 
       host: req.body.host,
       port: req.body.port,
       user: req.body.user,
-      sshKey: req.body.sshKey,
-      statusPath: req.body.statusPath,
-      ecsCluster: req.body.ecsCluster,
-      ecsService: req.body.ecsService,
+      sshKey,
+      statusCommand: req.body.statusCommand,
+      appDirectory: req.body.appDirectory,
       actions: req.body.actions,
     })
 
@@ -219,20 +235,17 @@ export async function updateServerManagementServer(req: Request, res: Response, 
     updates.user = req.body.user
   }
 
-  if (req.body.sshKey !== undefined) {
+  if (typeof req.body.sshKey === 'string' && req.body.sshKey.trim().length > 0) {
+    validateSshKeyInput(req.body.sshKey)
     updates.sshKey = req.body.sshKey
   }
 
-  if (req.body.statusPath !== undefined) {
-    updates.statusPath = req.body.statusPath
+  if (req.body.statusCommand !== undefined) {
+    updates.statusCommand = req.body.statusCommand
   }
 
-  if (req.body.ecsCluster !== undefined) {
-    updates.ecsCluster = req.body.ecsCluster
-  }
-
-  if (req.body.ecsService !== undefined) {
-    updates.ecsService = req.body.ecsService
+  if (req.body.appDirectory !== undefined) {
+    updates.appDirectory = req.body.appDirectory
   }
 
   if (req.body.actions !== undefined) {
@@ -276,7 +289,7 @@ export async function createServerManagementAction(req: Request, res: Response, 
     const action = await serverManagementService.addAction(projectId, serverId, {
       name: req.body.name,
       description: req.body.description,
-      path: req.body.path,
+      command: req.body.command,
       dangerous: req.body.dangerous,
     })
 
@@ -308,11 +321,11 @@ export async function updateServerManagementAction(req: Request, res: Response, 
     updates.description = req.body.description
   }
 
-  if (req.body.path !== undefined) {
-    if (!req.body.path?.trim()) {
-      return next(createHttpError(400, 'Action path cannot be empty'))
+  if (req.body.command !== undefined) {
+    if (!req.body.command?.trim()) {
+      return next(createHttpError(400, 'Action command cannot be empty'))
     }
-    updates.path = req.body.path
+    updates.command = req.body.command
   }
 
   if (req.body.dangerous !== undefined) {
@@ -368,8 +381,8 @@ export async function runServerManagementAction(req: Request, res: Response, nex
       return next(createHttpError(400, 'Server SSH key is missing'))
     }
 
-    if (!resolved.action.path?.trim()) {
-      return next(createHttpError(400, 'Action path is missing'))
+    if (!resolved.action.command?.trim()) {
+      return next(createHttpError(400, 'Action command is missing'))
     }
 
     const canManage = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_MANAGE)
@@ -423,8 +436,8 @@ export async function getServerManagementStatus(req: Request, res: Response, nex
       return next(createHttpError(400, 'Server SSH key is missing'))
     }
 
-    if (!resolved.server.statusPath?.trim()) {
-      return next(createHttpError(400, 'Status script path is missing'))
+    if (!resolved.server.statusCommand?.trim()) {
+      return next(createHttpError(400, 'Status command is missing'))
     }
 
     const canManage = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_MANAGE)
