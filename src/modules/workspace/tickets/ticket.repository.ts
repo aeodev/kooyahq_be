@@ -37,6 +37,7 @@ export type CreateTicketInput = {
   dueDate?: Date
   github?: {
     branchName?: string
+    targetBranch?: string
     pullRequestUrl?: string
     status?: TicketGithubStatus
   }
@@ -79,6 +80,7 @@ export type UpdateTicketInput = {
   archivedBy?: string | null
   github?: {
     branchName?: string
+    targetBranch?: string
     pullRequestUrl?: string
     status?: TicketGithubStatus
   }

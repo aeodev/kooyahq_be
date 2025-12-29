@@ -144,8 +144,7 @@ export class BoardService {
     // Generate unique prefix if not provided
     const prefix = await generateUniquePrefix(data.name, data.prefix)
 
-    // Set default settings if not provided
-    const settings = data.settings || {
+    const defaultSettings = {
       defaultView: 'board' as const,
       showSwimlanes: false,
       ticketDetailsSettings: {
@@ -159,6 +158,16 @@ export class BoardService {
           { fieldName: 'endDate', isVisible: true, order: 6 },
         ],
       },
+      githubAutomation: {
+        rules: [],
+      },
+    }
+
+    const settings = {
+      ...defaultSettings,
+      ...data.settings,
+      ticketDetailsSettings: data.settings?.ticketDetailsSettings || defaultSettings.ticketDetailsSettings,
+      githubAutomation: data.settings?.githubAutomation || defaultSettings.githubAutomation,
     }
 
     const members = normalizeBoardMembers(data.members, data.createdBy)
@@ -225,10 +234,7 @@ export class BoardService {
       prefix: string
       emoji: string
       type: 'kanban' | 'sprint'
-      settings: {
-        defaultView: 'board' | 'list' | 'timeline'
-        showSwimlanes: boolean
-      }
+      settings: Board['settings']
       columns: Array<{
         id: string
         name: string

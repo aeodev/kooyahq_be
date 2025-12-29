@@ -10,47 +10,81 @@ import type { Ticket, TicketGithubStatus } from '../../workspace/tickets/ticket.
 const GATEWAY_ACTOR_ID = 'github-gateway'
 
 const statusMap: Record<string, TicketGithubStatus> = {
-  open: 'open',
-  merged: 'merged',
-  closed: 'closed',
-  requested_pr: 'requested_pr',
-  merging_pr: 'merging_pr',
-  merged_pr: 'merged_pr',
+  pull_requested: 'pull-requested',
+  pull_request: 'pull-requested',
+  pr_requested: 'pull-requested',
+  requested_pr: 'pull-requested',
+  pr_request: 'pull-requested',
+  open: 'pull-requested',
+  on_queue: 'pull-requested',
+  queue: 'pull-requested',
+  queued: 'pull-requested',
+  building: 'pull-requested',
+  build: 'pull-requested',
+  push: 'pull-requested',
+  pushed: 'pull-requested',
+
+  pull_request_build_check_passed: 'pull-request-build-check-passed',
+  pr_build_check_passed: 'pull-request-build-check-passed',
+  build_check_passed: 'pull-request-build-check-passed',
+  checks_passed: 'pull-request-build-check-passed',
+  build_passed: 'pull-request-build-check-passed',
+  build_succeeded: 'pull-request-build-check-passed',
+  build_success: 'pull-request-build-check-passed',
+  merged: 'pull-request-build-check-passed',
+  merged_pr: 'pull-request-build-check-passed',
+  merging: 'pull-request-build-check-passed',
+  merging_pr: 'pull-request-build-check-passed',
+
+  pull_request_build_check_failed: 'pull-request-build-check-failed',
+  pr_build_check_failed: 'pull-request-build-check-failed',
+  build_check_failed: 'pull-request-build-check-failed',
+  checks_failed: 'pull-request-build-check-failed',
+  build_failed: 'pull-request-build-check-failed',
+  building_failed: 'pull-request-build-check-failed',
+  failed_build: 'pull-request-build-check-failed',
+  merge_conflict: 'pull-request-build-check-failed',
+  merge_conflicts: 'pull-request-build-check-failed',
+  merge_error: 'pull-request-build-check-failed',
+  merge_error_conflicts: 'pull-request-build-check-failed',
+  conflict: 'pull-request-build-check-failed',
+  closed: 'pull-request-build-check-failed',
+  failed: 'pull-request-build-check-failed',
+
   deploying: 'deploying',
+  deploy: 'deploying',
+
+  deployment_failed: 'deployment-failed',
+  deploy_failed: 'deployment-failed',
+  deploying_error: 'deployment-failed',
+  deploy_error: 'deployment-failed',
+
   deployed: 'deployed',
-  failed: 'failed',
 }
 
 type GithubGatewayPayload = {
-  branch?: unknown
   branchName?: unknown
-  column?: unknown
-  columnName?: unknown
+  targetBranch?: unknown
   status?: unknown
-  prLink?: unknown
   pullRequestUrl?: unknown
 }
 
-function normalizeBranchName(branch?: unknown, branchName?: unknown): string {
-  const value = typeof branchName === 'string' && branchName.trim().length > 0
-    ? branchName.trim()
-    : typeof branch === 'string'
-      ? branch.trim()
-      : ''
+function normalizeBranchName(branchName?: unknown): string {
+  const value = typeof branchName === 'string' ? branchName.trim() : ''
 
   if (!value) {
-    throw createHttpError(400, 'branch or branchName is required')
+    throw createHttpError(400, 'branchName is required')
   }
 
   return value
 }
 
-function normalizeColumnName(column?: unknown): string {
-  if (typeof column !== 'string' || column.trim().length === 0) {
-    throw createHttpError(400, 'column is required')
-  }
+function normalizeTargetBranch(
+  targetBranch?: unknown,
+): string | undefined {
+  const value = typeof targetBranch === 'string' ? targetBranch.trim() : ''
 
-  return column.trim()
+  return value || undefined
 }
 
 function normalizeStatus(status?: unknown): TicketGithubStatus {
@@ -58,7 +92,11 @@ function normalizeStatus(status?: unknown): TicketGithubStatus {
     throw createHttpError(400, 'status is required')
   }
 
-  const normalized = status.trim().toLowerCase().replace(/[\s-]+/g, '_')
+  const normalized = status
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
   const mapped = statusMap[normalized]
 
   if (!mapped) {
@@ -68,16 +106,16 @@ function normalizeStatus(status?: unknown): TicketGithubStatus {
   return mapped
 }
 
-function normalizePrLink(prLink?: unknown): string | undefined {
-  if (prLink === undefined || prLink === null) {
+function normalizePullRequestUrl(pullRequestUrl?: unknown): string | undefined {
+  if (pullRequestUrl === undefined || pullRequestUrl === null) {
     return undefined
   }
 
-  if (typeof prLink !== 'string') {
-    throw createHttpError(400, 'prLink must be a string')
+  if (typeof pullRequestUrl !== 'string') {
+    throw createHttpError(400, 'pullRequestUrl must be a string')
   }
 
-  const trimmed = prLink.trim()
+  const trimmed = pullRequestUrl.trim()
   if (!trimmed) {
     return undefined
   }
@@ -86,27 +124,28 @@ function normalizePrLink(prLink?: unknown): string | undefined {
     const url = new URL(trimmed)
     return url.toString()
   } catch {
-    throw createHttpError(400, 'Invalid prLink URL')
+    throw createHttpError(400, 'Invalid pullRequestUrl URL')
   }
 }
 
 function extractTicketKeyFromBranch(branchName: string): string | null {
-  const match = branchName.match(/([A-Z]+-\d+)/i)
+  const match = branchName.match(/\/([A-Z]+-\d+)\//i)
   return match ? match[1].toUpperCase() : null
 }
 
 async function findTicketForBranch(branchName: string): Promise<Ticket> {
-  const existing = await ticketService.findByGithubBranchName(branchName)
-  if (existing) {
-    return existing
-  }
-
   const ticketKey = extractTicketKeyFromBranch(branchName)
   if (ticketKey) {
     const byKey = await ticketService.findByTicketKey(ticketKey)
     if (byKey) {
       return byKey
     }
+    throw createHttpError(404, 'Ticket not found for provided branch')
+  }
+
+  const existing = await ticketService.findByGithubBranchName(branchName)
+  if (existing) {
+    return existing
   }
 
   throw createHttpError(404, 'Ticket not found for provided branch')
@@ -115,11 +154,13 @@ async function findTicketForBranch(branchName: string): Promise<Ticket> {
 function buildGithubUpdate(
   ticket: Ticket,
   branchName: string,
+  targetBranch: string,
   status: TicketGithubStatus,
   pullRequestUrl?: string,
 ) {
   return {
     branchName,
+    targetBranch,
     pullRequestUrl: pullRequestUrl ?? ticket.github?.pullRequestUrl,
     status,
   }
@@ -176,6 +217,17 @@ function buildChanges(params: {
     })
   }
 
+  const prevTargetBranch = params.previous.github?.targetBranch
+  const nextTargetBranch = params.updated.github?.targetBranch
+  if (prevTargetBranch !== nextTargetBranch && nextTargetBranch) {
+    changes.push({
+      field: 'github.targetBranch',
+      oldValue: prevTargetBranch ?? null,
+      newValue: nextTargetBranch,
+      text: `set target branch to ${nextTargetBranch}`,
+    })
+  }
+
   const prevPr = params.previous.github?.pullRequestUrl
   const nextPr = params.updated.github?.pullRequestUrl
   if (prevPr !== nextPr && nextPr) {
@@ -192,10 +244,11 @@ function buildChanges(params: {
 
 export const githubGatewayService = {
   async processGithubAction(payload: GithubGatewayPayload) {
-    const branchName = normalizeBranchName(payload.branch, payload.branchName)
+    const branchName = normalizeBranchName(payload.branchName)
+    const targetBranchInput = normalizeTargetBranch(payload.targetBranch)
     const status = normalizeStatus(payload.status)
-    const columnName = normalizeColumnName(payload.column ?? payload.columnName)
-    const pullRequestUrl = normalizePrLink(payload.prLink ?? payload.pullRequestUrl)
+    const pullRequestUrl = normalizePullRequestUrl(payload.pullRequestUrl)
+    const targetBranch = targetBranchInput ?? branchName
 
     const ticket = await findTicketForBranch(branchName)
     const board = await boardService.findById(ticket.boardId)
@@ -204,18 +257,29 @@ export const githubGatewayService = {
       throw createHttpError(404, 'Board not found for ticket')
     }
 
-    const targetColumn = board.columns.find(
-      (col) => col.name.trim().toLowerCase() === columnName.toLowerCase(),
-    )
-
-    if (!targetColumn) {
-      throw createHttpError(404, 'Column not found on ticket board')
-    }
+    const normalizedTargetBranch = targetBranch.toLowerCase()
+    const rules = board.settings?.githubAutomation?.rules ?? []
+    const matchedRule = rules.find((rule) => {
+      if (!rule.enabled) return false
+      const normalizedRuleStatus = statusMap[rule.status] ?? rule.status
+      if (normalizedRuleStatus !== status) return false
+      if (!rule.targetBranch) return true
+      const ruleTarget = rule.targetBranch.trim().toLowerCase()
+      if (!ruleTarget || ruleTarget === '*') return true
+      if (ruleTarget.includes('*')) {
+        const prefix = ruleTarget.replace(/\*+$/, '')
+        return normalizedTargetBranch.startsWith(prefix)
+      }
+      return ruleTarget === normalizedTargetBranch
+    })
+    const targetColumn = matchedRule
+      ? board.columns.find((col) => col.id === matchedRule.columnId)
+      : undefined
 
     const previousColumn = board.columns.find((col) => col.id === ticket.columnId)
     const updates = {
-      columnId: targetColumn.id,
-      github: buildGithubUpdate(ticket, branchName, status, pullRequestUrl),
+      ...(targetColumn ? { columnId: targetColumn.id } : {}),
+      github: buildGithubUpdate(ticket, branchName, targetBranch, status, pullRequestUrl),
     }
 
     const updatedTicket = await ticketService.updateTicket(
@@ -234,7 +298,7 @@ export const githubGatewayService = {
       ticketKey: ticket.ticketKey,
       previous: ticket,
       updated: updatedTicket,
-      targetColumnName: targetColumn.name,
+      targetColumnName: targetColumn?.name || previousColumn?.name || 'Unknown',
       previousColumnName: previousColumn?.name,
     })
 

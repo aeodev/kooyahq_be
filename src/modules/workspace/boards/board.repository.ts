@@ -92,10 +92,7 @@ export class BoardRepository {
       prefix: string
       emoji: string
       type: 'kanban' | 'sprint'
-      settings: {
-        defaultView: 'board' | 'list' | 'timeline'
-        showSwimlanes: boolean
-      }
+      settings: Board['settings']
       columns: Array<{
         id: string
         name: string

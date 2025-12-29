@@ -44,15 +44,25 @@ The frontend expects a health check endpoint at `/api/health`. It returns uptime
 
 Set `GITHUB_GATEWAY_SECRET` in your environment. GitHub Actions should `POST` to `/api/gateways/github/actions` with either `x-github-gateway-secret`, `x-gateway-secret`, or `Authorization: Bearer <secret>`.
 
-Example payload:
+Example payloads:
 
 ```json
 {
-  "branch": "feature/ENG-123-awesome",
-  "column": "Deploying",
-  "status": "deploying",
-  "prLink": "https://github.com/org/repo/pull/123"
+  "branchName": "feature/TT-1/add-cta",
+  "targetBranch": "main",
+  "status": "pull-requested",
+  "pullRequestUrl": "https://github.com/org/repo/pull/44"
 }
 ```
 
-Accepted statuses: `open`, `requested_pr`, `merging_pr`, `merged_pr`, `merged`, `deploying`, `deployed`, `failed`, `closed`. The service also accepts space or dash separated variants (e.g., `requested pr`, `merging pr`).
+```json
+{
+  "branchName": "feature/TT-1/add-cta",
+  "targetBranch": "main",
+  "status": "deploying"
+}
+```
+
+Accepted statuses: `pull-requested`, `pull-request-build-check-passed`, `pull-request-build-check-failed`, `deploying`, `deployment-failed`, `deployed`. The service also accepts space or dash separated variants (e.g., `pull requested`, `pull request build check passed`).
+
+Branch names must include the ticket key as a full path segment (e.g., `/TT-1/`) so the gateway can resolve tickets without partial matches.

@@ -17,15 +17,12 @@ export interface DocumentLink {
 }
 
 export type TicketGithubStatus =
-  | 'open'
-  | 'merged'
-  | 'closed'
-  | 'requested_pr'
-  | 'merging_pr'
-  | 'merged_pr'
+  | 'pull-requested'
+  | 'pull-request-build-check-passed'
+  | 'pull-request-build-check-failed'
   | 'deploying'
+  | 'deployment-failed'
   | 'deployed'
-  | 'failed'
 
 export interface ChecklistItem {
   id: string
@@ -35,6 +32,7 @@ export interface ChecklistItem {
 
 export interface TicketGithub {
   branchName?: string
+  targetBranch?: string
   pullRequestUrl?: string
   status?: TicketGithubStatus
 }
@@ -114,10 +112,18 @@ const checklistItemSchema = new Schema<ChecklistItem>(
 const ticketGithubSchema = new Schema<TicketGithub>(
   {
     branchName: { type: String },
+    targetBranch: { type: String },
     pullRequestUrl: { type: String },
     status: {
       type: String,
-      enum: ['open', 'merged', 'closed', 'requested_pr', 'merging_pr', 'merged_pr', 'deploying', 'deployed', 'failed'],
+      enum: [
+        'pull-requested',
+        'pull-request-build-check-passed',
+        'pull-request-build-check-failed',
+        'deploying',
+        'deployment-failed',
+        'deployed',
+      ],
     },
   },
   { _id: false },
@@ -295,6 +301,7 @@ export type Ticket = {
   deletedBy?: string
   github?: {
     branchName?: string
+    targetBranch?: string
     pullRequestUrl?: string
     status?: TicketGithubStatus
   }
@@ -353,6 +360,7 @@ export function toTicket(doc: TicketDocument): Ticket {
     github: doc.github
       ? {
           branchName: doc.github.branchName,
+          targetBranch: doc.github.targetBranch,
           pullRequestUrl: doc.github.pullRequestUrl,
           status: doc.github.status as TicketGithubStatus | undefined,
         }

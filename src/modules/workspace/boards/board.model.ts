@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
+import type { TicketGithubStatus } from '../tickets/ticket.model'
 
 export const DEFAULT_WORKSPACE_ID = 'global'
 
@@ -32,11 +33,23 @@ export interface TicketDetailsFieldConfig {
   order: number // Lower numbers appear first (top to bottom)
 }
 
+export interface GithubAutomationRule {
+  id: string
+  enabled: boolean
+  status: TicketGithubStatus
+  targetBranch?: string
+  columnId: string
+  description?: string
+}
+
 export interface BoardSettings {
   defaultView: 'board' | 'list' | 'timeline'
   showSwimlanes: boolean
   ticketDetailsSettings: {
     fieldConfigs: TicketDetailsFieldConfig[]
+  }
+  githubAutomation: {
+    rules: GithubAutomationRule[]
   }
 }
 
@@ -115,6 +128,18 @@ const ticketDetailsFieldConfigSchema = new Schema<TicketDetailsFieldConfig>(
   { _id: false },
 )
 
+const githubAutomationRuleSchema = new Schema<GithubAutomationRule>(
+  {
+    id: { type: String, required: true },
+    enabled: { type: Boolean, required: true, default: true },
+    status: { type: String, required: true },
+    targetBranch: { type: String },
+    columnId: { type: String, required: true },
+    description: { type: String },
+  },
+  { _id: false },
+)
+
 const boardSettingsSchema = new Schema<BoardSettings>(
   {
     defaultView: {
@@ -154,6 +179,22 @@ const boardSettingsSchema = new Schema<BoardSettings>(
           { fieldName: 'startDate', isVisible: true, order: 5 },
           { fieldName: 'endDate', isVisible: true, order: 6 },
         ],
+      }),
+    },
+    githubAutomation: {
+      type: new Schema(
+        {
+          rules: {
+            type: [githubAutomationRuleSchema],
+            required: true,
+            default: [],
+          },
+        },
+        { _id: false },
+      ),
+      required: true,
+      default: () => ({
+        rules: [],
       }),
     },
   },
@@ -255,6 +296,16 @@ export type Board = {
         order: number
       }>
     }
+    githubAutomation: {
+      rules: Array<{
+        id: string
+        enabled: boolean
+        status: TicketGithubStatus
+        targetBranch?: string
+        columnId: string
+        description?: string
+      }>
+    }
   }
   columns: Array<{
     id: string
@@ -301,6 +352,16 @@ export function toBoard(doc: BoardDocument): Board {
           { fieldName: 'startDate', isVisible: true, order: 5 },
           { fieldName: 'endDate', isVisible: true, order: 6 },
         ],
+      },
+      githubAutomation: {
+        rules: doc.settings.githubAutomation?.rules?.map((rule) => ({
+          id: rule.id,
+          enabled: rule.enabled,
+          status: rule.status as TicketGithubStatus,
+          targetBranch: rule.targetBranch,
+          columnId: rule.columnId,
+          description: rule.description,
+        })) || [],
       },
     },
     columns: doc.columns.map((col) => ({

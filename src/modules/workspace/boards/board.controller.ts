@@ -342,7 +342,23 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       updates.emoji = data.emoji
     }
     if (data.settings !== undefined) {
-      updates.settings = data.settings
+      const baseSettings = board.settings
+      const incomingSettings =
+        data.settings && typeof data.settings === 'object' ? data.settings : {}
+      const incomingGithubAutomation =
+        incomingSettings.githubAutomation && typeof incomingSettings.githubAutomation === 'object'
+          ? incomingSettings.githubAutomation
+          : {}
+      updates.settings = {
+        ...baseSettings,
+        ...incomingSettings,
+        ticketDetailsSettings: incomingSettings.ticketDetailsSettings ?? baseSettings.ticketDetailsSettings,
+        githubAutomation: {
+          ...baseSettings.githubAutomation,
+          ...incomingGithubAutomation,
+          rules: incomingGithubAutomation.rules ?? baseSettings.githubAutomation.rules,
+        },
+      }
     }
     if (data.columns !== undefined) {
       updates.columns = Array.isArray(data.columns) ? data.columns : []

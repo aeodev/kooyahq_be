@@ -182,6 +182,7 @@ export const ticketService = {
       archivedBy?: string | null
       github?: {
         branchName?: string
+        targetBranch?: string
         pullRequestUrl?: string
         status?: TicketGithubStatus
       }
