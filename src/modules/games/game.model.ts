@@ -1,6 +1,6 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
-export type GameType = 'tic-tac-toe' | 'rock-paper-scissors' | 'number-guessing' | 'reaction-test'
+export type GameType = 'tic-tac-toe' | 'rock-paper-scissors' | 'number-guessing' | 'reaction-test' | 'tetris-battle'
 
 export type GameStatus = 'waiting' | 'in-progress' | 'completed' | 'abandoned'
 
@@ -22,7 +22,7 @@ const gameMatchSchema = new Schema<GameMatchDocument>(
     gameType: {
       type: String,
       required: true,
-      enum: ['tic-tac-toe', 'rock-paper-scissors', 'number-guessing', 'reaction-test'],
+      enum: ['tic-tac-toe', 'rock-paper-scissors', 'number-guessing', 'reaction-test', 'tetris-battle'],
       index: true,
     },
     players: {

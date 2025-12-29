@@ -128,6 +128,11 @@ export class GameService {
         name: 'Reaction Test',
         description: 'Test your reaction speed',
       },
+      {
+        type: 'tetris-battle',
+        name: 'Tetris Battle',
+        description: 'Infinite Battle Tetris with bomb mechanics',
+      },
     ]
   }
 
