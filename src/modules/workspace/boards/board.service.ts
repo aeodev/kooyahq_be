@@ -1,5 +1,11 @@
 import { boardRepository } from './board.repository'
-import { DEFAULT_WORKSPACE_ID, type Board, type BoardMember, type CreateBoardInput } from './board.model'
+import {
+  DEFAULT_WORKSPACE_ID,
+  type Board,
+  type BoardMember,
+  type BoardSettings,
+  type CreateBoardInput,
+} from './board.model'
 
 /**
  * Generate a unique board prefix from the board name
@@ -144,7 +150,7 @@ export class BoardService {
     // Generate unique prefix if not provided
     const prefix = await generateUniquePrefix(data.name, data.prefix)
 
-    const defaultSettings = {
+    const defaultSettings: BoardSettings = {
       defaultView: 'board' as const,
       showSwimlanes: false,
       ticketDetailsSettings: {
@@ -163,7 +169,7 @@ export class BoardService {
       },
     }
 
-    const settings = {
+    const settings: BoardSettings = {
       ...defaultSettings,
       ...data.settings,
       ticketDetailsSettings: data.settings?.ticketDetailsSettings || defaultSettings.ticketDetailsSettings,
