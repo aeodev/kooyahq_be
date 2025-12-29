@@ -12,7 +12,7 @@ import {
   type OpenAIMessage,
   type OpenAIToolCall,
 } from './ai-assistant.types'
-import { getAvailableTools, toOpenAITools, findTool, canUseTool } from './ai-assistant.tools'
+import { getAvailableTools, toOpenAITools, findTool, canUseTool } from './tools'
 import {
   ConfigurationError,
   APIError,
