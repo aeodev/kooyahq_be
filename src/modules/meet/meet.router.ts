@@ -3,6 +3,7 @@ import { generateToken } from './meet.controller'
 import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
+import recordingRouter from './meet-recording.router'
 
 export const meetRouter = Router()
 
@@ -59,5 +60,8 @@ meetRouter.post(
   requirePermission(PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS),
   generateToken
 )
+
+// Recording routes
+meetRouter.use('/', recordingRouter)
 
 

@@ -66,6 +66,10 @@ export const updateTicketTool: AITool = {
     // Update ticket
     const updated = await ticketService.updateTicket(ticket.id, updates, user.id)
     
+    if (!updated) {
+      return { success: false, message: 'Failed to update ticket' }
+    }
+    
     return {
       success: true,
       message: `Updated ${ticket.ticketKey}`,

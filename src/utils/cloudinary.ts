@@ -8,7 +8,7 @@ cloudinary.config({
   api_secret: env.cloudinary.apiSecret,
 })
 
-export type UploadFolder = 'posts' | 'profiles' | 'gallery' | 'cards' | 'rich-text-media'
+export type UploadFolder = 'posts' | 'profiles' | 'gallery' | 'cards' | 'rich-text-media' | 'meet-recordings'
 
 export interface UploadResult {
   url: string

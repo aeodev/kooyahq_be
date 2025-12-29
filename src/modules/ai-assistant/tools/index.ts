@@ -22,6 +22,7 @@ import { getTicketDetailsTool } from './workspace/workspace-get-ticket-details.t
 import { moveTicketTool } from './workspace/workspace-move-ticket.tools'
 import { searchTicketsTool } from './workspace/workspace-search-tickets.tools'
 import { updateTicketTool } from './workspace/workspace-update-ticket.tools'
+import { analyzeMeetingTool } from './workspace/workspace-analyze-meeting.tools'
 
 // User tools
 import { getCurrentUserTool } from './user/user-get-current.tools'
@@ -48,6 +49,7 @@ export const AI_TOOLS: AITool[] = [
   moveTicketTool,
   searchTicketsTool,
   updateTicketTool,
+  analyzeMeetingTool,
   // User tools
   getCurrentUserTool,
 ]

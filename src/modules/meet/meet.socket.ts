@@ -44,4 +44,46 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
       timestamp: new Date().toISOString(),
     })
   })
+
+  // Handle meet invitations
+  socket.on('meet:invite', async (data: { meetId: string; invitedUserId: string }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
+    const { meetId, invitedUserId } = data
+
+    // Emit invitation to the invited user
+    SocketEmitter.emitToUser(invitedUserId, 'meet:invitation', {
+      fromUserId: userId,
+      fromUserName: socket.user?.name || 'Someone',
+      meetId,
+      timestamp: new Date().toISOString(),
+    })
+  })
+
+  // Handle invitation acceptance
+  socket.on('meet:accept-invitation', (data: { meetId: string; fromUserId: string }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
+    const { meetId, fromUserId } = data
+
+    // Notify the inviter that invitation was accepted
+    SocketEmitter.emitToUser(fromUserId, 'meet:invitation-accepted', {
+      acceptedByUserId: userId,
+      acceptedByUserName: socket.user?.name || 'Someone',
+      meetId,
+      timestamp: new Date().toISOString(),
+    })
+  })
+
+  // Handle invitation decline
+  socket.on('meet:decline-invitation', (data: { meetId: string; fromUserId: string }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
+    const { meetId, fromUserId } = data
+
+    // Notify the inviter that invitation was declined
+    SocketEmitter.emitToUser(fromUserId, 'meet:invitation-declined', {
+      declinedByUserId: userId,
+      declinedByUserName: socket.user?.name || 'Someone',
+      meetId,
+      timestamp: new Date().toISOString(),
+    })
+  })
 }
