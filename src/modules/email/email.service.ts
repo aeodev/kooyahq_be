@@ -132,11 +132,11 @@ function generateAnnouncementEmailHtml(data: AnnouncementEmailData): string {
       <td align="center" style="padding: 40px 20px;">
         
         <!-- Main Card -->
-        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: ${COLORS.white}; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: ${COLORS.white}; border: 1px solid ${COLORS.border}; overflow: hidden;">
           
-          <!-- Header with Logo and Gradient -->
+          <!-- Header with Logo -->
           <tr>
-            <td align="center" style="background: linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.primaryDark} 100%); padding: 48px 40px;">
+            <td align="center" style="background-color: ${COLORS.primary}; padding: 48px 40px; border-bottom: 4px solid ${COLORS.primaryDark};">
               <img src="${LOGO_URL}" alt="KooyaHQ" width="140" style="display: block; margin-bottom: 20px;" />
               <h1 style="margin: 0; color: ${COLORS.white}; font-family: Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; letter-spacing: -0.5px;">
                 New Announcement
@@ -153,10 +153,10 @@ function generateAnnouncementEmailHtml(data: AnnouncementEmailData): string {
                 ${data.title}
               </h2>
               
-              <!-- Quote Block with Gradient -->
+              <!-- Quote Block -->
               <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 32px;">
                 <tr>
-                  <td style="border-left: 3px solid ${COLORS.primaryLight}; background: linear-gradient(to right, ${COLORS.secondary}, ${COLORS.white}); padding: 24px; border-radius: 0 8px 8px 0;">
+                  <td style="border-left: 4px solid ${COLORS.primary}; background-color: ${COLORS.secondary}; padding: 24px;">
                     <p style="margin: 0; font-size: 16px; line-height: 1.7; color: #374151;">
                       ${data.content.replace(/\n/g, '<br>')}
                     </p>
@@ -172,11 +172,11 @@ function generateAnnouncementEmailHtml(data: AnnouncementEmailData): string {
                     <!-- Author Section -->
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
-                        <!-- Avatar Circle -->
+                        <!-- Avatar Square -->
                         <td style="vertical-align: middle; padding-right: 14px;">
-                          <table role="presentation" cellpadding="0" cellspacing="0" width="48" height="48">
+                          <table role="presentation" cellpadding="0" cellspacing="0" width="44" height="44">
                             <tr>
-                              <td align="center" valign="middle" style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, ${COLORS.primaryLight}, ${COLORS.primary}); color: ${COLORS.white}; font-weight: 600; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                              <td align="center" valign="middle" style="width: 44px; height: 44px; background-color: ${COLORS.primary}; color: ${COLORS.white}; font-weight: 600; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                                 ${initials}
                               </td>
                             </tr>
@@ -203,12 +203,12 @@ function generateAnnouncementEmailHtml(data: AnnouncementEmailData): string {
           
           <!-- Footer with CTA -->
           <tr>
-            <td align="center" style="background-color: ${COLORS.background}; padding: 32px 40px;">
+            <td align="center" style="background-color: ${COLORS.background}; padding: 32px 40px; border-top: 1px solid ${COLORS.border};">
               
               <!-- CTA Button -->
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, ${COLORS.primaryLight}, ${COLORS.primary});">
+                  <td align="center" style="background-color: ${COLORS.primary};">
                     <a href="${FRONTEND_URL}" target="_blank" style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: ${COLORS.white}; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                       View in KooyaHQ
                     </a>
@@ -275,7 +275,7 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
       </td>
       <td style="padding: 16px; border-bottom: 1px solid ${COLORS.border};">
         ${entry.projects.length > 0 
-          ? entry.projects.map(p => `<span style="display: inline-block; padding: 4px 10px; background: linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.accent}); color: ${COLORS.primaryDark}; border-radius: 12px; font-size: 12px; font-weight: 500; margin-right: 6px;">${p}</span>`).join('') 
+          ? entry.projects.map(p => `<span style="display: inline-block; padding: 4px 10px; background-color: ${COLORS.secondary}; color: ${COLORS.primaryDark}; font-size: 12px; font-weight: 500; margin-right: 6px; border: 1px solid ${COLORS.accent};">${p}</span>`).join('') 
           : `<span style="color: ${COLORS.textMuted};">—</span>`}
       </td>
       <td style="padding: 16px; border-bottom: 1px solid ${COLORS.border}; text-align: right; font-weight: 600; color: ${COLORS.primary}; font-feature-settings: 'tnum';">
@@ -317,11 +317,11 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
       <td align="center" style="padding: 40px 20px;">
         
         <!-- Main Card -->
-        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: ${COLORS.white}; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: ${COLORS.white}; border: 1px solid ${COLORS.border}; overflow: hidden;">
           
-          <!-- Header with Logo and Gradient -->
+          <!-- Header with Logo -->
           <tr>
-            <td align="center" style="background: linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.primaryDark} 100%); padding: 48px 40px;">
+            <td align="center" style="background-color: ${COLORS.primary}; padding: 48px 40px; border-bottom: 4px solid ${COLORS.primaryDark};">
               <img src="${LOGO_URL}" alt="KooyaHQ" width="140" style="display: block; margin-bottom: 20px;" />
               <h1 style="margin: 0; color: ${COLORS.white}; font-family: Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; letter-spacing: -0.5px;">
                 Daily Time Summary
@@ -342,9 +342,9 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 14px;">
-                          <table role="presentation" cellpadding="0" cellspacing="0" width="52" height="52">
+                          <table role="presentation" cellpadding="0" cellspacing="0" width="48" height="48">
                             <tr>
-                              <td align="center" valign="middle" style="width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, ${COLORS.primaryLight}, ${COLORS.primary}); color: ${COLORS.white}; font-weight: 600; font-size: 18px;">
+                              <td align="center" valign="middle" style="width: 48px; height: 48px; background-color: ${COLORS.primary}; color: ${COLORS.white}; font-weight: 600; font-size: 17px;">
                                 ${userInitials}
                               </td>
                             </tr>
@@ -378,30 +378,18 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
           <!-- Total Time Card -->
           <tr>
             <td style="padding: 24px 40px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, ${COLORS.secondary} 0%, ${COLORS.accent} 100%); border-radius: 12px; border: 1px solid ${COLORS.primaryLight}20;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${COLORS.secondary}; border: 1px solid ${COLORS.accent};">
                 <tr>
                   <td style="padding: 28px 32px;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                      <tr>
-                        <td>
-                          <p style="margin: 0; font-size: 13px; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">
-                            Total Time Logged
-                          </p>
-                          <p style="margin: 8px 0 0 0; font-size: 42px; font-weight: 700; color: ${COLORS.primary}; line-height: 1; font-family: Georgia, 'Times New Roman', serif;">
-                            ${totalDurationFormatted}
-                          </p>
-                          <p style="margin: 8px 0 0 0; font-size: 14px; color: ${COLORS.primaryDark};">
-                            ${hoursFormatted} hours • ${data.entryCount} ${data.entryCount === 1 ? 'entry' : 'entries'}
-                          </p>
-                        </td>
-                        <td align="right" valign="middle">
-                          <!-- Clock Icon -->
-                          <div style="width: 64px; height: 64px; border-radius: 50%; background: ${COLORS.white}; display: inline-block; text-align: center; line-height: 64px;">
-                            <span style="font-size: 28px;">⏱️</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </table>
+                    <p style="margin: 0; font-size: 13px; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">
+                      Total Time Logged
+                    </p>
+                    <p style="margin: 8px 0 0 0; font-size: 42px; font-weight: 700; color: ${COLORS.primary}; line-height: 1; font-family: Georgia, 'Times New Roman', serif;">
+                      ${totalDurationFormatted}
+                    </p>
+                    <p style="margin: 8px 0 0 0; font-size: 14px; color: ${COLORS.primaryDark};">
+                      ${hoursFormatted} hours | ${data.entryCount} ${data.entryCount === 1 ? 'entry' : 'entries'}
+                    </p>
                   </td>
                 </tr>
               </table>
@@ -415,16 +403,16 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
               <p style="margin: 0 0 16px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 600; color: ${COLORS.textDark};">
                 Time Entries
               </p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid ${COLORS.border}; border-radius: 12px; overflow: hidden;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid ${COLORS.border}; overflow: hidden;">
                 <thead>
-                  <tr style="background: linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.accent});">
-                    <th style="padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primaryLight};">
+                  <tr style="background-color: ${COLORS.secondary};">
+                    <th style="padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
                       Task
                     </th>
-                    <th style="padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primaryLight};">
+                    <th style="padding: 14px 16px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
                       Projects
                     </th>
-                    <th style="padding: 14px 16px; text-align: right; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primaryLight};">
+                    <th style="padding: 14px 16px; text-align: right; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
                       Duration
                     </th>
                   </tr>
@@ -434,11 +422,10 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
                 </tbody>
               </table>
               ` : `
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${COLORS.background}; border-radius: 12px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${COLORS.background}; border: 1px solid ${COLORS.border};">
                 <tr>
                   <td align="center" style="padding: 48px 32px;">
-                    <p style="margin: 0; font-size: 40px;">📭</p>
-                    <p style="margin: 16px 0 0 0; font-size: 16px; color: ${COLORS.textLight};">
+                    <p style="margin: 0; font-size: 16px; color: ${COLORS.textLight};">
                       No time entries recorded for this day.
                     </p>
                   </td>
@@ -452,7 +439,7 @@ function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailData): s
           <tr>
             <td align="center" style="background-color: ${COLORS.background}; padding: 28px 40px; border-top: 1px solid ${COLORS.border};">
               <p style="margin: 0; font-size: 13px; color: ${COLORS.textMuted};">
-                Automated Report • KooyaHQ Time Tracker
+                Automated Report | KooyaHQ Time Tracker
               </p>
               <p style="margin: 12px 0 0 0; font-size: 12px; color: ${COLORS.textMuted};">
                 &copy; ${new Date().getFullYear()} KooyaHQ. All rights reserved.
