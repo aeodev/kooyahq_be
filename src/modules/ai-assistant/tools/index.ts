@@ -27,6 +27,9 @@ import { analyzeMeetingTool } from './workspace/workspace-analyze-meeting.tools'
 // User tools
 import { getCurrentUserTool } from './user/user-get-current.tools'
 
+// Home tools
+import { createAnnouncementTool } from './home/home-create-announcement.tools'
+
 // Export all tools as combined array
 export const AI_TOOLS: AITool[] = [
   // Time tracker tools
@@ -52,6 +55,8 @@ export const AI_TOOLS: AITool[] = [
   analyzeMeetingTool,
   // User tools
   getCurrentUserTool,
+  // Home tools
+  createAnnouncementTool,
 ]
 
 // Re-export utility functions with proper signatures
