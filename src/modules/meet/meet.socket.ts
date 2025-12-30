@@ -20,13 +20,29 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
     if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
     const room = meetRoom(meetId)
     socket.join(room)
+
+    // Broadcast participant joined to all other participants in the room
+    socket.to(room).emit('meet:participant-joined', {
+      userId,
+      userName: socket.user?.name,
+      timestamp: new Date().toISOString(),
+    })
+
     console.log(`User ${userId} joined meet ${meetId}`)
   })
 
   // Leave a meeting room
   socket.on('meet:leave', (meetId: string) => {
     if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
-    socket.leave(meetRoom(meetId))
+    const room = meetRoom(meetId)
+
+    // Broadcast participant left to all other participants in the room
+    socket.to(room).emit('meet:participant-left', {
+      userId,
+      timestamp: new Date().toISOString(),
+    })
+
+    socket.leave(room)
     console.log(`User ${userId} left meet ${meetId}`)
   })
 
@@ -93,6 +109,19 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
       declinedByUserName: socket.user?.name || 'Someone',
       meetId,
       timestamp: new Date().toISOString(),
+    })
+  })
+
+  // Handle LiveKit identity mapping
+  socket.on('meet:livekit-identity', (data: { meetId: string; userId: string; liveKitIdentity: string }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
+    const { meetId, userId, liveKitIdentity } = data
+
+    // Broadcast the identity mapping to all other participants in the room
+    const room = meetRoom(meetId)
+    socket.to(room).emit('meet:livekit-identity', {
+      userId,
+      liveKitIdentity,
     })
   })
 }
