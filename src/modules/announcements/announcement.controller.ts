@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from 'express'
 import { createHttpError } from '../../utils/http-error'
 import { announcementService } from './announcement.service'
 import { notificationService } from '../notifications/notification.service'
+import { emailService } from '../email/email.service'
+import { userService } from '../users/user.service'
 
 export async function createAnnouncement(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -48,6 +50,23 @@ export async function createAnnouncement(req: Request, res: Response, next: Next
         await notificationService.createSystemNotificationBroadcast(announcement.title)
       } catch (notifError) {
         console.error('Failed to create system notification broadcast:', notifError)
+      }
+
+      // Send email notification to all users
+      try {
+        const users = await userService.findAll()
+        const userEmails = users.map((user) => user.email).filter(Boolean)
+        
+        if (userEmails.length > 0) {
+          await emailService.sendAnnouncementEmail(userEmails, {
+            title: announcement.title,
+            content: announcement.content,
+            authorName: announcement.author.name,
+          })
+        }
+      } catch (emailError) {
+        console.error('Failed to send announcement emails:', emailError)
+        // Don't fail the request if email fails
       }
     }
 

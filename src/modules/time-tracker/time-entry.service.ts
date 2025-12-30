@@ -6,6 +6,7 @@ import { userRepository } from '../users/user.repository'
 import { HttpError } from '../../utils/http-error'
 import { SocketEmitter, TimeEntrySocketEvents } from '../../utils/socket-emitter'
 import type { TimeEntry } from './time-entry.model'
+import { emailService } from '../email/email.service'
 
 export type PublicTimeEntry = TimeEntry & {
   userName: string
@@ -181,10 +182,51 @@ export class TimeEntryService {
   }
 
   async endDay(userId: string): Promise<PublicTimeEntry[]> {
-    const entries = await this.timeEntryRepo.stopAllActiveTimers(userId)
+    // Stop any active timers first
+    await this.timeEntryRepo.stopAllActiveTimers(userId)
+    
     const endedAt = new Date()
     await this.dayEndRepo.create(userId, endedAt)
-    return Promise.all(entries.map(entry => this.toPublicTimeEntry(entry, userId)))
+    
+    // Fetch ALL today's entries for the email (not just the ones that were active)
+    const startOfDay = new Date()
+    startOfDay.setHours(0, 0, 0, 0)
+    const allTodayEntries = await this.timeEntryRepo.findByUserIdAndDateRange(userId, startOfDay, endedAt)
+    const publicEntries = await Promise.all(allTodayEntries.map(entry => this.toPublicTimeEntry(entry, userId)))
+
+    // Send email summary to julius@kooya.ph
+    try {
+      const user = await userRepository.findById(userId)
+      if (user) {
+        // Calculate totals
+        const totalMinutes = publicEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0)
+        const totalHours = Math.floor(totalMinutes / 60)
+
+        // Format entries for email
+        const emailEntries = publicEntries.map((entry) => ({
+          task: entry.tasks && entry.tasks.length > 0 
+            ? entry.tasks.map(t => t.text).join(', ') 
+            : 'No task specified',
+          projects: entry.projects || [],
+          duration: entry.duration || 0,
+        }))
+
+        await emailService.sendTimeTrackerEndDayEmail({
+          userName: user.name,
+          userEmail: user.email,
+          date: endedAt.toISOString(),
+          totalHours,
+          totalMinutes,
+          entryCount: publicEntries.length,
+          entries: emailEntries,
+        })
+      }
+    } catch (emailError) {
+      console.error('Failed to send time tracker end day email:', emailError)
+      // Don't fail the end day operation if email fails
+    }
+
+    return publicEntries
   }
 
   async getDayEndedAt(userId: string, date: Date): Promise<Date | null> {

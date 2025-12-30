@@ -64,4 +64,8 @@ export const env = {
     },
   },
   openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
+  sendgrid: {
+    apiKey: requireEnv('SENDGRID_API_KEY'),
+    fromEmail: requireEnv('SENDGRID_FROM_EMAIL'),
+  },
 }
