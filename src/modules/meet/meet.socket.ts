@@ -35,12 +35,21 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
     if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
     const { meetId, message } = data
     
+    // Validate inputs
+    if (!meetId || typeof meetId !== 'string') return
+    if (!message || typeof message !== 'string') return
+    if (message.length > 2000) return // Max 2000 characters
+    
+    // Sanitize message
+    const sanitizedMessage = message.trim().slice(0, 2000)
+    if (!sanitizedMessage) return
+    
     // Broadcast chat message to all participants in the room (including sender)
     SocketEmitter.emitToRoom(meetRoom(meetId), 'meet:chat-message', {
       userId,
       userName: socket.user?.name,
       meetId,
-      message,
+      message: sanitizedMessage,
       timestamp: new Date().toISOString(),
     })
   })

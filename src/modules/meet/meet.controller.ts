@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { AccessToken } from 'livekit-server-sdk'
 import { env } from '../../config/env'
-import { authenticate } from '../../middleware/authenticate'
 
 type TokenRequestBody = {
   roomName?: unknown
