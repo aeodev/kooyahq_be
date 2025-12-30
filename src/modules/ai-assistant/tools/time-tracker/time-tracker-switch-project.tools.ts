@@ -2,6 +2,7 @@ import type { AITool } from '../../ai-assistant.types'
 import { PERMISSIONS } from '../../../auth/rbac/permissions'
 import { TimeEntryService } from '../../../time-tracker/time-entry.service'
 import { projectService } from '../../../projects/project.service'
+import { findClosestProject } from '../utils'
 
 const timeEntryService = new TimeEntryService()
 
@@ -35,30 +36,39 @@ export const switchTimerProjectTool: AITool = {
       }
     }
     
-    // Verify project exists
-    const projects = await projectService.findAll()
-    const projectExists = projects.some(p => p.name === project)
-    if (!projectExists) {
+    // Find the closest matching project
+    const matchedProject = await findClosestProject(project)
+    
+    if (!matchedProject) {
+      // Get all available projects for error message
+      const allProjects = await projectService.findAll()
       return {
         success: false,
-        message: `Project "${project}" not found`,
-        availableProjects: projects.map(p => p.name),
+        message: `Project "${project}" not found. Available projects: ${allProjects.map(p => p.name).join(', ')}`,
+        availableProjects: allProjects.map(p => p.name),
       }
     }
+    
+    const matchedProjectName = matchedProject.name
     
     // Stop current timer (saves time entry)
     await timeEntryService.stopTimer(user.id)
     
     // Start new timer with new project
     const newTimer = await timeEntryService.startTimer(user.id, {
-      projects: [project],
+      projects: [matchedProjectName],
       task: task || 'Started working',
       isOvertime: activeTimer.isOvertime || false,
     })
     
+    // If the matched project name differs from input, indicate the correction
+    const correctionText = matchedProjectName.toLowerCase() !== project.toLowerCase()
+      ? ` (matched "${matchedProjectName}" from "${project}")`
+      : ''
+    
     return {
       success: true,
-      message: `Switched from ${activeTimer.projects[0]} to ${project}`,
+      message: `Switched from ${activeTimer.projects[0]} to ${matchedProjectName}${correctionText}`,
       entry: {
         id: newTimer.id,
         projects: newTimer.projects,
