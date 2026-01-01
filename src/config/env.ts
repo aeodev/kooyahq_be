@@ -3,6 +3,15 @@ import type { StringValue } from 'ms'
 
 loadEnv()
 
+const nodeEnv = process.env.ENV || 'development'
+
+function normalizePathPrefix(value: string): string {
+  return value
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+}
+
 function requireEnv(name: string) {
   const value = process.env[name]
   if (!value) {
@@ -27,10 +36,13 @@ function parseClientUrls(value: string | undefined): string[] {
   return value.split(',').map(url => url.trim()).filter(Boolean)
 }
 
+const storageEnvPrefix = normalizePathPrefix(process.env.S3_ENV_PREFIX || nodeEnv)
+
 export const env = {
-  nodeEnv: process.env.ENV || 'development',
+  nodeEnv,
   port: Number(requireEnv('PORT')),
   clientUrls: parseClientUrls(requireEnv('CLIENT_URL')),
+  serverUrls: parseClientUrls(requireEnv('SERVER_URL')),
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
   mongoUri: requireEnv('MONGO_URI'),
   jwt: {
@@ -41,10 +53,10 @@ export const env = {
     url: requireEnv('REDIS_URL'),
     ttlSeconds: Number(requireEnv('REDIS_TTL_SECONDS')),
   },
-  cloudinary: {
-    cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
-    apiKey: requireEnv('CLOUDINARY_API_KEY'),
-    apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+  s3: {
+    bucket: requireEnv('S3_BUCKET'),
+    region: requireEnv('S3_REGION'),
+    envPrefix: storageEnvPrefix,
   },
   livekit: {
     url: requireEnv('LIVEKIT_URL'),

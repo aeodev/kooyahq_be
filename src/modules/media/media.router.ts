@@ -1,11 +1,30 @@
 import { Router } from 'express'
-import { uploadMedia } from './media.controller'
+import { getMediaFile, uploadMedia } from './media.controller'
 import { uploadMedia as uploadMediaMiddleware } from '../../middleware/upload-media'
 import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
 
 export const mediaRouter = Router()
+
+/**
+ * @swagger
+ * /media/file:
+ *   get:
+ *     summary: Proxy a stored media file by path
+ *     tags: [Media]
+ *     parameters:
+ *       - in: query
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Storage path returned from uploads
+ *     responses:
+ *       200:
+ *         description: Media file stream
+ */
+mediaRouter.get('/file', getMediaFile)
 
 /**
  * @swagger
@@ -43,7 +62,7 @@ export const mediaRouter = Router()
  *                   properties:
  *                     url:
  *                       type: string
- *                     publicId:
+ *                     path:
  *                       type: string
  *                     filename:
  *                       type: string

@@ -11,6 +11,10 @@ npm run dev
 
 By default the server listens on `http://localhost:5001`. Configure variables in `.env` (see `.env.example`).
 
+### Storage (S3)
+
+Set `S3_BUCKET` and `S3_REGION` for uploads. `S3_ENV_PREFIX` (optional) prefixes keys (e.g., `development/` or `production/`). When the frontend is on a different domain, set `PUBLIC_API_URL` so proxied media URLs are absolute.
+
 ### Google Sign-In
 
 Set the following variables to enable Google login:

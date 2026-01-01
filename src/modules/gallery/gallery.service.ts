@@ -1,7 +1,7 @@
 import { GalleryRepository, type CreateGalleryInput, type UpdateGalleryInput } from './gallery.repository'
 import { HttpError } from '../../utils/http-error'
 import { toGalleryItem, type GalleryItem } from './gallery.model'
-import { deleteFromCloudinary, extractPublicIdFromUrl } from '../../utils/cloudinary'
+import { deleteStorageObject, isStoragePath } from '../../lib/storage'
 
 export class GalleryService {
   private galleryRepo = new GalleryRepository()
@@ -58,21 +58,14 @@ export class GalleryService {
 
   async delete(id: string): Promise<void> {
     const item = await this.galleryRepo.findById(id)
-    if (item) {
-      // Delete from Cloudinary if it's a Cloudinary URL
-      if (item.path && item.path.startsWith('http')) {
-        try {
-          const publicId = extractPublicIdFromUrl(item.path) || item.filename
-          if (publicId) {
-            await deleteFromCloudinary(publicId)
-          }
-        } catch (error) {
-          // File might already be deleted, continue anyway
-          console.warn('Failed to delete from Cloudinary:', error)
-        }
+    await this.galleryRepo.delete(id)
+    if (item && isStoragePath(item.path)) {
+      try {
+        await deleteStorageObject(item.path)
+      } catch (error) {
+        // File might already be deleted, continue anyway
+        console.warn('Failed to delete from storage:', error)
       }
     }
-    await this.galleryRepo.delete(id)
   }
 }
-

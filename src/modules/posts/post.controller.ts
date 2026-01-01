@@ -21,7 +21,7 @@ export async function createPost(req: Request, res: Response, next: NextFunction
     let imageUrl: string | undefined
 
     if (file) {
-      imageUrl = (file as any).cloudinaryUrl
+      imageUrl = (file as any).storagePath
     }
 
     // Handle tags - could come as tags[] array or tags string from FormData
@@ -118,7 +118,7 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
     }
 
     if (file) {
-      updates.imageUrl = (file as any).cloudinaryUrl
+      updates.imageUrl = (file as any).storagePath
     }
 
     const post = await postService.update(id, userId, updates)

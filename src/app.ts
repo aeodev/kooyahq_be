@@ -75,6 +75,7 @@ export function createApp() {
 
   app.use('/api/auth', authRouter)
   app.use('/api/users', userRouter)
+  app.use('/health', healthRouter)
   app.use('/api/health', healthRouter)
   app.use('/api/time-entries', timeEntryRouter)
   app.use('/api/gallery', galleryRouter)

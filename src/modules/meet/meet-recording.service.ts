@@ -7,7 +7,6 @@ export const meetRecordingService = {
     meetId: string
     userId: string
     recordingUrl: string
-    cloudinaryPublicId?: string
     duration: number
     startTime: Date
     endTime: Date
@@ -83,4 +82,3 @@ export const meetRecordingService = {
     return doc ? toMeetAnalysis(doc) : null
   },
 }
-

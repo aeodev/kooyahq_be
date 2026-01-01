@@ -95,12 +95,12 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     const profilePicFile = profilePicFiles && profilePicFiles.length > 0 ? profilePicFiles[0] : undefined
     const bannerFile = bannerFiles && bannerFiles.length > 0 ? bannerFiles[0] : undefined
 
-    if (profilePicFile && (profilePicFile as any).cloudinaryUrl) {
-      updates.profilePic = (profilePicFile as any).cloudinaryUrl
+    if (profilePicFile && (profilePicFile as any).storagePath) {
+      updates.profilePic = (profilePicFile as any).storagePath
     }
 
-    if (bannerFile && (bannerFile as any).cloudinaryUrl) {
-      updates.banner = (bannerFile as any).cloudinaryUrl
+    if (bannerFile && (bannerFile as any).storagePath) {
+      updates.banner = (bannerFile as any).storagePath
     }
 
     if (bio !== undefined) {

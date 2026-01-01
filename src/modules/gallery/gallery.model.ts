@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
+import { resolveMediaUrl } from '../../utils/media-url'
 
 export interface GalleryDocument extends Document {
   title: string
@@ -82,7 +83,7 @@ export type GalleryItem = {
   updatedAt: string
 }
 
-export function toGalleryItem(doc: GalleryDocument, baseUrl: string = ''): GalleryItem {
+export function toGalleryItem(doc: GalleryDocument, _baseUrl: string = ''): GalleryItem {
   const createdAt = doc.createdAt instanceof Date 
     ? doc.createdAt.toISOString() 
     : new Date(doc.createdAt as any).toISOString()
@@ -91,8 +92,7 @@ export function toGalleryItem(doc: GalleryDocument, baseUrl: string = ''): Galle
     ? doc.updatedAt.toISOString() 
     : new Date(doc.updatedAt as any).toISOString()
 
-  // If path is a Cloudinary URL, use it directly; otherwise fall back to old format for backward compatibility
-  const imageUrl = doc.path.startsWith('http') ? doc.path : `${baseUrl}/gallery/files/${doc.filename}`
+  const imageUrl = resolveMediaUrl(doc.path) || doc.path
 
   return {
     id: doc.id,
@@ -110,4 +110,3 @@ export function toGalleryItem(doc: GalleryDocument, baseUrl: string = ''): Galle
     updatedAt,
   }
 }
-
