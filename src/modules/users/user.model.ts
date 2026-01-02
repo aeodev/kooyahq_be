@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
+import { resolveMediaUrl } from '../../utils/media-url'
 
 export interface UserDocument extends Document {
   email: string
@@ -112,5 +113,9 @@ export function toUser(doc: UserDocument): User {
 }
 
 export function toPublicUser(user: User): PublicUser {
-  return user
+  return {
+    ...user,
+    profilePic: resolveMediaUrl(user.profilePic),
+    banner: resolveMediaUrl(user.banner),
+  }
 }

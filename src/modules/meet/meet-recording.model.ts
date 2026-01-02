@@ -1,10 +1,10 @@
 import { Schema, model, models, type Document } from 'mongoose'
+import { resolveMediaUrl } from '../../utils/media-url'
 
 export interface MeetRecordingDocument extends Document {
   meetId: string
   userId: string
   recordingUrl: string
-  cloudinaryPublicId?: string
   duration: number // seconds
   startTime: Date
   endTime: Date
@@ -29,9 +29,6 @@ const meetRecordingSchema = new Schema<MeetRecordingDocument>(
     recordingUrl: {
       type: String,
       required: true,
-    },
-    cloudinaryPublicId: {
-      type: String,
     },
     duration: {
       type: Number,
@@ -72,7 +69,6 @@ export type MeetRecording = {
   meetId: string
   userId: string
   recordingUrl: string
-  cloudinaryPublicId?: string
   duration: number
   startTime: string
   endTime: string
@@ -87,8 +83,7 @@ export function toMeetRecording(doc: MeetRecordingDocument): MeetRecording {
     id: doc.id,
     meetId: doc.meetId,
     userId: doc.userId,
-    recordingUrl: doc.recordingUrl,
-    cloudinaryPublicId: doc.cloudinaryPublicId,
+    recordingUrl: resolveMediaUrl(doc.recordingUrl) || doc.recordingUrl,
     duration: doc.duration,
     startTime: doc.startTime instanceof Date ? doc.startTime.toISOString() : new Date(doc.startTime as any).toISOString(),
     endTime: doc.endTime instanceof Date ? doc.endTime.toISOString() : new Date(doc.endTime as any).toISOString(),
@@ -98,4 +93,3 @@ export function toMeetRecording(doc: MeetRecordingDocument): MeetRecording {
     updatedAt: doc.updatedAt instanceof Date ? doc.updatedAt.toISOString() : new Date(doc.updatedAt as any).toISOString(),
   }
 }
-

@@ -1,7 +1,7 @@
 import multer from 'multer'
 import { createHttpError } from '../utils/http-error'
 import type { Request, Response, NextFunction } from 'express'
-import { uploadToCloudinary } from '../utils/cloudinary'
+import { uploadBufferToStorage } from '../lib/storage'
 
 const storage = multer.memoryStorage()
 
@@ -30,11 +30,15 @@ export const upload = {
         if (err) return next(err)
         if (req.file) {
           try {
-            const result = await uploadToCloudinary(req.file.buffer, 'gallery')
-            ;(req.file as any).cloudinaryUrl = result.secureUrl
-            ;(req.file as any).cloudinaryPublicId = result.publicId
+            const result = await uploadBufferToStorage({
+              buffer: req.file.buffer,
+              contentType: req.file.mimetype,
+              folder: 'gallery',
+              originalName: req.file.originalname,
+            })
+            ;(req.file as any).storagePath = result.path
           } catch (error) {
-            return next(createHttpError(500, 'Failed to upload image to Cloudinary'))
+            return next(createHttpError(500, 'Failed to upload image'))
           }
         }
         next()
@@ -48,13 +52,17 @@ export const upload = {
         if (req.files && Array.isArray(req.files)) {
           try {
             const uploadPromises = req.files.map(async (file) => {
-              const result = await uploadToCloudinary(file.buffer, 'gallery')
-              ;(file as any).cloudinaryUrl = result.secureUrl
-              ;(file as any).cloudinaryPublicId = result.publicId
+              const result = await uploadBufferToStorage({
+                buffer: file.buffer,
+                contentType: file.mimetype,
+                folder: 'gallery',
+                originalName: file.originalname,
+              })
+              ;(file as any).storagePath = result.path
             })
             await Promise.all(uploadPromises)
           } catch (error) {
-            return next(createHttpError(500, 'Failed to upload images to Cloudinary'))
+            return next(createHttpError(500, 'Failed to upload images'))
           }
         }
         next()
@@ -62,4 +70,3 @@ export const upload = {
     }
   },
 }
-

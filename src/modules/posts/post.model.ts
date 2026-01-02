@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
+import { resolveMediaUrl } from '../../utils/media-url'
 
 export interface PostDocument extends Document {
   content: string
@@ -90,7 +91,7 @@ export function toPost(doc: PostDocument): Post {
     id: doc.id,
     content: doc.content,
     authorId: doc.authorId,
-    imageUrl: doc.imageUrl,
+    imageUrl: resolveMediaUrl(doc.imageUrl),
     category: doc.category,
     tags: doc.tags || [],
     draft: doc.draft ?? false,
@@ -107,4 +108,3 @@ export function toPost(doc: PostDocument): Post {
     } : undefined
   }
 }
-

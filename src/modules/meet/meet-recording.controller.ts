@@ -22,8 +22,7 @@ export async function uploadRecording(req: Request, res: Response, next: NextFun
   }
 
   try {
-    const recordingUrl = (file as any).cloudinaryUrl || ''
-    const cloudinaryPublicId = (file as any).cloudinaryPublicId || ''
+    const recordingUrl = (file as any).storagePath || ''
 
     if (!recordingUrl) {
       return next(createHttpError(500, 'Failed to upload recording'))
@@ -33,7 +32,6 @@ export async function uploadRecording(req: Request, res: Response, next: NextFun
       meetId,
       userId,
       recordingUrl,
-      cloudinaryPublicId,
       duration: parseInt(duration, 10),
       startTime: new Date(startTime),
       endTime: new Date(endTime),
@@ -135,4 +133,3 @@ export async function getAnalysis(req: Request, res: Response, next: NextFunctio
     next(error)
   }
 }
-

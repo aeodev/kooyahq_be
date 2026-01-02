@@ -17,14 +17,13 @@ export async function createGalleryItem(req: Request, res: Response) {
   const title = req.body.title?.trim() || file.originalname.replace(/\.[^/.]+$/, '')
   const description = req.body.description?.trim()
 
-  const cloudinaryUrl = (file as any).cloudinaryUrl || ''
-  const cloudinaryPublicId = (file as any).cloudinaryPublicId || ''
+  const storagePath = (file as any).storagePath || ''
 
   const input: CreateGalleryInput = {
     title,
     description,
-    filename: cloudinaryPublicId || file.originalname,
-    path: cloudinaryUrl,
+    filename: file.originalname,
+    path: storagePath,
     mimetype: file.mimetype,
     size: file.size,
     uploadedBy: userId,
@@ -52,14 +51,13 @@ export async function createMultipleGalleryItems(req: Request, res: Response) {
     const description = req.body[`description-${index}`]?.trim() 
       || req.body[`description-${file.fieldname}`]?.trim()
 
-    const cloudinaryUrl = (file as any).cloudinaryUrl || ''
-    const cloudinaryPublicId = (file as any).cloudinaryPublicId || ''
+    const storagePath = (file as any).storagePath || ''
 
     const input: CreateGalleryInput = {
       title,
       description,
-      filename: cloudinaryPublicId || file.originalname,
-      path: cloudinaryUrl,
+      filename: file.originalname,
+      path: storagePath,
       mimetype: file.mimetype,
       size: file.size,
       uploadedBy: userId,
@@ -145,4 +143,3 @@ export async function approveGalleryItem(req: Request, res: Response) {
   const item = await service.approve(id, userId, '')
   res.json({ status: 'success', data: item })
 }
-

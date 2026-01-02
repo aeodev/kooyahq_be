@@ -1,6 +1,8 @@
 import { postRepository, type CreatePostInput } from './post.repository'
+import { PostModel } from './post.model'
 import { userService } from '../users/user.service'
 import type { Post } from './post.model'
+import { deleteStorageObject, isStoragePath } from '../../lib/storage'
 
 export type PostWithAuthor = Post & {
   author: {
@@ -32,17 +34,25 @@ export const postService = {
   },
 
   async update(id: string, authorId: string, updates: import('./post.repository').UpdatePostInput): Promise<PostWithAuthor> {
-    const post = await postRepository.findById(id)
-    if (!post) {
+    const existing = await PostModel.findById(id).exec()
+    if (!existing) {
       throw new Error('Post not found')
     }
-    if (post.authorId !== authorId) {
+    if (existing.authorId !== authorId) {
       throw new Error('Forbidden')
     }
 
     const updated = await postRepository.update(id, updates)
     if (!updated) {
       throw new Error('Failed to update post')
+    }
+
+    if (updates.imageUrl && existing.imageUrl && existing.imageUrl !== updates.imageUrl && isStoragePath(existing.imageUrl)) {
+      try {
+        await deleteStorageObject(existing.imageUrl)
+      } catch (error) {
+        console.warn('Failed to delete old post image from storage:', error)
+      }
     }
 
     const author = await userService.getPublicProfile(authorId)
@@ -132,7 +142,20 @@ export const postService = {
   },
 
   async delete(id: string, authorId: string): Promise<boolean> {
-    return postRepository.delete(id, authorId)
+    const existing = await PostModel.findById(id).exec()
+    if (!existing || existing.authorId !== authorId) {
+      return false
+    }
+
+    const deleted = await postRepository.delete(id, authorId)
+    if (deleted && existing.imageUrl && isStoragePath(existing.imageUrl)) {
+      try {
+        await deleteStorageObject(existing.imageUrl)
+      } catch (error) {
+        console.warn('Failed to delete post image from storage:', error)
+      }
+    }
+    return deleted
   },
   
   async vote(postId: string, userId: string, optionIndex: number): Promise<PostWithAuthor> {
@@ -157,4 +180,3 @@ export const postService = {
     }
   },
 }
-

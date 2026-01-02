@@ -1,7 +1,7 @@
 import multer from 'multer'
 import { createHttpError } from '../utils/http-error'
 import type { Request, Response, NextFunction } from 'express'
-import { uploadToCloudinary } from '../utils/cloudinary'
+import { uploadBufferToStorage } from '../lib/storage'
 
 const storage = multer.memoryStorage()
 
@@ -37,9 +37,13 @@ export const uploadProfile = {
               if (fieldFiles) {
                 for (const file of fieldFiles) {
                   uploadPromises.push(
-                    uploadToCloudinary(file.buffer, 'profiles').then((result) => {
-                      ;(file as any).cloudinaryUrl = result.secureUrl
-                      ;(file as any).cloudinaryPublicId = result.publicId
+                    uploadBufferToStorage({
+                      buffer: file.buffer,
+                      contentType: file.mimetype,
+                      folder: 'profiles',
+                      originalName: file.originalname,
+                    }).then((result) => {
+                      ;(file as any).storagePath = result.path
                     })
                   )
                 }
@@ -47,7 +51,7 @@ export const uploadProfile = {
             }
             await Promise.all(uploadPromises)
           } catch (error) {
-            return next(createHttpError(500, 'Failed to upload images to Cloudinary'))
+            return next(createHttpError(500, 'Failed to upload images'))
           }
         }
         next()
@@ -55,7 +59,6 @@ export const uploadProfile = {
     }
   },
 }
-
 
 
 

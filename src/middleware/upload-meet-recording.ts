@@ -1,7 +1,7 @@
 import multer from 'multer'
 import { createHttpError } from '../utils/http-error'
 import type { Request, Response, NextFunction } from 'express'
-import { uploadToCloudinary } from '../utils/cloudinary'
+import { uploadBufferToStorage } from '../lib/storage'
 
 const storage = multer.memoryStorage()
 
@@ -37,16 +37,15 @@ export const uploadMeetRecording = {
         if (err) return next(err)
         if (req.file) {
           try {
-            const result = await uploadToCloudinary(
-              req.file.buffer,
-              'meet-recordings',
-              undefined,
-              'video'
-            )
-            ;(req.file as any).cloudinaryUrl = result.secureUrl
-            ;(req.file as any).cloudinaryPublicId = result.publicId
+            const result = await uploadBufferToStorage({
+              buffer: req.file.buffer,
+              contentType: req.file.mimetype,
+              folder: 'meet-recordings',
+              originalName: req.file.originalname,
+            })
+            ;(req.file as any).storagePath = result.path
           } catch (error) {
-            return next(createHttpError(500, 'Failed to upload recording to Cloudinary'))
+            return next(createHttpError(500, 'Failed to upload recording'))
           }
         }
         next()
@@ -54,4 +53,3 @@ export const uploadMeetRecording = {
     }
   },
 }
-
