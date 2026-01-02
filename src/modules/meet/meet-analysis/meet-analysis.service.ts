@@ -1,6 +1,6 @@
-import { meetRecordingService } from './meet-recording.service'
-import { aiAssistantService } from '../ai-assistant/ai-assistant.service'
-import type { AuthUser } from '../auth/rbac/permissions'
+import { meetRecordingService } from '../meet-recording/meet-recording.service'
+import { aiAssistantService } from '../../ai-assistant/ai-assistant.service'
+import type { AuthUser } from '../../auth/rbac/permissions'
 
 export const meetAnalysisService = {
   async analyzeRecording(recordingId: string, user: AuthUser): Promise<void> {

@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import { authenticate } from '../../middleware/authenticate'
-import { requirePermission } from '../../middleware/require-permission'
-import { PERMISSIONS } from '../auth/rbac/permissions'
+import { authenticate } from '../../../middleware/authenticate'
+import { requirePermission } from '../../../middleware/require-permission'
+import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   startEgress,
   stopEgress,

@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { authenticate } from '../../middleware/authenticate'
-import { uploadMeetRecording } from '../../middleware/upload-meet-recording'
+import { authenticate } from '../../../middleware/authenticate'
+import { uploadMeetRecording } from '../../../middleware/upload-meet-recording'
 import {
   uploadRecording,
   getRecordings,

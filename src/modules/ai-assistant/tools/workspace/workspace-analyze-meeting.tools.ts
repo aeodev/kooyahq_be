@@ -1,6 +1,6 @@
 import type { AITool } from '../../ai-assistant.types'
 import { PERMISSIONS } from '../../../auth/rbac/permissions'
-import { meetRecordingService } from '../../../meet/meet-recording.service'
+import { meetRecordingService } from '../../../meet/meet-recording/meet-recording.service'
 
 export const analyzeMeetingTool: AITool = {
   name: 'analyze_meeting',

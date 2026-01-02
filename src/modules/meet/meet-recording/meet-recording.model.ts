@@ -1,5 +1,5 @@
 import { Schema, model, models, type Document } from 'mongoose'
-import { resolveMediaUrl } from '../../utils/media-url'
+import { resolveMediaUrl } from '../../../utils/media-url'
 
 export interface MeetRecordingDocument extends Document {
   meetId: string

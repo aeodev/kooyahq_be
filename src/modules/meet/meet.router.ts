@@ -3,8 +3,8 @@ import { generateToken } from './meet.controller'
 import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
-import recordingRouter from './meet-recording.router'
-import egressRouter from './meet-egress.router'
+import recordingRouter from './meet-recording/meet-recording.router'
+import egressRouter from './meet-egress/meet-egress.router'
 
 export const meetRouter = Router()
 

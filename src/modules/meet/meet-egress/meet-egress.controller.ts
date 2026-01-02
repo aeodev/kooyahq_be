@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
-import { createHttpError } from '../../utils/http-error'
+import { createHttpError } from '../../../utils/http-error'
 import { meetEgressService } from './meet-egress.service'
-import { meetRecordingService } from './meet-recording.service'
-import { meetAnalysisService } from './meet-analysis.service'
+import { meetRecordingService } from '../meet-recording/meet-recording.service'
+import { meetAnalysisService } from '../meet-analysis/meet-analysis.service'
 
 /**
  * Start egress recording for a room

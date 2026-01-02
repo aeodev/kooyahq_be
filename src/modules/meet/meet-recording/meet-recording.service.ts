@@ -1,6 +1,6 @@
 import { MeetRecordingModel, toMeetRecording, type MeetRecording } from './meet-recording.model'
-import { MeetAnalysisModel, toMeetAnalysis, type MeetAnalysis } from './meet-analysis.model'
-import { HttpError } from '../../utils/http-error'
+import { MeetAnalysisModel, toMeetAnalysis, type MeetAnalysis } from '../meet-analysis/meet-analysis.model'
+import { HttpError } from '../../../utils/http-error'
 
 export const meetRecordingService = {
   async create(input: {

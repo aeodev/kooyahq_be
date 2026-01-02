@@ -1,6 +1,6 @@
 import { EgressClient, EncodedFileOutput, S3Upload, EncodedFileType } from 'livekit-server-sdk'
-import { env } from '../../config/env'
-import { createHttpError } from '../../utils/http-error'
+import { env } from '../../../config/env'
+import { createHttpError } from '../../../utils/http-error'
 
 // Store active egress sessions in memory (room -> egressId mapping)
 const activeEgresses = new Map<string, string>()
