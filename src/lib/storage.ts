@@ -4,7 +4,15 @@ import { extname } from 'node:path'
 import { Readable } from 'node:stream'
 import { env } from '../config/env'
 
-const s3Client = new S3Client({ region: env.s3.region })
+const s3Client = new S3Client({
+  region: env.s3.region,
+  credentials: env.s3.accessKeyId && env.s3.secretAccessKey
+    ? {
+        accessKeyId: env.s3.accessKeyId,
+        secretAccessKey: env.s3.secretAccessKey,
+      }
+    : undefined,
+})
 
 function normalizeSegment(value: string): string {
   return value
