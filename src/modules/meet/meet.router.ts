@@ -4,6 +4,7 @@ import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
 import recordingRouter from './meet-recording.router'
+import egressRouter from './meet-egress.router'
 
 export const meetRouter = Router()
 
@@ -63,5 +64,8 @@ meetRouter.post(
 
 // Recording routes
 meetRouter.use('/', recordingRouter)
+
+// Egress routes (server-side recording to S3)
+meetRouter.use('/', egressRouter)
 
 
