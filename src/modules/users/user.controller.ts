@@ -3,7 +3,6 @@ import { userService } from './user.service'
 import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
-import { hashPassword } from '../../utils/password'
 import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS } from '../auth/rbac/permissions'
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
@@ -133,24 +132,24 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 }
 
 export async function createUser(req: Request, res: Response, next: NextFunction) {
-  const { name, email, password, position, birthday, status, permissions, bio } = req.body
+  const { name, email, position, birthday, status, permissions, bio } = req.body
   const validStatuses = ['online', 'busy', 'away', 'offline']
   const validPermissions = new Set(Object.values(PERMISSIONS))
 
   try {
-    if (!name || !name.trim()) {
+    const nameValue = typeof name === 'string' ? name.trim() : ''
+    if (!nameValue) {
       return next(createHttpError(400, 'Name is required'))
     }
-    if (!email || !email.trim()) {
+    const emailValue = typeof email === 'string' ? email.trim() : ''
+    if (!emailValue) {
       return next(createHttpError(400, 'Email is required'))
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(emailValue)) {
       return next(createHttpError(400, 'Invalid email format'))
     }
-    if (!password || password.length < 8) {
-      return next(createHttpError(400, 'Password must be at least 8 characters long'))
-    }
+    const normalizedEmail = emailValue.toLowerCase()
 
     const birthdayStr = typeof birthday === 'string' ? birthday.trim() : ''
     if (birthdayStr) {
@@ -169,26 +168,24 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       return next(createHttpError(400, 'Invalid status value'))
     }
 
-    const existingAuth = await authRepository.findByEmail(email.trim().toLowerCase())
+    const existingUser = await userService.findByEmail(normalizedEmail)
+    if (existingUser) {
+      return next(createHttpError(409, 'Email already in use'))
+    }
+
+    const existingAuth = await authRepository.findByEmail(normalizedEmail)
     if (existingAuth) {
       return next(createHttpError(409, 'Email already in use'))
     }
 
     const user = await userService.create({
-      email: email.trim(),
-      name: name.trim(),
+      email: normalizedEmail,
+      name: nameValue,
       position: typeof position === 'string' ? position.trim() : undefined,
       birthday: birthdayStr || undefined,
       status: status || 'online',
       permissions: sanitizedPermissions,
       bio: typeof bio === 'string' ? bio.trim() : undefined,
-    })
-
-    const passwordHash = await hashPassword(password)
-    await authRepository.create({
-      email: email.trim().toLowerCase(),
-      passwordHash,
-      userId: user.id,
     })
 
     if (req.user?.id) {
@@ -356,50 +353,46 @@ export async function deleteEmployee(req: Request, res: Response, next: NextFunc
 }
 
 export async function createClient(req: Request, res: Response, next: NextFunction) {
-  const { name, email, password } = req.body
+  const { name, email } = req.body
   const permissions = Array.isArray(req.body.permissions)
     ? (req.body.permissions.filter((p: unknown) => typeof p === 'string') as string[])
     : []
 
   try {
     // Validate required fields
-    if (!name || !name.trim()) {
+    const nameValue = typeof name === 'string' ? name.trim() : ''
+    if (!nameValue) {
       return next(createHttpError(400, 'Name is required'))
     }
 
-    if (!email || !email.trim()) {
+    const emailValue = typeof email === 'string' ? email.trim() : ''
+    if (!emailValue) {
       return next(createHttpError(400, 'Email is required'))
     }
 
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(emailValue)) {
       return next(createHttpError(400, 'Invalid email format'))
     }
 
-    if (!password || password.length < 8) {
-      return next(createHttpError(400, 'Password must be at least 8 characters long'))
+    // Check if email already exists
+    const normalizedEmail = emailValue.toLowerCase()
+    const existingUser = await userService.findByEmail(normalizedEmail)
+    if (existingUser) {
+      return next(createHttpError(409, 'Email already in use'))
     }
 
-    // Check if email already exists
-    const existingAuth = await authRepository.findByEmail(email.trim().toLowerCase())
+    const existingAuth = await authRepository.findByEmail(normalizedEmail)
     if (existingAuth) {
       return next(createHttpError(409, 'Email already in use'))
     }
 
     // Create client user
     const user = await userService.create({
-      email: email.trim(),
-      name: name.trim(),
+      email: normalizedEmail,
+      name: nameValue,
       permissions,
-    })
-
-    // Create auth credentials
-    const passwordHash = await hashPassword(password)
-    await authRepository.create({
-      email: email.trim().toLowerCase(),
-      passwordHash,
-      userId: user.id,
     })
 
     // Log admin activity
