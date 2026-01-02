@@ -13,7 +13,7 @@ By default the server listens on `http://localhost:5001`. Configure variables in
 
 ### Storage (S3)
 
-Set `S3_BUCKET` and `S3_REGION` for uploads. `S3_ENV_PREFIX` (optional) prefixes keys (e.g., `development/` or `production/`). When the frontend is on a different domain, set `PUBLIC_API_URL` so proxied media URLs are absolute.
+Set `S3_BUCKET` and `S3_REGION` for uploads. `S3_ENV_PREFIX` (optional) prefixes keys (e.g., `development/` or `production/`). When the frontend is on a different domain, set `PUBLIC_API_URL` so proxied media URLs are absolute. If you are not using an instance/task role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for authenticated uploads.
 
 ### Google Sign-In
 

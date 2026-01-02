@@ -36,7 +36,18 @@ function parseClientUrls(value: string | undefined): string[] {
   return value.split(',').map(url => url.trim()).filter(Boolean)
 }
 
+function validateAwsCredentials(accessKeyId?: string, secretAccessKey?: string) {
+  const hasAccessKey = Boolean(accessKeyId)
+  const hasSecretKey = Boolean(secretAccessKey)
+  if (hasAccessKey !== hasSecretKey) {
+    throw new Error('Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together.')
+  }
+}
+
 const storageEnvPrefix = normalizePathPrefix(process.env.S3_ENV_PREFIX || nodeEnv)
+const s3AccessKeyId = process.env.AWS_ACCESS_KEY_ID || undefined
+const s3SecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || undefined
+validateAwsCredentials(s3AccessKeyId, s3SecretAccessKey)
 
 export const env = {
   nodeEnv,
@@ -57,6 +68,8 @@ export const env = {
     bucket: requireEnv('S3_BUCKET'),
     region: requireEnv('S3_REGION'),
     envPrefix: storageEnvPrefix,
+    accessKeyId: s3AccessKeyId,
+    secretAccessKey: s3SecretAccessKey,
   },
   livekit: {
     url: requireEnv('LIVEKIT_URL'),
