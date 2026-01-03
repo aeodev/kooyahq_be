@@ -10,7 +10,7 @@ export async function getGameTypes(_req: Request, res: Response) {
 
 export async function createMatch(req: Request, res: Response) {
   const userId = req.user!.id
-  const { gameType, players, metadata } = req.body
+  const { gameType, players, metadata, status, startedAt } = req.body
 
   if (!gameType) {
     return res.status(400).json({ status: 'error', message: 'Game type is required' })
@@ -25,7 +25,14 @@ export async function createMatch(req: Request, res: Response) {
   }
 
   try {
-    const match = await gameService.createMatch(userId, { gameType, players, metadata })
+    const startedAtDate = typeof startedAt === 'string' ? new Date(startedAt) : undefined
+    const match = await gameService.createMatch(userId, {
+      gameType,
+      players,
+      metadata,
+      status,
+      startedAt: startedAtDate,
+    })
     res.json({ status: 'success', data: match })
   } catch (error) {
     if (error instanceof HttpError) {
@@ -118,4 +125,3 @@ export async function cleanupOldMatches(_req: Request, res: Response) {
     res.status(500).json({ status: 'error', message: 'Failed to cleanup matches' })
   }
 }
-

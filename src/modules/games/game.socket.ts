@@ -394,6 +394,10 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
           odactuserId: userId,
           playerName: player.name,
         })
+        const alivePlayers = Array.from(lobby.players.values()).filter(p => p.alive)
+        if (alivePlayers.length <= 1) {
+          endTetrisGame(lobby, tetrisLobbyRoom(lobby.id))
+        }
       } else {
         // Remove from lobby if waiting
         lobby.players.delete(userId)

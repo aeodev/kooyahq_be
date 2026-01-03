@@ -17,6 +17,8 @@ export type GameLeaderboardEntry = {
   draws: number
   totalGames: number
   winRate: number
+  bestScore?: number
+  avgScore?: number
 }
 
 export class GameService {

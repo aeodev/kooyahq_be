@@ -26,8 +26,7 @@ const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [
 const canViewBoard = (board: Board, user: any): boolean => {
   if (hasFullBoardAccess(user)) return true
   const role = getBoardRole(board, user?.id)
-  if (role !== 'none') return true
-  return hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW)
+  return role !== 'none'
 }
 
 const canUpdateBoard = (board: Board, user: any): boolean => {
