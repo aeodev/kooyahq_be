@@ -40,6 +40,7 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
     // Broadcast participant left to all other participants in the room
     socket.to(room).emit('meet:participant-left', {
       userId,
+      userName: socket.user?.name,
       timestamp: new Date().toISOString(),
     })
 

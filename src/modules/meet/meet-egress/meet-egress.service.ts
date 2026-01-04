@@ -109,8 +109,16 @@ export const meetEgressService = {
     const fileResults = egressInfo.fileResults
     if (fileResults && fileResults.length > 0) {
       const file = fileResults[0]
-      // Construct S3 URL
-      recordingUrl = `https://${env.s3.bucket}.s3.${env.s3.region}.amazonaws.com/${file.filename}`
+      // Ensure filename includes env prefix if it's missing
+      // LiveKit should return the exact path we provided, but defensive check
+      let filename = file.filename || ''
+      const prefix = env.s3.envPrefix
+      if (prefix && filename && !filename.startsWith(`${prefix}/`)) {
+        filename = `${prefix}/${filename}`
+      }
+      // Construct S3 URL (S3 handles URL encoding automatically, but encode to be safe)
+      const encodedFilename = encodeURI(filename)
+      recordingUrl = `https://${env.s3.bucket}.s3.${env.s3.region}.amazonaws.com/${encodedFilename}`
     }
 
     return {
@@ -161,7 +169,16 @@ export const meetEgressService = {
     const fileResults = egressInfo.fileResults
     if (fileResults && fileResults.length > 0) {
       const file = fileResults[0]
-      recordingUrl = `https://${env.s3.bucket}.s3.${env.s3.region}.amazonaws.com/${file.filename}`
+      // Ensure filename includes env prefix if it's missing
+      // LiveKit should return the exact path we provided, but defensive check
+      let filename = file.filename || ''
+      const prefix = env.s3.envPrefix
+      if (prefix && filename && !filename.startsWith(`${prefix}/`)) {
+        filename = `${prefix}/${filename}`
+      }
+      // Construct S3 URL (S3 handles URL encoding automatically, but encode to be safe)
+      const encodedFilename = encodeURI(filename)
+      recordingUrl = `https://${env.s3.bucket}.s3.${env.s3.region}.amazonaws.com/${encodedFilename}`
       duration = file.duration ? Number(file.duration) : undefined
     }
 
