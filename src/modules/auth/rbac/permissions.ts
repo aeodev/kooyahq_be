@@ -19,6 +19,7 @@ export const PERMISSIONS = {
 
   BOARD_FULL_ACCESS: 'board:fullAccess',
   BOARD_VIEW: 'board:view',
+  BOARD_VIEW_ALL: 'board:viewAll',
   BOARD_CREATE: 'board:create',
   BOARD_UPDATE: 'board:update',
   BOARD_DELETE: 'board:delete',

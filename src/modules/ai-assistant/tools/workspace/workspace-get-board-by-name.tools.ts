@@ -5,7 +5,7 @@ import { boardService } from '../../../workspace/boards/board.service'
 export const getBoardByNameTool: AITool = {
   name: 'get_board_by_name',
   description: 'Find a board by its name. Use this when the user specifies a board by name instead of ID. Returns the board ID if found.',
-  requiredPermission: PERMISSIONS.BOARD_VIEW,
+  requiredPermission: [PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_VIEW_ALL],
   parameters: {
     type: 'object',
     properties: {
@@ -60,4 +60,3 @@ export const getBoardByNameTool: AITool = {
     }
   },
 }
-

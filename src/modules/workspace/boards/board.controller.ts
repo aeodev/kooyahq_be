@@ -10,8 +10,10 @@ import { DEFAULT_WORKSPACE_ID } from './board.model'
 import { boardCache } from '../cache/board.cache'
 import { ticketCache } from '../cache/ticket.cache'
 import { notificationService } from '../../notifications/notification.service'
+import { userService } from '../../users/user.service'
 
 type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
+type BoardUserSummary = { id: string; name: string; email?: string; profilePic?: string }
 
 const getBoardRole = (board: Board, userId?: string): BoardRole => {
   if (!userId) return 'none'
@@ -22,18 +24,22 @@ const getBoardRole = (board: Board, userId?: string): BoardRole => {
 }
 
 const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_FULL_ACCESS)
+const hasBoardViewAllAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW_ALL)
+const hasBoardViewAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW)
+const hasBoardUpdateAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_UPDATE)
 
 const canViewBoard = (board: Board, user: any): boolean => {
-  if (hasFullBoardAccess(user)) return true
+  if (hasFullBoardAccess(user) || hasBoardViewAllAccess(user)) return true
+  if (!hasBoardViewAccess(user)) return false
   const role = getBoardRole(board, user?.id)
   return role !== 'none'
 }
 
 const canUpdateBoard = (board: Board, user: any): boolean => {
-  const role = getBoardRole(board, user?.id)
   if (hasFullBoardAccess(user)) return true
-  if (role === 'owner' || role === 'admin') return true
-  return role !== 'none' && hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_UPDATE)
+  if (!hasBoardUpdateAccess(user)) return false
+  const role = getBoardRole(board, user?.id)
+  return role === 'owner' || role === 'admin'
 }
 
 const canDeleteBoard = (board: Board, user: any): boolean => {
@@ -48,6 +54,55 @@ const isBoardMember = (board: Board, userId: string) => getBoardRole(board, user
 const isBoardAdmin = (board: Board, userId: string) => {
   const role = getBoardRole(board, userId)
   return role === 'owner' || role === 'admin'
+}
+
+const buildUserSummary = (user?: { id: string; name: string; email?: string; profilePic?: string } | null): BoardUserSummary | undefined => {
+  if (!user) return undefined
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    profilePic: user.profilePic,
+  }
+}
+
+const attachCreatorsToBoards = async (boards: Board[]) => {
+  if (!boards.length) return boards
+  const creatorIds = Array.from(
+    new Set(
+      boards
+        .map((board) => board.createdBy)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+  const creators = await userService.findPublicByIds(creatorIds)
+  const creatorMap = new Map(creators.map((creator) => [creator.id, creator]))
+
+  return boards.map((board) => ({
+    ...board,
+    createdByUser: buildUserSummary(creatorMap.get(board.createdBy)),
+  }))
+}
+
+const attachMembersToBoard = async (board: Board) => {
+  const memberIds = new Set(board.members.map((member) => member.userId))
+  if (board.createdBy) memberIds.add(board.createdBy)
+  const users = await userService.findPublicByIds([...memberIds])
+  const userMap = new Map(users.map((user) => [user.id, user]))
+  const creatorUser = buildUserSummary(userMap.get(board.createdBy))
+  const memberUsers = board.members
+    .map((member) => buildUserSummary(userMap.get(member.userId)))
+    .filter((user): user is BoardUserSummary => Boolean(user))
+
+  if (creatorUser && !memberUsers.some((user) => user.id === creatorUser.id)) {
+    memberUsers.unshift(creatorUser)
+  }
+
+  return {
+    ...board,
+    createdByUser: creatorUser,
+    memberUsers,
+  }
 }
 
 export async function createBoard(req: Request, res: Response, next: NextFunction) {
@@ -89,10 +144,11 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
     })
 
     await boardCache.setBoard(board)
+    const boardWithMembers = await attachMembersToBoard(board)
 
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(workspaceId), 'board:created', {
-      board,
+      board: boardWithMembers,
       userId,
       timestamp: new Date().toISOString(),
     })
@@ -113,7 +169,7 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
 
     res.status(201).json({
       success: true,
-      data: board,
+      data: boardWithMembers,
       timestamp: new Date().toISOString(),
     })
   } catch (error: any) {
@@ -143,8 +199,15 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
   }
 
   try {
-    const hasFullAccess = hasFullBoardAccess(req.user)
-    const boards = hasFullAccess ? await boardService.findAll() : await boardService.findByUserId(userId)
+    const authUser = req.user ?? { permissions: [] }
+    const canViewAll = hasFullBoardAccess(authUser) || hasBoardViewAllAccess(authUser)
+    const canViewLimited = hasBoardViewAccess(authUser)
+
+    if (!canViewAll && !canViewLimited) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const boards = canViewAll ? await boardService.findAll() : await boardService.findByUserId(userId)
 
     // Get favorite board IDs for the user
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
@@ -158,13 +221,14 @@ export async function getBoards(req: Request, res: Response, next: NextFunction)
         isFavorite: favoriteSet.has(board.id),
       }))
 
-    const accessibleBoards = hasFullAccess
+    const accessibleBoards = canViewAll
       ? boardsWithFavorites
       : boardsWithFavorites.filter((board) => isBoardMember(board, userId))
+    const boardsWithCreators = await attachCreatorsToBoards(accessibleBoards)
 
     res.json({
       success: true,
-      data: accessibleBoards,
+      data: boardsWithCreators,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -185,8 +249,15 @@ export async function getBoardsForUser(req: Request, res: Response, next: NextFu
   }
 
   try {
-    const hasFullAccess = hasFullBoardAccess(req.user)
-    const boards = hasFullAccess ? await boardService.findAll() : await boardService.findByUserId(userId)
+    const authUser = req.user ?? { permissions: [] }
+    const canViewAll = hasFullBoardAccess(authUser) || hasBoardViewAllAccess(authUser)
+    const canViewLimited = hasBoardViewAccess(authUser)
+
+    if (!canViewAll && !canViewLimited) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const boards = canViewAll ? await boardService.findAll() : await boardService.findByUserId(userId)
     const favoriteBoardIds = await boardFavoriteService.getFavoriteBoardIds(userId)
     const favoriteSet = new Set(favoriteBoardIds)
 
@@ -197,9 +268,11 @@ export async function getBoardsForUser(req: Request, res: Response, next: NextFu
         isFavorite: favoriteSet.has(board.id),
       }))
 
+    const boardsWithCreators = await attachCreatorsToBoards(boardsWithFavorites)
+
     res.json({
       success: true,
-      data: boardsWithFavorites,
+      data: boardsWithCreators,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -233,9 +306,11 @@ export async function getBoardById(req: Request, res: Response, next: NextFuncti
       return next(createHttpError(403, 'Forbidden'))
     }
 
+    const boardWithMembers = await attachMembersToBoard(board)
+
     res.json({
       success: true,
-      data: board,
+      data: boardWithMembers,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -276,9 +351,11 @@ export async function getBoardByKey(req: Request, res: Response, next: NextFunct
       return next(createHttpError(403, 'Forbidden'))
     }
 
+    const boardWithMembers = await attachMembersToBoard(board)
+
     res.json({
       success: true,
-      data: board,
+      data: boardWithMembers,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -402,16 +479,18 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       )
     }
 
+    const updatedWithMembers = await attachMembersToBoard(updated)
+
     // Emit socket event for real-time updates
     SocketEmitter.emitToRoom(workspaceRoom(board.workspaceId || DEFAULT_WORKSPACE_ID), 'board:updated', {
-      board: updated,
+      board: updatedWithMembers,
       userId,
       timestamp: new Date().toISOString(),
     })
 
     res.json({
       success: true,
-      data: updated,
+      data: updatedWithMembers,
       timestamp: new Date().toISOString(),
     })
   } catch (error: any) {

@@ -7,7 +7,7 @@ import { userService } from '../../../users/user.service'
 export const getTicketDetailsTool: AITool = {
   name: 'get_ticket_details',
   description: 'Get detailed information about a ticket by its key (e.g., TB-123) or ID.',
-  requiredPermission: PERMISSIONS.BOARD_VIEW,
+  requiredPermission: [PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_VIEW_ALL],
   parameters: {
     type: 'object',
     properties: {
@@ -71,4 +71,3 @@ export const getTicketDetailsTool: AITool = {
     }
   },
 }
-

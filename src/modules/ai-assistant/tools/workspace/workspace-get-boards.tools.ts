@@ -5,7 +5,7 @@ import { boardService } from '../../../workspace/boards/board.service'
 export const getMyBoardsTool: AITool = {
   name: 'get_my_boards',
   description: 'Get a list of boards the user has access to.',
-  requiredPermission: PERMISSIONS.BOARD_VIEW,
+  requiredPermission: [PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_VIEW_ALL],
   parameters: {
     type: 'object',
     properties: {},
@@ -25,4 +25,3 @@ export const getMyBoardsTool: AITool = {
     }
   },
 }
-

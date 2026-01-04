@@ -21,7 +21,7 @@ export class GameRepository {
   async create(input: CreateGameMatchInput): Promise<GameMatch> {
     const doc = new GameMatchModel({
       ...input,
-      status: input.status || 'waiting',
+      status: input.status || 'in-progress',
       startedAt: input.startedAt,
     })
     await doc.save()
@@ -36,8 +36,9 @@ export class GameRepository {
   async findByUserId(userId: string, limit = 50): Promise<GameMatch[]> {
     const docs = await GameMatchModel.find({
       players: userId,
+      status: 'completed',
     })
-      .sort({ createdAt: -1 })
+      .sort({ endedAt: -1, createdAt: -1 })
       .limit(limit)
     return docs.map(toGameMatch)
   }
@@ -52,7 +53,7 @@ export class GameRepository {
   async findActiveByUserId(userId: string): Promise<GameMatch[]> {
     const docs = await GameMatchModel.find({
       players: userId,
-      status: { $in: ['waiting', 'in-progress'] },
+      status: 'in-progress',
     }).sort({ createdAt: -1 })
     return docs.map(toGameMatch)
   }
@@ -69,6 +70,7 @@ export class GameRepository {
     })
 
     const stats = new Map<string, { wins: number; losses: number; draws: number; totalGames: number; bestScore?: number; avgScore?: number; scores: number[] }>()
+    const trackScores = gameType === 'reaction-test' || gameType === 'tetris-battle'
 
     for (const match of matches) {
       const players = match.players || []
@@ -83,8 +85,8 @@ export class GameRepository {
         const playerStats = stats.get(playerId)!
         playerStats.totalGames++
 
-        // For reaction-test, track scores
-        if (gameType === 'reaction-test' && scores[playerId] !== undefined) {
+        // Track numeric scores for score-based leaderboards
+        if (trackScores && scores[playerId] !== undefined) {
           playerStats.scores.push(Number(scores[playerId]))
         }
 
@@ -106,9 +108,13 @@ export class GameRepository {
           ...rest,
         }
 
-        // For reaction-test, calculate best and average scores
-        if (gameType === 'reaction-test' && scores.length > 0) {
-          result.bestScore = Math.min(...scores)
+        // For score-based games, calculate best and average scores
+        if (trackScores && scores.length > 0) {
+          if (gameType === 'tetris-battle') {
+            result.bestScore = Math.max(...scores)
+          } else {
+            result.bestScore = Math.min(...scores)
+          }
           result.avgScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
         }
 
@@ -120,6 +126,12 @@ export class GameRepository {
           const aScore = a.bestScore ?? Infinity
           const bScore = b.bestScore ?? Infinity
           return aScore - bScore
+        }
+        // For tetris-battle, sort by best score (higher is better)
+        if (gameType === 'tetris-battle') {
+          const aScore = a.bestScore ?? -Infinity
+          const bScore = b.bestScore ?? -Infinity
+          return bScore - aScore
         }
         // For other games, sort by wins
         return b.wins - a.wins || a.losses - b.losses
@@ -134,11 +146,11 @@ export class GameRepository {
   async abandonOldMatches(cutoffDate: Date): Promise<number> {
     const result = await GameMatchModel.updateMany(
       {
-        status: { $in: ['waiting', 'in-progress'] },
+        status: 'in-progress',
         updatedAt: { $lt: cutoffDate },
       },
       {
-        $set: { status: 'abandoned' },
+        $set: { status: 'completed', endedAt: new Date() },
       }
     )
     return result.modifiedCount

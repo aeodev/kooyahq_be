@@ -23,6 +23,10 @@ export const userService = {
     return userRepository.findAll()
   },
 
+  async findPublicByIds(ids: string[]) {
+    return userRepository.findPublicByIds(ids)
+  },
+
   async searchUsers(params: {
     page?: number
     limit?: number

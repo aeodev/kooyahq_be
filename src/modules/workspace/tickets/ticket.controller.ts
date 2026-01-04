@@ -24,9 +24,12 @@ const getBoardRole = (board: { createdBy: string; members: Array<{ userId: strin
 }
 
 const hasFullBoardAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_FULL_ACCESS)
+const hasBoardViewAllAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW_ALL)
+const hasBoardViewAccess = (user: any) => hasPermission(user ?? { permissions: [] }, PERMISSIONS.BOARD_VIEW)
 
 const canViewBoard = (board: { createdBy: string; members: Array<{ userId: string; role: BoardRole }> }, user: any) => {
-  if (hasFullBoardAccess(user)) return true
+  if (hasFullBoardAccess(user) || hasBoardViewAllAccess(user)) return true
+  if (!hasBoardViewAccess(user)) return false
   const role = getBoardRole(board, user?.id)
   return role !== 'none'
 }

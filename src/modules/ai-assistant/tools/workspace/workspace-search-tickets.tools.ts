@@ -8,7 +8,7 @@ import type { Ticket } from '../../../workspace/tickets/ticket.model'
 export const searchTicketsTool: AITool = {
   name: 'search_tickets',
   description: 'Search for tickets by board, assignee, or keyword. Returns matching tickets.',
-  requiredPermission: PERMISSIONS.BOARD_VIEW,
+  requiredPermission: [PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_VIEW_ALL],
   parameters: {
     type: 'object',
     properties: {
@@ -95,4 +95,3 @@ export const searchTicketsTool: AITool = {
     }
   },
 }
-

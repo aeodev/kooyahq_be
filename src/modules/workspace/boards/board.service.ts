@@ -102,11 +102,12 @@ export function normalizeBoardMembers(
     const userId = typeof member === 'string' ? member : member?.userId
     if (!userId) return
 
-    const providedRole = typeof member === 'string' ? undefined : (member as BoardMember)?.role
-    const role: BoardMember['role'] =
-      providedRole === 'admin' || providedRole === 'viewer' ? providedRole : 'member'
-
     const previous = previousMembers.get(userId)
+    const providedRole = typeof member === 'string' ? undefined : (member as BoardMember)?.role
+    const resolvedRole: BoardMember['role'] =
+      providedRole === 'admin' || providedRole === 'viewer' || providedRole === 'member'
+        ? providedRole
+        : previous?.role ?? 'member'
     const joinedAt =
       typeof (member as BoardMember)?.joinedAt === 'string' || (member as BoardMember)?.joinedAt instanceof Date
         ? new Date((member as BoardMember).joinedAt as any)
@@ -114,7 +115,7 @@ export function normalizeBoardMembers(
 
     normalizedMembers.set(userId, {
       userId,
-      role: previous?.role ?? role,
+      role: resolvedRole,
       joinedAt,
     })
   })

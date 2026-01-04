@@ -31,8 +31,13 @@ export async function getTicketActivities(req: Request, res: Response, next: Nex
     // Check if user is a member of the board
     const authUser = req.user ?? { permissions: [] }
     const hasFullAccess = hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)
+    const hasViewAll = hasPermission(authUser, PERMISSIONS.BOARD_VIEW_ALL)
+    const hasViewLimited = hasPermission(authUser, PERMISSIONS.BOARD_VIEW)
     const isMember = board.members.some((m) => m.userId === userId)
-    if (!isMember && !hasFullAccess) {
+    if ((hasFullAccess || hasViewAll) === false && hasViewLimited === false) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+    if (!isMember && !hasFullAccess && !hasViewAll) {
       return next(createHttpError(403, 'Forbidden'))
     }
 
@@ -69,8 +74,13 @@ export async function getBoardActivities(req: Request, res: Response, next: Next
     // Check if user is a member of the board
     const authUser = req.user ?? { permissions: [] }
     const hasFullAccess = hasPermission(authUser, PERMISSIONS.BOARD_FULL_ACCESS)
+    const hasViewAll = hasPermission(authUser, PERMISSIONS.BOARD_VIEW_ALL)
+    const hasViewLimited = hasPermission(authUser, PERMISSIONS.BOARD_VIEW)
     const isMember = board.members.some((m) => m.userId === userId)
-    if (!isMember && !hasFullAccess) {
+    if ((hasFullAccess || hasViewAll) === false && hasViewLimited === false) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+    if (!isMember && !hasFullAccess && !hasViewAll) {
       return next(createHttpError(403, 'Forbidden'))
     }
 

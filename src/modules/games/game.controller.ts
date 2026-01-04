@@ -119,7 +119,7 @@ export async function cleanupOldMatches(_req: Request, res: Response) {
   try {
     const olderThan = parseInt((_req.query.olderThan as string) || '30')
     const count = await gameService.abandonOldMatches(olderThan)
-    res.json({ status: 'success', data: { abandonedMatches: count } })
+    res.json({ status: 'success', data: { completedMatches: count } })
   } catch (error) {
     console.error('Error cleaning up old matches:', error)
     res.status(500).json({ status: 'error', message: 'Failed to cleanup matches' })

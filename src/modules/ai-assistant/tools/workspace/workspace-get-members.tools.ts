@@ -6,7 +6,7 @@ import { userService } from '../../../users/user.service'
 export const getBoardMembersTool: AITool = {
   name: 'get_board_members',
   description: 'Get all members of a board who can be assigned to tickets.',
-  requiredPermission: PERMISSIONS.BOARD_VIEW,
+  requiredPermission: [PERMISSIONS.BOARD_VIEW, PERMISSIONS.BOARD_VIEW_ALL],
   parameters: {
     type: 'object',
     properties: {
@@ -49,4 +49,3 @@ export const getBoardMembersTool: AITool = {
     }
   },
 }
-

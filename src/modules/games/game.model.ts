@@ -2,7 +2,7 @@ import { Schema, model, models, type Document } from 'mongoose'
 
 export type GameType = 'tic-tac-toe' | 'rock-paper-scissors' | 'number-guessing' | 'reaction-test' | 'tetris-battle'
 
-export type GameStatus = 'waiting' | 'in-progress' | 'completed' | 'abandoned'
+export type GameStatus = 'in-progress' | 'completed'
 
 export interface GameMatchDocument extends Document {
   gameType: GameType
@@ -32,8 +32,8 @@ const gameMatchSchema = new Schema<GameMatchDocument>(
     },
     status: {
       type: String,
-      enum: ['waiting', 'in-progress', 'completed', 'abandoned'],
-      default: 'waiting',
+      enum: ['in-progress', 'completed'],
+      default: 'in-progress',
       index: true,
     },
     winner: {
@@ -90,6 +90,5 @@ export function toGameMatch(doc: GameMatchDocument): GameMatch {
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-
 
 

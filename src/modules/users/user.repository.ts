@@ -48,6 +48,15 @@ export const userRepository = {
     return docs.map((doc) => toPublicUser(toUser(doc)))
   },
 
+  async findPublicByIds(ids: string[]): Promise<PublicUser[]> {
+    if (!Array.isArray(ids) || ids.length === 0) return []
+    const docs = await UserModel.find({
+      _id: { $in: ids },
+      deletedAt: undefined,
+    }).exec()
+    return docs.map((doc) => toPublicUser(toUser(doc)))
+  },
+
   async searchUsers(params: {
     page?: number
     limit?: number

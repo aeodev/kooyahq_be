@@ -201,18 +201,38 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
     const lobby = getOrCreateGlobalLobby()
     const roomName = tetrisLobbyRoom(lobby.id)
     
-    if (lobby.players.has(userId)) {
-      lobby.players.delete(userId)
-      socket.leave(roomName)
-      
-      // Broadcast player left
-      SocketEmitter.emitToRoom(roomName, 'tetris:player-left', {
+    const player = lobby.players.get(userId)
+    if (!player) return
+
+    lobby.players.delete(userId)
+    socket.leave(roomName)
+
+    if (lobby.status === 'in-progress') {
+      SocketEmitter.emitToRoom(roomName, 'tetris:player-disconnected', {
         odactuserId: userId,
-        playerCount: lobby.players.size,
+        playerName: player.name,
       })
-      
-      console.log(`User ${userId} left Tetris lobby. Remaining players: ${lobby.players.size}`)
+      SocketEmitter.emitToRoom(roomName, 'tetris:player-update', {
+        odactuserId: userId,
+        score: player.score,
+        stackHeight: player.stackHeight,
+        koCount: player.koCount,
+        alive: false,
+      })
+      const alivePlayers = Array.from(lobby.players.values()).filter(p => p.alive)
+      if (alivePlayers.length <= 1) {
+        endTetrisGame(lobby, roomName)
+      }
+      return
     }
+
+    // Broadcast player left
+    SocketEmitter.emitToRoom(roomName, 'tetris:player-left', {
+      odactuserId: userId,
+      playerCount: lobby.players.size,
+    })
+    
+    console.log(`User ${userId} left Tetris lobby. Remaining players: ${lobby.players.size}`)
   })
 
   // Player ready toggle
@@ -249,9 +269,29 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
       
       // Schedule game start
       setTimeout(() => {
-        if (lobby.status === 'countdown') {
-          startTetrisGame(lobby, roomName)
+        if (lobby.status !== 'countdown') return
+
+        const currentReadyCount = Array.from(lobby.players.values()).filter(p => p.ready).length
+        const currentReadyRatio = lobby.players.size > 0 ? currentReadyCount / lobby.players.size : 0
+
+        if (lobby.players.size < 2 || currentReadyRatio < READY_THRESHOLD) {
+          lobby.status = 'waiting'
+          lobby.countdownStart = undefined
+          SocketEmitter.emitToRoom(roomName, 'tetris:lobby-state', {
+            lobbyId: lobby.id,
+            status: lobby.status,
+            players: Array.from(lobby.players.entries()).map(([id, p]) => ({
+              odactuserId: id,
+              name: p.name,
+              ready: p.ready,
+            })),
+            seed: lobby.seed,
+            tickRate: lobby.tickRate,
+          })
+          return
         }
+
+        startTetrisGame(lobby, roomName)
       }, COUNTDOWN_DURATION)
     }
   })
@@ -288,9 +328,18 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
     
     player.score = data.score
     player.stackHeight = data.stackHeight
-    player.koCount = data.koCount
+    player.koCount = Math.max(player.koCount, data.koCount)
     player.alive = data.alive
     player.lastUpdate = Date.now()
+
+    const roomName = tetrisLobbyRoom(lobby.id)
+    SocketEmitter.emitToRoom(roomName, 'tetris:player-update', {
+      odactuserId: userId,
+      score: player.score,
+      stackHeight: player.stackHeight,
+      koCount: player.koCount,
+      alive: player.alive,
+    })
   })
 
   // Send attack (garbage lines) to opponents
@@ -322,10 +371,9 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
     }
     
     if (targetId && lobby.players.has(targetId)) {
-      // Send attack to target
-      SocketEmitter.emitToRoom(roomName, 'tetris:receive-attack', {
+      // Send attack to target only
+      SocketEmitter.emitToUser(targetId, 'tetris:receive-attack', {
         fromUserId: userId,
-        toUserId: targetId,
         lines: data.lines,
         timestamp: Date.now(),
       })
@@ -333,7 +381,7 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
   })
 
   // Player topped out (died)
-  socket.on('tetris:top-out', () => {
+  socket.on('tetris:top-out', (data?: { killedBy?: string | null }) => {
     if (!socketHasPermission(socket, PERMISSIONS.GAME_PLAY, PERMISSIONS.GAME_FULL_ACCESS)) return
     
     const lobby = getOrCreateGlobalLobby()
@@ -351,6 +399,18 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
       playerName: player.name,
       finalScore: player.score,
     })
+
+    if (data?.killedBy && data.killedBy !== userId && lobby.players.has(data.killedBy)) {
+      const killer = lobby.players.get(data.killedBy)!
+      killer.koCount += 1
+      SocketEmitter.emitToRoom(roomName, 'tetris:player-update', {
+        odactuserId: data.killedBy,
+        score: killer.score,
+        stackHeight: killer.stackHeight,
+        koCount: killer.koCount,
+        alive: killer.alive,
+      })
+    }
     
     // Check if game should end (only one player left)
     const alivePlayers = Array.from(lobby.players.values()).filter(p => p.alive)
@@ -384,29 +444,35 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
   // Handle disconnect - remove from lobby
   socket.on('disconnect', () => {
     const lobby = getOrCreateGlobalLobby()
-    if (lobby.players.has(userId)) {
-      const player = lobby.players.get(userId)!
-      
-      if (lobby.status === 'in-progress') {
-        // Mark as dead if game in progress
-        player.alive = false
-        SocketEmitter.emitToRoom(tetrisLobbyRoom(lobby.id), 'tetris:player-disconnected', {
-          odactuserId: userId,
-          playerName: player.name,
-        })
-        const alivePlayers = Array.from(lobby.players.values()).filter(p => p.alive)
-        if (alivePlayers.length <= 1) {
-          endTetrisGame(lobby, tetrisLobbyRoom(lobby.id))
-        }
-      } else {
-        // Remove from lobby if waiting
-        lobby.players.delete(userId)
-        SocketEmitter.emitToRoom(tetrisLobbyRoom(lobby.id), 'tetris:player-left', {
-          odactuserId: userId,
-          playerCount: lobby.players.size,
-        })
+    const player = lobby.players.get(userId)
+    if (!player) return
+
+    const roomName = tetrisLobbyRoom(lobby.id)
+    lobby.players.delete(userId)
+    
+    if (lobby.status === 'in-progress') {
+      SocketEmitter.emitToRoom(roomName, 'tetris:player-disconnected', {
+        odactuserId: userId,
+        playerName: player.name,
+      })
+      SocketEmitter.emitToRoom(roomName, 'tetris:player-update', {
+        odactuserId: userId,
+        score: player.score,
+        stackHeight: player.stackHeight,
+        koCount: player.koCount,
+        alive: false,
+      })
+      const alivePlayers = Array.from(lobby.players.values()).filter(p => p.alive)
+      if (alivePlayers.length <= 1) {
+        endTetrisGame(lobby, roomName)
       }
+      return
     }
+
+    SocketEmitter.emitToRoom(roomName, 'tetris:player-left', {
+      odactuserId: userId,
+      playerCount: lobby.players.size,
+    })
   })
 }
 
