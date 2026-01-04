@@ -3,14 +3,23 @@ import { createHttpError } from '../../../utils/http-error'
 import { PERMISSIONS, hasPermission } from '../../auth/rbac/permissions'
 import { serverManagementService } from './server-management.service'
 import { hasSshKeyEncryptionSecret, isEncryptedPrivateKey, normalizeSshKey } from './server-management.ssh'
+import type { ActionRisk } from './server-management.model'
 import type {
   CreateServerManagementProjectInput,
   CreateServerManagementServerInput,
+  CreateServerManagementServiceActionInput,
   ServerManagementActionInput,
+  ServerManagementServiceInput,
   UpdateServerManagementActionInput,
   UpdateServerManagementProjectInput,
   UpdateServerManagementServerInput,
 } from './server-management.repository'
+
+const ACTION_RISKS: ActionRisk[] = ['normal', 'warning', 'dangerous']
+
+function isActionRisk(value: unknown): value is ActionRisk {
+  return typeof value === 'string' && ACTION_RISKS.includes(value as ActionRisk)
+}
 
 function validateProjectPayload(payload: Partial<CreateServerManagementProjectInput>) {
   if (!payload.name?.trim()) {
@@ -46,6 +55,9 @@ function validateActionPayload(action: Partial<ServerManagementActionInput>) {
   if (!action.command?.trim()) {
     throw createHttpError(400, 'Action command is required')
   }
+  if (action.risk !== undefined && !isActionRisk(action.risk)) {
+    throw createHttpError(400, 'Action risk must be normal, warning, or dangerous')
+  }
 }
 
 function validateSshKeyInput(sshKey?: string) {
@@ -65,6 +77,21 @@ function validateActions(actions?: ServerManagementActionInput[]) {
     throw createHttpError(400, 'Actions must be an array')
   }
   actions.forEach((action) => validateActionPayload(action))
+}
+
+function validateServicePayload(service: Partial<ServerManagementServiceInput>) {
+  if (!service.name?.trim()) {
+    throw createHttpError(400, 'Service name is required')
+  }
+  validateActions(service.actions)
+}
+
+function validateServices(services?: ServerManagementServiceInput[]) {
+  if (!services) return
+  if (!Array.isArray(services)) {
+    throw createHttpError(400, 'Services must be an array')
+  }
+  services.forEach((service) => validateServicePayload(service))
 }
 
 export async function getServerManagementProjects(req: Request, res: Response, next: NextFunction) {
@@ -178,7 +205,7 @@ export async function createServerManagementServer(req: Request, res: Response, 
         ? req.body.sshKey
         : undefined
     validateSshKeyInput(sshKey)
-    validateActions(req.body.actions)
+    validateServices(req.body.services)
 
     const server = await serverManagementService.addServer(projectId, {
       name: req.body.name,
@@ -189,7 +216,7 @@ export async function createServerManagementServer(req: Request, res: Response, 
       sshKey,
       statusCommand: req.body.statusCommand,
       appDirectory: req.body.appDirectory,
-      actions: req.body.actions,
+      services: req.body.services,
     })
 
     if (!server) {
@@ -248,9 +275,9 @@ export async function updateServerManagementServer(req: Request, res: Response, 
     updates.appDirectory = req.body.appDirectory
   }
 
-  if (req.body.actions !== undefined) {
-    validateActions(req.body.actions)
-    updates.actions = req.body.actions
+  if (req.body.services !== undefined) {
+    validateServices(req.body.services)
+    updates.services = req.body.services
   }
 
   try {
@@ -285,16 +312,22 @@ export async function createServerManagementAction(req: Request, res: Response, 
 
   try {
     validateActionPayload(req.body)
+    const serviceName = req.body.serviceName?.trim()
+    if (!serviceName) {
+      return next(createHttpError(400, 'Service name is required'))
+    }
 
     const action = await serverManagementService.addAction(projectId, serverId, {
+      serviceName,
       name: req.body.name,
       description: req.body.description,
       command: req.body.command,
+      risk: req.body.risk,
       dangerous: req.body.dangerous,
-    })
+    } as CreateServerManagementServiceActionInput)
 
     if (!action) {
-      return next(createHttpError(404, 'Server not found'))
+      return next(createHttpError(404, 'Service not found'))
     }
 
     res.status(201).json({ status: 'success', data: action })
@@ -328,7 +361,12 @@ export async function updateServerManagementAction(req: Request, res: Response, 
     updates.command = req.body.command
   }
 
-  if (req.body.dangerous !== undefined) {
+  if (req.body.risk !== undefined) {
+    if (!isActionRisk(req.body.risk)) {
+      return next(createHttpError(400, 'Action risk must be normal, warning, or dangerous'))
+    }
+    updates.risk = req.body.risk
+  } else if (req.body.dangerous !== undefined) {
     updates.dangerous = Boolean(req.body.dangerous)
   }
 
@@ -388,12 +426,23 @@ export async function runServerManagementAction(req: Request, res: Response, nex
     const canManage = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_MANAGE)
     const canElevated = canManage || hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_ELEVATED_USE)
     const canUse = canElevated || hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_USE)
+    const canActionNormal = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_ACTION_NORMAL)
+    const canActionWarning = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_ACTION_WARNING)
+    const canActionDangerous = hasPermission(user, PERMISSIONS.SERVER_MANAGEMENT_ACTION_DANGEROUS)
 
-    if (!canUse) {
-      return next(createHttpError(403, 'Forbidden'))
-    }
+    const canRunDangerous = canElevated || canActionDangerous
+    const canRunWarning = canRunDangerous || canActionWarning
+    const canRunNormal = canRunWarning || canActionNormal || canUse
 
-    if (resolved.action.dangerous && !canElevated) {
+    const actionRisk = resolved.action.risk ?? 'normal'
+    const allowed =
+      actionRisk === 'dangerous'
+        ? canRunDangerous
+        : actionRisk === 'warning'
+          ? canRunWarning
+          : canRunNormal
+
+    if (!allowed) {
       return next(createHttpError(403, 'Forbidden'))
     }
 

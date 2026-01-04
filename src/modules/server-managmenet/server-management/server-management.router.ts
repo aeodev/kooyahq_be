@@ -48,6 +48,13 @@ const usePermissions = [
   PERMISSIONS.SERVER_MANAGEMENT_MANAGE,
 ]
 
+const actionPermissions = [
+  ...usePermissions,
+  PERMISSIONS.SERVER_MANAGEMENT_ACTION_NORMAL,
+  PERMISSIONS.SERVER_MANAGEMENT_ACTION_WARNING,
+  PERMISSIONS.SERVER_MANAGEMENT_ACTION_DANGEROUS,
+]
+
 serverManagementRouter.get('/projects', requirePermission(...viewPermissions), getServerManagementProjects)
 serverManagementRouter.post('/projects', requirePermission(PERMISSIONS.SERVER_MANAGEMENT_MANAGE), createServerManagementProject)
 serverManagementRouter.get('/projects/:projectId', requirePermission(...viewPermissions), getServerManagementProject)
@@ -65,7 +72,7 @@ serverManagementRouter.delete('/projects/:projectId/servers/:serverId/actions/:a
 serverManagementRouter.post(
   '/servers/:serverId/actions/:actionId/run',
   serverManagementActionLimiter,
-  requirePermission(...usePermissions),
+  requirePermission(...actionPermissions),
   runServerManagementAction
 )
 serverManagementRouter.post(
