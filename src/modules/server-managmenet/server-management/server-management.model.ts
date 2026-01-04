@@ -1,11 +1,19 @@
 import { Schema, model, models, type Document } from 'mongoose'
 
+export type ActionRisk = 'normal' | 'warning' | 'dangerous'
+
 export type ServerManagementAction = {
   id: string
   name: string
   description: string
   command: string
-  dangerous?: boolean
+  risk: ActionRisk
+}
+
+export type ServerManagementService = {
+  name: string
+  serviceName: string
+  actions: ServerManagementAction[]
 }
 
 export type ServerManagementServer = {
@@ -18,7 +26,7 @@ export type ServerManagementServer = {
   sshKey?: string
   statusCommand?: string
   appDirectory?: string
-  actions: ServerManagementAction[]
+  services: ServerManagementService[]
 }
 
 export interface ServerManagementProjectDocument extends Document {
@@ -52,9 +60,30 @@ const actionSchema = new Schema<ServerManagementAction>(
       required: true,
       trim: true,
     },
-    dangerous: {
-      type: Boolean,
-      default: false,
+    risk: {
+      type: String,
+      enum: ['normal', 'warning', 'dangerous'],
+      default: 'normal',
+    },
+  },
+  { _id: false }
+)
+
+const serviceSchema = new Schema<ServerManagementService>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    serviceName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    actions: {
+      type: [actionSchema],
+      default: [],
     },
   },
   { _id: false }
@@ -101,8 +130,8 @@ const serverSchema = new Schema<ServerManagementServer>(
       type: String,
       trim: true,
     },
-    actions: {
-      type: [actionSchema],
+    services: {
+      type: [serviceSchema],
       default: [],
     },
   },
@@ -136,9 +165,9 @@ const serverManagementProjectSchema = new Schema<ServerManagementProjectDocument
   },
 )
 
-export const ServerManagementProjectModel =
-  models.ServerManagementProject ??
-  model<ServerManagementProjectDocument>('ServerManagementProject', serverManagementProjectSchema)
+export const ServerManagementProjectV2Model =
+  models.ServerManagementProjectV2 ??
+  model<ServerManagementProjectDocument>('ServerManagementProjectV2', serverManagementProjectSchema)
 
 export type ServerManagementProject = {
   id: string
@@ -167,12 +196,16 @@ export function toServerManagementProject(
       user: server.user,
       statusCommand: server.statusCommand,
       appDirectory: server.appDirectory,
-      actions: (server.actions || []).map((action) => ({
-        id: action.id,
-        name: action.name,
-        description: action.description,
-        command: action.command,
-        dangerous: action.dangerous ?? false,
+      services: (server.services || []).map((service) => ({
+        name: service.name,
+        serviceName: service.serviceName ?? '',
+        actions: (service.actions || []).map((action) => ({
+          id: action.id,
+          name: action.name,
+          description: action.description,
+          command: action.command,
+          risk: action.risk ?? 'normal',
+        })),
       })),
     })),
     createdAt: doc.createdAt.toISOString(),

@@ -15,6 +15,9 @@ export const PERMISSIONS = {
   SERVER_MANAGEMENT_VIEW: 'serverManagement:view',
   SERVER_MANAGEMENT_USE: 'serverManagement:use',
   SERVER_MANAGEMENT_ELEVATED_USE: 'serverManagement:elevatedUse',
+  SERVER_MANAGEMENT_ACTION_NORMAL: 'serverManagement:actionNormal',
+  SERVER_MANAGEMENT_ACTION_WARNING: 'serverManagement:actionWarning',
+  SERVER_MANAGEMENT_ACTION_DANGEROUS: 'serverManagement:actionDangerous',
   SERVER_MANAGEMENT_MANAGE: 'serverManagement:manage',
 
   BOARD_FULL_ACCESS: 'board:fullAccess',
