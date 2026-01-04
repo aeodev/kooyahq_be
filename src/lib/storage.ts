@@ -22,7 +22,7 @@ function normalizeSegment(value: string): string {
     .join('/')
 }
 
-function withEnvPrefix(path: string): string {
+export function withEnvPrefix(path: string): string {
   const normalizedPath = normalizeStoragePath(path)
   const prefix = normalizeSegment(env.s3.envPrefix)
   if (!prefix) return normalizedPath
