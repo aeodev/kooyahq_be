@@ -1,6 +1,7 @@
 import { EgressClient, EncodedFileOutput, S3Upload, EncodedFileType } from 'livekit-server-sdk'
 import { env } from '../../../config/env'
 import { createHttpError } from '../../../utils/http-error'
+import { withEnvPrefix } from '../../../lib/storage'
 
 // Store active egress sessions in memory (room -> egressId mapping)
 const activeEgresses = new Map<string, string>()
@@ -42,9 +43,10 @@ export const meetEgressService = {
     const client = getEgressClient()
     const s3Config = getS3Config()
 
-    // Generate unique filename with timestamp
+    // Generate unique filename with timestamp and env prefix (same as storage.ts)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filepath = `meet-recordings/${roomName}/${timestamp}-${userId}.mp4`
+    const recordingPath = `meet-recordings/${roomName}/${timestamp}-${userId}.mp4`
+    const filepath = withEnvPrefix(recordingPath)
 
     const fileOutput = new EncodedFileOutput({
       filepath,
