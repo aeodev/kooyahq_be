@@ -25,6 +25,7 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
     socket.to(room).emit('meet:participant-joined', {
       userId,
       userName: socket.user?.name,
+      profilePic: socket.user?.profilePic,
       timestamp: new Date().toISOString(),
     })
 
