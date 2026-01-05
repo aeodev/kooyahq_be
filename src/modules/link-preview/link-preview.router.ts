@@ -12,3 +12,4 @@ linkPreviewRouter.get(
   requirePermission(PERMISSIONS.LINK_PREVIEW_FETCH, PERMISSIONS.SYSTEM_FULL_ACCESS),
   getLinkPreview
 )
+

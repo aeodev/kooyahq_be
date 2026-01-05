@@ -126,4 +126,16 @@ export function registerMeetHandlers(socket: AuthenticatedSocket): void {
       liveKitIdentity,
     })
   })
+
+  // Handle Morgan AI toggle - broadcast to room
+  socket.on('meet:morgan-toggle', (data: { meetId: string; isActive: boolean }) => {
+    if (!socketHasPermission(socket, PERMISSIONS.MEET_TOKEN, PERMISSIONS.MEET_FULL_ACCESS)) return
+    const { meetId, isActive } = data
+    
+    const room = meetRoom(meetId)
+    socket.to(room).emit('meet:morgan-toggle', {
+      isActive,
+      activatedBy: userId,
+    })
+  })
 }

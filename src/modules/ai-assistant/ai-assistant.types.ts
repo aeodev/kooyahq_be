@@ -5,6 +5,7 @@ import type { AuthUser } from '../auth/rbac/permissions'
 export const AIAssistantSocketEvents = {
   MESSAGE: 'ai:message',
   RESPONSE: 'ai:response',
+  AUDIO_RESPONSE: 'ai:audio-response',
   TOOL_START: 'ai:tool-start',
   TOOL_COMPLETE: 'ai:tool-complete',
   ERROR: 'ai:error',
@@ -86,6 +87,12 @@ export interface AIErrorPayload {
   message: string
   code?: string
   errors?: Array<{ field: string; message: string; code: string }>
+}
+
+export interface AIAudioResponsePayload {
+  conversationId: string
+  audio: string // base64 encoded audio
+  format: 'mp3'
 }
 
 // OpenAI function format (used by OpenRouter)

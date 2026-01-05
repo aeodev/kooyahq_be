@@ -84,3 +84,4 @@ newsItemSchema.index({ source: 1, publishedAt: -1 })
 export const NewsItemModel =
   models.NewsItem ?? model<NewsItemDocument>('NewsItem', newsItemSchema)
 
+

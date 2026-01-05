@@ -15,3 +15,4 @@ export interface LinkPreviewOptions {
   followRedirects?: boolean
   maxRedirects?: number
 }
+

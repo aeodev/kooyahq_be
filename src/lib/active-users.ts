@@ -86,6 +86,15 @@ class ActiveUsersManager {
       profilePic: u!.profilePic,
     }))
   }
+
+  /**
+   * Get sockets for a specific user
+   */
+  getUserSockets(userId: string): AuthenticatedSocket[] {
+    return Array.from(this.activeUsers.values())
+      .filter((u) => u.userId === userId)
+      .map((u) => u.socket)
+  }
 }
 
 export const activeUsersManager = new ActiveUsersManager()

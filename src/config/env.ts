@@ -93,4 +93,8 @@ export const env = {
     apiKey: requireEnv('SENDGRID_API_KEY'),
     fromEmail: requireEnv('SENDGRID_FROM_EMAIL'),
   },
+  polly: {
+    region: process.env.AWS_POLLY_REGION || 'us-east-1',
+    // Uses existing AWS credentials from s3 config
+  },
 }

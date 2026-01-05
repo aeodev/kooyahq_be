@@ -30,6 +30,11 @@ import { getCurrentUserTool } from './user/user-get-current.tools'
 // Home tools
 import { createAnnouncementTool } from './home/home-create-announcement.tools'
 
+// Meet tools
+import { createMeetRoomTool } from './meet/meet-create-room.tools'
+import { getUsersTool } from './meet/meet-get-users.tools'
+import { inviteToMeetTool } from './meet/meet-invite-users.tools'
+
 // Export all tools as combined array
 export const AI_TOOLS: AITool[] = [
   // Time tracker tools
@@ -57,6 +62,10 @@ export const AI_TOOLS: AITool[] = [
   getCurrentUserTool,
   // Home tools
   createAnnouncementTool,
+  // Meet tools
+  createMeetRoomTool,
+  getUsersTool,
+  inviteToMeetTool,
 ]
 
 // Re-export utility functions with proper signatures

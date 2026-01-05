@@ -6,12 +6,14 @@ import type { AuthUser } from '../auth/rbac/permissions'
 import {
   AIAssistantSocketEvents,
   type AIResponsePayload,
+  type AIAudioResponsePayload,
   type AIToolStartPayload,
   type AIToolCompletePayload,
   type AIErrorPayload,
   type OpenAIMessage,
   type OpenAIToolCall,
 } from './ai-assistant.types'
+import { synthesizeSpeech, isPollyAvailable } from './tts.service'
 import { getAvailableTools, toOpenAITools, findTool, canUseTool } from './tools'
 import {
   ConfigurationError,
@@ -38,12 +40,16 @@ Guidelines:
 - For timer setup: Call get_projects_for_timer, show ONLY bullet points, wait for selection
 - When starting timers, extract project names from user messages (e.g., "start timer for TalentTap" → projects: ["TalentTap"])
 - For tickets: Get boards first, never ask for IDs
+- For board queries: When user asks about boards (how many, what boards, list boards, show boards, boards in workspace, etc.), ALWAYS call get_my_boards tool first. Never respond without checking.
 - Use "me" for self-assignment
 - Confirm destructive actions
 - Never show internal IDs to users
+- When creating meet rooms: Only mention the room ID, never mention URLs or paths
+- For meet invitations: The invite_to_meet tool automatically detects and uses the current meeting room the user is in. Never ask for meeting room ID - it is automatically detected from the user's active socket connection.
 
 Response format:
 - Timer projects: ONLY bullet points (no text before/after)
+- Board lists: Format as "You have {count} board(s):\n• Board Name (PREFIX) - {type} - Lead: {creator name}\n• ..." Include all details: name, key/prefix, type, and lead/creator name. If no boards, say "You have no boards in your workspace."
 - Lists: "Here are your boards:\n• Board Name (PREFIX) - kanban\nWhich one?"
 
 Remember: You can only perform actions the user has permission for.`
@@ -94,6 +100,32 @@ async function deleteConversation(conversationId: string): Promise<void> {
     console.error(`[AI Assistant] Failed to delete conversation from Redis:`, error)
     // Still try to delete from fallback
     fallbackConversations.delete(conversationId)
+  }
+}
+
+/**
+ * Generate and emit TTS audio for a response
+ * This runs in the background and doesn't block the text response
+ */
+async function emitAudioResponse(userId: string, conversationId: string, text: string): Promise<void> {
+  // Skip if Polly is not available or text is empty
+  if (!isPollyAvailable() || !text.trim()) {
+    return
+  }
+
+  try {
+    const audioBase64 = await synthesizeSpeech(text)
+    
+    SocketEmitter.emitToUser(userId, AIAssistantSocketEvents.AUDIO_RESPONSE, {
+      conversationId,
+      audio: audioBase64,
+      format: 'mp3',
+    } as AIAudioResponsePayload)
+    
+    console.log(`[AI Assistant] Emitted audio response for user ${userId}, ${text.length} chars`)
+  } catch (error) {
+    // Log but don't fail - audio is optional enhancement
+    console.error(`[AI Assistant] Failed to generate TTS audio for user ${userId}:`, error)
   }
 }
 
@@ -362,6 +394,9 @@ export const aiAssistantService = {
           content: responseText,
           isComplete: true,
         } as AIResponsePayload)
+
+        // Generate and emit TTS audio (non-blocking)
+        emitAudioResponse(userId, conversationId, responseText)
       } else {
         // No function calls - just a text response
         const responseText = response.content || ''
@@ -378,6 +413,9 @@ export const aiAssistantService = {
           content: responseText,
           isComplete: true,
         } as AIResponsePayload)
+
+        // Generate and emit TTS audio (non-blocking)
+        emitAudioResponse(userId, conversationId, responseText)
       }
 
       // Emit stream end

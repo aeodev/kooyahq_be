@@ -31,3 +31,4 @@ export interface NewsResponse {
   filter: NewsFilter
 }
 
+

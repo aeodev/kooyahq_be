@@ -35,3 +35,4 @@ export async function getLinkPreview(req: Request, res: Response) {
     throw new HttpError(500, 'Failed to fetch link preview')
   }
 }
+
