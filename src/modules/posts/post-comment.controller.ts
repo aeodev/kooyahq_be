@@ -3,6 +3,7 @@ import { postCommentService } from './post-comment.service'
 import { notificationService } from '../notifications/notification.service'
 import { postService } from './post.service'
 import { createHttpError } from '../../utils/http-error'
+import { sanitizeHtmlContent } from '../../utils/rich-text-sanitizer'
 
 export async function createPostComment(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -21,7 +22,7 @@ export async function createPostComment(req: Request, res: Response, next: NextF
     const comment = await postCommentService.create({
       postId,
       userId,
-      content: content.trim(),
+      content: sanitizeHtmlContent(content.trim()),
     })
     
     // Create notification for post author
@@ -80,7 +81,7 @@ export async function updatePostComment(req: Request, res: Response, next: NextF
   }
 
   try {
-    const comment = await postCommentService.update(id, userId, content.trim())
+    const comment = await postCommentService.update(id, userId, sanitizeHtmlContent(content.trim()))
     res.json({
       status: 'success',
       data: comment,
@@ -117,4 +118,3 @@ export async function deletePostComment(req: Request, res: Response, next: NextF
     next(error)
   }
 }
-

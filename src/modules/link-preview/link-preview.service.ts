@@ -1,6 +1,76 @@
+import { lookup } from 'node:dns/promises'
+import net from 'node:net'
 import type { LinkPreview, LinkPreviewOptions } from './link-preview.types'
 import { getCachedPreview, setCachedPreview } from './link-preview.cache'
 import { isGifUrl, normalizeImageUrl } from '../../utils/image.utils'
+import { createHttpError } from '../../utils/http-error'
+
+const BLOCKED_HOSTS = new Set(['localhost', 'localhost.localdomain'])
+const BLOCKED_HOST_SUFFIXES = ['.local', '.internal']
+
+function isPrivateIp(address: string): boolean {
+  if (net.isIP(address) === 4) {
+    const parts = address.split('.').map((part) => Number(part))
+    if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) return true
+    const [a, b] = parts
+    if (a === 10) return true
+    if (a === 127) return true
+    if (a === 0) return true
+    if (a === 169 && b === 254) return true
+    if (a === 172 && b >= 16 && b <= 31) return true
+    if (a === 192 && b === 168) return true
+    if (a === 100 && b >= 64 && b <= 127) return true
+    return false
+  }
+
+  if (net.isIP(address) === 6) {
+    const normalized = address.toLowerCase()
+    if (normalized === '::' || normalized === '::1') return true
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true
+    if (normalized.startsWith('fe80')) return true
+    if (normalized.startsWith('::ffff:')) {
+      const v4 = normalized.replace('::ffff:', '')
+      return isPrivateIp(v4)
+    }
+    return false
+  }
+
+  return true
+}
+
+async function assertSafeUrl(rawUrl: string): Promise<void> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw createHttpError(400, 'Invalid URL format')
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw createHttpError(400, 'Only HTTP(S) URLs are allowed')
+  }
+
+  const hostname = parsed.hostname.toLowerCase()
+  if (BLOCKED_HOSTS.has(hostname) || BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) {
+    throw createHttpError(400, 'URL host is not allowed')
+  }
+
+  if (net.isIP(hostname)) {
+    if (isPrivateIp(hostname)) {
+      throw createHttpError(400, 'URL host is not allowed')
+    }
+    return
+  }
+
+  const records = await lookup(hostname, { all: true })
+  if (records.length === 0) {
+    throw createHttpError(400, 'Unable to resolve URL host')
+  }
+
+  if (records.some((record) => isPrivateIp(record.address))) {
+    throw createHttpError(400, 'URL host is not allowed')
+  }
+}
 
 // Extract meta tag content from HTML
 function extractMetaTag(html: string, property: string, attribute: 'property' | 'name' | 'itemprop' = 'property'): string | undefined {
@@ -199,6 +269,7 @@ async function followRedirects(url: string, maxRedirects: number = 3): Promise<s
   let currentUrl = url
   for (let i = 0; i < maxRedirects; i++) {
     try {
+      await assertSafeUrl(currentUrl)
       const controller = new AbortController()
       setTimeout(() => controller.abort(), 3000)
       const response = await fetch(currentUrl, {
@@ -208,7 +279,11 @@ async function followRedirects(url: string, maxRedirects: number = 3): Promise<s
       })
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location')
-        if (location) currentUrl = normalizeUrl(location, currentUrl)
+        if (location) {
+          const nextUrl = normalizeUrl(location, currentUrl)
+          await assertSafeUrl(nextUrl)
+          currentUrl = nextUrl
+        }
         else break
       } else break
     } catch {
@@ -229,6 +304,8 @@ export async function fetchLinkPreview(
     maxRedirects = 5,
   } = options
   
+  await assertSafeUrl(url)
+
   // Check cache first
   const cached = await getCachedPreview(url)
   if (cached && (cached.image || cached.title)) {
@@ -241,6 +318,8 @@ export async function fetchLinkPreview(
   if (shouldFollowRedirects) {
     finalUrl = await followRedirects(url, maxRedirects)
   }
+
+  await assertSafeUrl(finalUrl)
   
   try {
     const controller = new AbortController()

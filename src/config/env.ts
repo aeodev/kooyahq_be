@@ -48,6 +48,10 @@ const storageEnvPrefix = normalizePathPrefix(process.env.S3_ENV_PREFIX || nodeEn
 const s3AccessKeyId = process.env.AWS_ACCESS_KEY_ID || undefined
 const s3SecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || undefined
 validateAwsCredentials(s3AccessKeyId, s3SecretAccessKey)
+const refreshTokenExpiresInDays = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 30)
+const normalizedRefreshTokenDays = Number.isFinite(refreshTokenExpiresInDays) && refreshTokenExpiresInDays > 0
+  ? refreshTokenExpiresInDays
+  : 30
 
 export const env = {
   nodeEnv,
@@ -96,5 +100,8 @@ export const env = {
   polly: {
     region: process.env.AWS_POLLY_REGION || 'us-east-1',
     // Uses existing AWS credentials from s3 config
+  },
+  refreshToken: {
+    expiresInDays: normalizedRefreshTokenDays,
   },
 }

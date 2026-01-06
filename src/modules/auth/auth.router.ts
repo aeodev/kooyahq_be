@@ -1,87 +1,8 @@
 import { Router } from 'express'
-import { currentUser, login, loginWithGoogle, register } from './auth.controller'
+import { currentUser, loginWithGoogle, logout, refreshSession } from './auth.controller'
 import { authenticate } from '../../middleware/authenticate'
 
 export const authRouter = Router()
-
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Register a new user
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - name
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 minLength: 6
- *               name:
- *                 type: string
- *     responses:
- *       201:
- *         description: User created successfully
- *       400:
- *         description: Invalid input
- *       409:
- *         description: Email already exists
- */
-authRouter.post('/register', register)
-
-/**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Login user
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/User'
- *                     token:
- *                       type: string
- *       401:
- *         description: Invalid credentials
- */
-authRouter.post('/login', login)
 
 /**
  * @swagger
@@ -104,6 +25,30 @@ authRouter.post('/login', login)
  *         description: Login successful
  */
 authRouter.post('/google', loginWithGoogle)
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Access token refreshed
+ */
+authRouter.post('/refresh', refreshSession)
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user and revoke refresh token
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
+authRouter.post('/logout', logout)
 
 /**
  * @swagger

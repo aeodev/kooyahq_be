@@ -13,6 +13,7 @@ import { workspaceRoom } from '../../../utils/socket-rooms'
 import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
 import { ticketCache } from '../cache/ticket.cache'
+import { sanitizeRichTextDoc } from '../../../utils/rich-text-sanitizer'
 
 type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
 
@@ -98,7 +99,7 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
         boardId,
         ticketType,
         title: title.trim(),
-        description: description || {},
+        description: sanitizeRichTextDoc(description || {}),
         parentTicketId,
         rootEpicId,
         columnId: targetColumnId,
@@ -398,11 +399,12 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       updates.title = data.title.trim()
     }
     if (data.description !== undefined) {
-      updates.description = data.description
+      const sanitizedDescription = sanitizeRichTextDoc(data.description)
+      updates.description = sanitizedDescription
       changes.push({
         field: 'description',
         oldValue: ticket.description,
-        newValue: data.description,
+        newValue: sanitizedDescription,
         text: 'updated description',
       })
     }

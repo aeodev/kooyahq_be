@@ -3,6 +3,7 @@ import { postService } from './post.service'
 import { notificationService } from '../notifications/notification.service'
 import { extractMentions } from '../../utils/mentions'
 import { createHttpError } from '../../utils/http-error'
+import { sanitizeHtmlContent } from '../../utils/rich-text-sanitizer'
 
 export async function createPost(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -49,8 +50,10 @@ export async function createPost(req: Request, res: Response, next: NextFunction
       }
     }
 
+    const sanitizedContent = content ? sanitizeHtmlContent(String(content).trim()) : ''
+
     const post = await postService.create({
-      content: content.trim(),
+      content: sanitizedContent,
       authorId: userId,
       imageUrl,
       category: category?.trim(),
@@ -96,7 +99,7 @@ export async function updatePost(req: Request, res: Response, next: NextFunction
 
     if (content !== undefined) {
       // Allow empty string updates
-      updates.content = content
+      updates.content = sanitizeHtmlContent(String(content))
     }
     if (category !== undefined) {
       updates.category = category?.trim() || undefined

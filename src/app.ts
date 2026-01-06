@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import { env } from './config/env'
 import { errorHandler } from './middleware/error-handler'
 import { authRouter } from './modules/auth/auth.router'
@@ -65,6 +66,7 @@ export function createApp() {
       allowedHeaders: ['Content-Type', 'Authorization'],
     }),
   )
+  app.use(cookieParser())
   app.use(express.json())
 
   // Swagger Documentation

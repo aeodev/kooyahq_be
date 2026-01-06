@@ -86,8 +86,6 @@ const activitySchema = new Schema<ActivityDocument>(
 )
 
 // Indexes for efficient queries
-activitySchema.index({ ticketId: 1 })
-activitySchema.index({ boardId: 1 })
 activitySchema.index({ createdAt: -1 })
 
 export const ActivityModel = models.Activity ?? model<ActivityDocument>('Activity', activitySchema)

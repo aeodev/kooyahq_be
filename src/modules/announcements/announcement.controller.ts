@@ -4,6 +4,7 @@ import { announcementService } from './announcement.service'
 import { notificationService } from '../notifications/notification.service'
 import { emailService } from '../email/email.service'
 import { userService } from '../users/user.service'
+import { sanitizeHtmlContent } from '../../utils/rich-text-sanitizer'
 
 export async function createAnnouncement(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -38,7 +39,7 @@ export async function createAnnouncement(req: Request, res: Response, next: Next
   try {
     const announcement = await announcementService.create({
       title: title.trim(),
-      content: content.trim(),
+      content: sanitizeHtmlContent(content.trim()),
       authorId: userId,
       isActive: isActive !== false,
       expiresAt: parsedExpiresAt ?? null,
@@ -119,7 +120,7 @@ export async function updateAnnouncement(req: Request, res: Response, next: Next
   try {
     const updates: any = {}
     if (title !== undefined) updates.title = title.trim()
-    if (content !== undefined) updates.content = content.trim()
+    if (content !== undefined) updates.content = sanitizeHtmlContent(content.trim())
     if (isActive !== undefined) updates.isActive = isActive
     if (expiresAt !== undefined) {
       if (expiresAt === null || expiresAt === '') {

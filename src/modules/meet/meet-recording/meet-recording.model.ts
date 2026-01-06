@@ -59,8 +59,6 @@ const meetRecordingSchema = new Schema<MeetRecordingDocument>(
 )
 
 meetRecordingSchema.index({ userId: 1, createdAt: -1 })
-meetRecordingSchema.index({ meetId: 1 })
-meetRecordingSchema.index({ analysisStatus: 1 })
 
 export const MeetRecordingModel = models.MeetRecording ?? model<MeetRecordingDocument>('MeetRecording', meetRecordingSchema)
 

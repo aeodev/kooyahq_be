@@ -43,8 +43,6 @@ const meetAnalysisSchema = new Schema<MeetAnalysisDocument>(
   },
 )
 
-meetAnalysisSchema.index({ recordingId: 1 })
-
 export const MeetAnalysisModel = models.MeetAnalysis ?? model<MeetAnalysisDocument>('MeetAnalysis', meetAnalysisSchema)
 
 export type MeetAnalysis = {
@@ -72,4 +70,3 @@ export function toMeetAnalysis(doc: MeetAnalysisDocument): MeetAnalysis {
       : undefined,
   }
 }
-

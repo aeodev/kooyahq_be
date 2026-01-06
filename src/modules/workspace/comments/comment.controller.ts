@@ -6,6 +6,8 @@ import { activityRepository } from '../activities/activity.repository'
 import { notificationService } from '../../notifications/notification.service'
 import { createHttpError } from '../../../utils/http-error'
 import { hasPermission, PERMISSIONS } from '../../auth/rbac/permissions'
+import { sanitizeRichTextDoc } from '../../../utils/rich-text-sanitizer'
+import { cleanHtml } from '../../../utils/text.utils'
 
 type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
 
@@ -39,7 +41,7 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  if (!content || typeof content !== 'object') {
+  if (!content || (typeof content !== 'object' && typeof content !== 'string')) {
     return next(createHttpError(400, 'Comment content is required'))
   }
 
@@ -58,12 +60,13 @@ export async function createComment(req: Request, res: Response, next: NextFunct
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const comment = await commentService.create(ticketId, userId, content)
+    const sanitizedContent = sanitizeRichTextDoc(content)
+    const comment = await commentService.create(ticketId, userId, sanitizedContent)
 
     // Create activity log
     try {
       // Extract text preview from rich text content
-      const textPreview = JSON.stringify(content).substring(0, 100)
+      const textPreview = cleanHtml(sanitizedContent.content).substring(0, 100)
 
       await activityRepository.create({
         workspaceId: board.workspaceId,
@@ -72,7 +75,7 @@ export async function createComment(req: Request, res: Response, next: NextFunct
         actorId: userId,
         actionType: 'comment',
         comment: {
-          content,
+          content: sanitizedContent,
           textPreview,
           mentions: [], // TODO: Extract mentions from content
           isEdit: false,
@@ -151,7 +154,7 @@ export async function updateComment(req: Request, res: Response, next: NextFunct
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  if (!content || typeof content !== 'object') {
+  if (!content || (typeof content !== 'object' && typeof content !== 'string')) {
     return next(createHttpError(400, 'Comment content is required'))
   }
 
@@ -175,7 +178,8 @@ export async function updateComment(req: Request, res: Response, next: NextFunct
       return next(createHttpError(403, 'Forbidden'))
     }
 
-    const updated = await commentService.update(id, userId, content)
+    const sanitizedContent = sanitizeRichTextDoc(content)
+    const updated = await commentService.update(id, userId, sanitizedContent)
 
     if (!updated) {
       return next(createHttpError(404, 'Comment not found'))
@@ -183,7 +187,7 @@ export async function updateComment(req: Request, res: Response, next: NextFunct
 
     // Create activity log for edit
     try {
-      const textPreview = JSON.stringify(content).substring(0, 100)
+      const textPreview = cleanHtml(sanitizedContent.content).substring(0, 100)
 
       await activityRepository.create({
         workspaceId: board.workspaceId,
@@ -192,7 +196,7 @@ export async function updateComment(req: Request, res: Response, next: NextFunct
         actorId: userId,
         actionType: 'comment',
         comment: {
-          content,
+          content: sanitizedContent,
           textPreview,
           mentions: [],
           isEdit: true,
