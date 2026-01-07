@@ -3,16 +3,33 @@ import { notificationService } from './notification.service'
 import { createHttpError } from '../../utils/http-error'
 import { SocketEmitter } from '../../utils/socket-emitter'
 
+const DEFAULT_PAGE_LIMIT = 20
+const MAX_PAGE_LIMIT = 100
+
+const parsePositiveInt = (value: unknown) => {
+  if (value === undefined || value === null) return undefined
+  const parsed = Number.parseInt(String(value), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
+
 export async function getNotifications(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
-  const { unreadOnly } = req.query
+  const unreadOnly = req.query.unreadOnly === 'true'
+  const pageParam = parsePositiveInt(req.query.page)
+  const limitParam = parsePositiveInt(req.query.limit)
+  const page = pageParam ?? 1
+  const limit = Math.min(limitParam ?? DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT)
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
   }
 
   try {
-    const notifications = await notificationService.findByUserId(userId, unreadOnly === 'true')
+    const { notifications, total } = await notificationService.findByUserId(userId, {
+      unreadOnly,
+      page,
+      limit,
+    })
     const unreadCount = await notificationService.getUnreadCount(userId)
     
     res.json({
@@ -20,6 +37,10 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       data: {
         notifications,
         unreadCount,
+        page,
+        limit,
+        total,
+        hasMore: page * limit < total,
       },
     })
   } catch (error) {
@@ -97,8 +118,6 @@ export async function getUnreadCount(req: Request, res: Response, next: NextFunc
     next(error)
   }
 }
-
-
 
 
 

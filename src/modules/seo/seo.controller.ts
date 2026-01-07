@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { env } from '../../config/env'
+import { serverManagementService } from '../server-managmenet/server-management/server-management.service'
 import { boardService } from '../workspace/boards/board.service'
 import { ticketService } from '../workspace/tickets/ticket.service'
 
@@ -14,6 +15,12 @@ type SeoMeta = {
   description: string
   canonical: string
   imageUrl: string
+}
+
+type DynamicMeta = {
+  title: string
+  description: string
+  imagePath: string
 }
 
 function escapeHtml(value: string): string {
@@ -97,6 +104,14 @@ function cleanPath(path: string): string {
   const value = path.split('?')[0].split('#')[0]
   if (!value || value === '/') return '/'
   return value.replace(/\/+$/, '')
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 const STATIC_META_BY_PATH: Record<string, { title: string; description: string; imagePath: string }> = {
@@ -252,6 +267,85 @@ function getStaticMeta(path: string) {
   return STATIC_META_BY_PATTERN.find((entry) => entry.pattern.test(path))?.meta
 }
 
+async function resolveServerManagementMeta(
+  path: string,
+  fallbackDescription: string
+): Promise<DynamicMeta | null | undefined> {
+  const serverMatch = path.match(/^\/server-management\/projects\/([^/]+)\/servers\/([^/]+)\/?$/)
+  if (serverMatch) {
+    const projectId = safeDecode(serverMatch[1])
+    const serverId = safeDecode(serverMatch[2])
+    const project = await serverManagementService.findProjectById(projectId)
+    if (!project) return null
+
+    const projectDescription = project.description?.trim() || fallbackDescription
+    const server = project.servers.find((item) => item.id === serverId)
+    if (server) {
+      return {
+        title: `${server.name} | ${project.name} | ${SITE_NAME}`,
+        description: server.summary?.trim() || projectDescription,
+        imagePath: '/og/server-management.jpg',
+      }
+    }
+
+    return {
+      title: `${project.name} | Server Management | ${SITE_NAME}`,
+      description: projectDescription,
+      imagePath: '/og/server-management.jpg',
+    }
+  }
+
+  const projectMatch = path.match(/^\/server-management\/projects\/([^/]+)\/?$/)
+  if (!projectMatch) return undefined
+
+  const projectId = safeDecode(projectMatch[1])
+  const project = await serverManagementService.findProjectById(projectId)
+  if (!project) return null
+
+  return {
+    title: `${project.name} | Server Management | ${SITE_NAME}`,
+    description: project.description?.trim() || fallbackDescription,
+    imagePath: '/og/server-management.jpg',
+  }
+}
+
+async function resolveWorkspaceMeta(path: string, fallbackDescription: string): Promise<DynamicMeta | null | undefined> {
+  const ticketMatch = path.match(/^\/workspace\/[^/]+\/([^/]+)\/?$/)
+  if (ticketMatch) {
+    const ticketKey = safeDecode(ticketMatch[1]).toUpperCase()
+    const ticket = await ticketService.findByTicketKey(ticketKey)
+    if (!ticket) return null
+
+    const ticketText = extractPlainText(ticket.description)
+    return {
+      title: `${ticket.ticketKey} ${ticket.title} | ${SITE_NAME}`,
+      description: ticketText || fallbackDescription,
+      imagePath: '/og/ticket.jpg',
+    }
+  }
+
+  const boardMatch = path.match(/^\/workspace\/([^/]+)\/?$/)
+  if (!boardMatch) return undefined
+
+  const boardKey = safeDecode(boardMatch[1]).toUpperCase()
+  const board = await boardService.findByPrefixAnyWorkspace(boardKey)
+  if (!board) return null
+
+  return {
+    title: `${board.prefix} | ${board.name} | ${SITE_NAME}`,
+    description: board.description?.trim() || fallbackDescription,
+    imagePath: '/og/board.jpg',
+  }
+}
+
+async function resolveDynamicMeta(path: string, fallbackDescription: string): Promise<DynamicMeta | null> {
+  const serverMeta = await resolveServerManagementMeta(path, fallbackDescription)
+  if (serverMeta !== undefined) return serverMeta
+
+  const workspaceMeta = await resolveWorkspaceMeta(path, fallbackDescription)
+  return workspaceMeta ?? null
+}
+
 export async function getSeoMeta(req: Request, res: Response) {
   const pathParam = typeof req.query.path === 'string' ? req.query.path : '/'
   const path = cleanPath(pathParam)
@@ -264,27 +358,11 @@ export async function getSeoMeta(req: Request, res: Response) {
   let imagePath = staticMeta?.imagePath ?? DEFAULT_IMAGE_PATH
 
   try {
-    const ticketMatch = path.match(/^\/workspace\/[^/]+\/([^/]+)\/?$/)
-    if (ticketMatch) {
-      const ticketKey = ticketMatch[1]
-      const ticket = await ticketService.findByTicketKey(ticketKey)
-      if (ticket) {
-        title = `${ticket.ticketKey} ${ticket.title} | ${SITE_NAME}`
-        const ticketText = extractPlainText(ticket.description)
-        description = ticketText || description
-        imagePath = '/og/ticket.jpg'
-      }
-    } else {
-      const boardMatch = path.match(/^\/workspace\/([^/]+)\/?$/)
-      if (boardMatch) {
-        const boardKey = boardMatch[1]
-        const board = await boardService.findByPrefixAnyWorkspace(boardKey)
-        if (board) {
-          title = `${board.prefix} | ${board.name} | ${SITE_NAME}`
-          description = board.description?.trim() || description
-          imagePath = '/og/board.jpg'
-        }
-      }
+    const dynamicMeta = await resolveDynamicMeta(path, description)
+    if (dynamicMeta) {
+      title = dynamicMeta.title
+      description = dynamicMeta.description
+      imagePath = dynamicMeta.imagePath
     }
   } catch (error) {
     console.error('SEO meta generation failed:', error)

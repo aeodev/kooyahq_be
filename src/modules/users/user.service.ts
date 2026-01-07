@@ -1,4 +1,4 @@
-import { toPublicUser, type PublicUser } from './user.model'
+import { toPublicUser, type PublicUser, type User } from './user.model'
 import { userRepository, type CreateUserInput } from './user.repository'
 import { deleteStorageObject, isStoragePath } from '../../lib/storage'
 
@@ -9,6 +9,10 @@ export const userService = {
 
   async findByEmail(email: string): Promise<PublicUser | undefined> {
     return userRepository.findByEmail(email)
+  },
+
+  async findByEmailRaw(email: string): Promise<User | undefined> {
+    return userRepository.findByEmailRaw(email)
   },
 
   async getPublicProfile(id: string): Promise<PublicUser | undefined> {

@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { env } from '../../config/env'
 import { createHttpError } from '../../utils/http-error'
 import { createAccessToken } from '../../utils/token'
+import { cacheGoogleProfileImage, isGoogleProfileImageUrl } from '../../utils/google-profile-image'
 import { userService } from '../users/user.service'
 import { refreshTokenRepository } from './refresh-token.repository'
 import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, type AuthUser } from './rbac/permissions'
@@ -86,25 +87,53 @@ export async function authenticateWithGoogle(idToken: string): Promise<{
   const profile = await verifyGoogleIdToken(idToken)
   const name = profile.name?.trim() || profile.email.split('@')[0]
 
-  let user = await userService.findByEmail(profile.email)
+  let user = await userService.findByEmailRaw(profile.email)
 
   if (!user) {
-    user = await userService.create({
+    const created = await userService.create({
       email: profile.email,
       name,
       permissions: DEFAULT_NEW_USER_PERMISSIONS,
     })
+    user = await userService.findById(created.id)
+  }
+
+  if (!user) {
+    throw createHttpError(500, 'User not found')
   } else {
     if (profile.name && profile.name.trim() && profile.name !== user.name) {
-      user = (await userService.updateEmployee(user.id, { name: profile.name })) ?? user
+      await userService.updateEmployee(user.id, { name: profile.name })
     }
   }
 
-  if (profile.picture && profile.picture !== user.profilePic) {
-    user = (await userService.updateProfile(user.id, { profilePic: profile.picture })) ?? user
+  const currentProfilePic = user.profilePic?.trim() || ''
+  const nextProfilePic = profile.picture?.trim() || ''
+
+  if (nextProfilePic) {
+    // Only auto-sync if the current profile picture is empty or still a Google URL.
+    const shouldUpdateProfilePic = !currentProfilePic || isGoogleProfileImageUrl(currentProfilePic)
+
+    if (shouldUpdateProfilePic) {
+      let updatedProfilePic = nextProfilePic
+      if (isGoogleProfileImageUrl(nextProfilePic)) {
+        const cachedPath = await cacheGoogleProfileImage(nextProfilePic)
+        if (cachedPath) {
+          updatedProfilePic = cachedPath
+        }
+      }
+
+      if (updatedProfilePic !== currentProfilePic) {
+        await userService.updateProfile(user.id, { profilePic: updatedProfilePic })
+      }
+    }
   }
 
-  const authUser = buildAuthUser(user)
+  const publicUser = await userService.getPublicProfile(user.id)
+  if (!publicUser) {
+    throw createHttpError(500, 'User not found')
+  }
+
+  const authUser = buildAuthUser(publicUser)
   const accessToken = createAccessToken(authUser)
   const { token: refreshToken, expiresAt: refreshExpiresAt } = await issueRefreshToken(authUser.id)
 

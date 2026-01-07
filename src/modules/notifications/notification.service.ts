@@ -90,8 +90,11 @@ export const notificationService = {
     )
   },
 
-  async findByUserId(userId: string, unreadOnly?: boolean): Promise<NotificationWithData[]> {
-    const notifications = await notificationRepository.findByUserId(userId, unreadOnly)
+  async findByUserId(
+    userId: string,
+    options: { unreadOnly?: boolean; page?: number; limit?: number } = {}
+  ): Promise<{ notifications: NotificationWithData[]; total: number }> {
+    const { notifications, total } = await notificationRepository.findByUserId(userId, options)
     
     // Get actor info for mentions, card_comment, card_assigned, card_moved, and board_member_added
     const actorIds = [...new Set(
@@ -111,7 +114,7 @@ export const notificationService = {
       actors.filter((a) => a.actor).map((a) => [a.id, a.actor!])
     )
 
-    return notifications.map((notification) => {
+    const notificationsWithData = notifications.map((notification) => {
       const notificationWithData: NotificationWithData = { ...notification }
       
       if (notification.mentionId && (notification.type === 'mention' || notification.type === 'card_comment' || notification.type === 'card_assigned' || notification.type === 'card_moved' || notification.type === 'board_member_added' || notification.type === 'game_invitation')) {
@@ -128,6 +131,8 @@ export const notificationService = {
       
       return notificationWithData
     })
+
+    return { notifications: notificationsWithData, total }
   },
 
   async markAsRead(id: string, userId: string): Promise<Notification | undefined> {
@@ -347,6 +352,5 @@ export const notificationService = {
     })
   },
 }
-
 
 
