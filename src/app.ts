@@ -30,6 +30,7 @@ import { mediaRouter } from './modules/media/media.router'
 import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 import { cesiumRouter } from './modules/cesium/cesium.router'
 import { settingsRouter } from './modules/settings/settings.router'
+import { seoRouter } from './modules/seo/seo.router'
 
 export function createApp() {
   const app = express()
@@ -83,6 +84,7 @@ export function createApp() {
   app.use('/api/gallery', galleryRouter)
   app.use('/api/ai-news', aiNewsRouter)
   app.use('/api/link-preview', linkPreviewRouter)
+  app.use('/meta', seoRouter)
   app.use('/api/posts', postRouter)
   app.use('/api/notifications', notificationRouter)
   app.use('/api/presence', presenceRouter)
