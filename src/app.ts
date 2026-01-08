@@ -32,6 +32,7 @@ import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 import { cesiumRouter } from './modules/cesium/cesium.router'
 import { settingsRouter } from './modules/settings/settings.router'
 import { seoRouter } from './modules/seo/seo.router'
+import { costAnalyticsRouter } from './modules/cost-analytics/cost-analytics.router'
 
 export function createApp() {
   const app = express()
@@ -96,6 +97,7 @@ export function createApp() {
   app.use('/api/media', mediaRouter)
   app.use('/api/cesium', cesiumRouter)
   app.use('/api/settings', settingsRouter)
+  app.use('/api/cost-analytics', costAnalyticsRouter)
   app.use('/api/gateways/github', githubGatewayRouter)
   app.use('/api/gateways/server-status', serverStatusGatewayRouter)
   app.use('/api/server-management', serverManagementRouter)

@@ -125,7 +125,7 @@ export const userRepository = {
     return doc ? toPublicUser(toUser(doc)) : undefined
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string }): Promise<PublicUser | undefined> {
+  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string; monthlySalary?: number }): Promise<PublicUser | undefined> {
     const updateData: Record<string, unknown> = {}
 
     if (updates.name !== undefined) {
@@ -148,6 +148,9 @@ export const userRepository = {
     }
     if (updates.permissions !== undefined) {
       updateData.permissions = updates.permissions
+    }
+    if (updates.monthlySalary !== undefined) {
+      updateData.monthlySalary = Math.max(0, updates.monthlySalary)
     }
 
     const doc = await UserModel.findByIdAndUpdate(

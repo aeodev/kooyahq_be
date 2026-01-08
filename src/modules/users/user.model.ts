@@ -11,6 +11,7 @@ export interface UserDocument extends Document {
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  monthlySalary?: number
   deletedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -59,6 +60,11 @@ const userSchema = new Schema<UserDocument>(
     birthday: {
       type: Date,
     },
+    monthlySalary: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     deletedAt: {
       type: Date,
       default: undefined,
@@ -87,6 +93,7 @@ export type User = {
   banner?: string
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
+  monthlySalary?: number
   deletedAt?: string
   createdAt: string
   updatedAt: string
@@ -106,6 +113,7 @@ export function toUser(doc: UserDocument): User {
     banner: doc.banner,
     bio: doc.bio,
     status: doc.status || 'online',
+    monthlySalary: doc.monthlySalary || 0,
     deletedAt: doc.deletedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
