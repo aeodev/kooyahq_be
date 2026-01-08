@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   SERVER_MANAGEMENT_ACTION_NORMAL: 'serverManagement:actionNormal',
   SERVER_MANAGEMENT_ACTION_WARNING: 'serverManagement:actionWarning',
   SERVER_MANAGEMENT_ACTION_DANGEROUS: 'serverManagement:actionDangerous',
+  SERVER_MANAGEMENT_STATUS_NOTIFY: 'serverManagement:statusNotify',
   SERVER_MANAGEMENT_MANAGE: 'serverManagement:manage',
 
   BOARD_FULL_ACCESS: 'board:fullAccess',

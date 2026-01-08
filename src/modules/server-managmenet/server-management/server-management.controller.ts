@@ -1,9 +1,11 @@
 import type { NextFunction, Request, Response } from 'express'
 import { createHttpError } from '../../../utils/http-error'
 import { PERMISSIONS, hasPermission } from '../../auth/rbac/permissions'
+import type { CreateAdminActivityInput } from '../../admin-activity/admin-activity.repository'
+import { adminActivityService } from '../../admin-activity/admin-activity.service'
 import { serverManagementService } from './server-management.service'
 import { hasSshKeyEncryptionSecret, isEncryptedPrivateKey, normalizeSshKey } from './server-management.ssh'
-import type { ActionRisk } from './server-management.model'
+import type { ActionRisk, ServerManagementAction, ServerManagementServer } from './server-management.model'
 import type {
   CreateServerManagementProjectInput,
   CreateServerManagementServerInput,
@@ -19,6 +21,12 @@ const ACTION_RISKS: ActionRisk[] = ['normal', 'warning', 'dangerous']
 
 function isActionRisk(value: unknown): value is ActionRisk {
   return typeof value === 'string' && ACTION_RISKS.includes(value as ActionRisk)
+}
+
+function logAdminActivity(input: CreateAdminActivityInput) {
+  void adminActivityService.logActivity(input).catch((logError) => {
+    console.error('Failed to log admin activity:', logError)
+  })
 }
 
 function validateProjectPayload(payload: Partial<CreateServerManagementProjectInput>) {
@@ -94,6 +102,109 @@ function validateServices(services?: ServerManagementServiceInput[]) {
   services.forEach((service) => validateServicePayload(service))
 }
 
+function summarizeServices(services?: ServerManagementServiceInput[]) {
+  if (!services) return undefined
+  return services
+    .map((service) => service.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 6)
+}
+
+function summarizeServiceNames(services?: Array<{ name?: string }>) {
+  if (!services) return undefined
+  return services
+    .map((service) => service.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 6)
+}
+
+function normalizeComparable(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).sort()
+  }
+  return value
+}
+
+function valuesEqual(a: unknown, b: unknown) {
+  return JSON.stringify(normalizeComparable(a)) === JSON.stringify(normalizeComparable(b))
+}
+
+function assignChange(changes: Record<string, unknown>, key: string, fromValue: unknown, toValue: unknown) {
+  if (!valuesEqual(fromValue, toValue)) {
+    changes[key] = { from: fromValue ?? null, to: toValue ?? null }
+  }
+}
+
+function buildServerChangeLog(
+  updates: UpdateServerManagementServerInput,
+  existing?: ServerManagementServer
+): Record<string, unknown> | undefined {
+  if (!existing) {
+    const logChanges: Record<string, unknown> = { ...updates }
+    if ('sshKey' in logChanges) {
+      logChanges.sshKey = '[redacted]'
+    }
+    if ('statusCommand' in logChanges) {
+      logChanges.statusCommand = '[redacted]'
+    }
+    if ('services' in logChanges) {
+      logChanges.services = summarizeServices(updates.services) ?? '[updated]'
+    }
+    return Object.keys(logChanges).length ? logChanges : undefined
+  }
+
+  const changes: Record<string, unknown> = {}
+
+  if (updates.name !== undefined) assignChange(changes, 'name', existing.name, updates.name)
+  if (updates.summary !== undefined) assignChange(changes, 'summary', existing.summary, updates.summary)
+  if (updates.host !== undefined) assignChange(changes, 'host', existing.host, updates.host)
+  if (updates.port !== undefined) assignChange(changes, 'port', existing.port, updates.port)
+  if (updates.user !== undefined) assignChange(changes, 'user', existing.user, updates.user)
+  if (updates.appDirectory !== undefined) {
+    assignChange(changes, 'appDirectory', existing.appDirectory, updates.appDirectory)
+  }
+  if (updates.sshKey !== undefined) assignChange(changes, 'sshKey', '[redacted]', '[redacted]')
+  if (updates.statusCommand !== undefined) assignChange(changes, 'statusCommand', '[redacted]', '[redacted]')
+  if (updates.services !== undefined) {
+    assignChange(
+      changes,
+      'services',
+      summarizeServiceNames(existing.services),
+      summarizeServices(updates.services)
+    )
+  }
+
+  return Object.keys(changes).length ? changes : undefined
+}
+
+function buildActionChangeLog(
+  updates: UpdateServerManagementActionInput,
+  existing?: ServerManagementAction
+): Record<string, unknown> | undefined {
+  if (!existing) {
+    const logChanges: Record<string, unknown> = { ...updates }
+    if ('command' in logChanges) {
+      logChanges.command = '[redacted]'
+    }
+    return Object.keys(logChanges).length ? logChanges : undefined
+  }
+
+  const changes: Record<string, unknown> = {}
+
+  if (updates.name !== undefined) assignChange(changes, 'name', existing.name, updates.name)
+  if (updates.description !== undefined) {
+    assignChange(changes, 'description', existing.description, updates.description)
+  }
+  if (updates.command !== undefined) assignChange(changes, 'command', '[redacted]', '[redacted]')
+  if (updates.risk !== undefined) assignChange(changes, 'risk', existing.risk, updates.risk)
+  if (updates.dangerous !== undefined) {
+    const nextRisk = updates.dangerous ? 'dangerous' : 'normal'
+    assignChange(changes, 'risk', existing.risk, nextRisk)
+  }
+
+  return Object.keys(changes).length ? changes : undefined
+}
+
 export async function getServerManagementProjects(req: Request, res: Response, next: NextFunction) {
   try {
     const projects = await serverManagementService.findAllProjects()
@@ -127,6 +238,17 @@ export async function createServerManagementProject(req: Request, res: Response,
       description: req.body.description,
       emoji: req.body.emoji,
     })
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'create_server_project',
+        targetType: 'server_project',
+        targetId: project.id,
+        targetLabel: project.name,
+        changes: { name: project.name, emoji: project.emoji },
+      })
+    }
 
     res.status(201).json({ status: 'success', data: project })
   } catch (error: any) {
@@ -166,9 +288,34 @@ export async function updateServerManagementProject(req: Request, res: Response,
   }
 
   try {
+    const existingProject = await serverManagementService.findProjectById(projectId)
     const project = await serverManagementService.updateProject(projectId, updates)
     if (!project) {
       return next(createHttpError(404, 'Project not found'))
+    }
+
+    if (req.user?.id) {
+      const changes: Record<string, unknown> = {}
+      if (existingProject) {
+        if (updates.name !== undefined) assignChange(changes, 'name', existingProject.name, updates.name)
+        if (updates.description !== undefined) {
+          assignChange(changes, 'description', existingProject.description, updates.description)
+        }
+        if (updates.emoji !== undefined) assignChange(changes, 'emoji', existingProject.emoji, updates.emoji)
+      } else {
+        Object.entries(updates).forEach(([key, value]) => {
+          changes[key] = { from: null, to: value ?? null }
+        })
+      }
+
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'update_server_project',
+        targetType: 'server_project',
+        targetId: projectId,
+        targetLabel: project.name,
+        changes: Object.keys(changes).length ? changes : undefined,
+      })
     }
 
     res.json({ status: 'success', data: project })
@@ -184,9 +331,20 @@ export async function deleteServerManagementProject(req: Request, res: Response,
   const { projectId } = req.params
 
   try {
+    const existingProject = await serverManagementService.findProjectById(projectId)
     const deleted = await serverManagementService.deleteProject(projectId)
     if (!deleted) {
       return next(createHttpError(404, 'Project not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'delete_server_project',
+        targetType: 'server_project',
+        targetId: projectId,
+        targetLabel: existingProject?.name,
+      })
     }
 
     res.json({ status: 'success', message: 'Project deleted' })
@@ -221,6 +379,25 @@ export async function createServerManagementServer(req: Request, res: Response, 
 
     if (!server) {
       return next(createHttpError(404, 'Project not found'))
+    }
+
+    if (req.user?.id) {
+      const serviceSummary = summarizeServices(req.body.services)
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'create_server',
+        targetType: 'server',
+        targetId: server.id,
+        targetLabel: server.name,
+        changes: {
+          name: server.name,
+          summary: server.summary,
+          host: server.host,
+          port: server.port,
+          user: server.user,
+          ...(serviceSummary ? { services: serviceSummary } : {}),
+        },
+      })
     }
 
     res.status(201).json({ status: 'success', data: server })
@@ -281,9 +458,21 @@ export async function updateServerManagementServer(req: Request, res: Response, 
   }
 
   try {
+    const existing = await serverManagementService.findServerById(serverId)
     const server = await serverManagementService.updateServer(projectId, serverId, updates)
     if (!server) {
       return next(createHttpError(404, 'Server not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'update_server',
+        targetType: 'server',
+        targetId: serverId,
+        targetLabel: server.name,
+        changes: buildServerChangeLog(updates, existing?.server),
+      })
     }
 
     res.json({ status: 'success', data: server })
@@ -296,9 +485,21 @@ export async function deleteServerManagementServer(req: Request, res: Response, 
   const { projectId, serverId } = req.params
 
   try {
+    const existingProject = await serverManagementService.findProjectById(projectId)
+    const existingServer = existingProject?.servers.find((server) => server.id === serverId)
     const deleted = await serverManagementService.deleteServer(projectId, serverId)
     if (!deleted) {
       return next(createHttpError(404, 'Server not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'delete_server',
+        targetType: 'server',
+        targetId: serverId,
+        targetLabel: existingServer?.name,
+      })
     }
 
     res.json({ status: 'success', message: 'Server deleted' })
@@ -328,6 +529,23 @@ export async function createServerManagementAction(req: Request, res: Response, 
 
     if (!action) {
       return next(createHttpError(404, 'Service not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'create_server_action',
+        targetType: 'server_action',
+        targetId: action.id,
+        targetLabel: action.name,
+        changes: {
+          serviceName,
+          name: action.name,
+          description: action.description,
+          risk: action.risk,
+          command: '[redacted]',
+        },
+      })
     }
 
     res.status(201).json({ status: 'success', data: action })
@@ -371,9 +589,21 @@ export async function updateServerManagementAction(req: Request, res: Response, 
   }
 
   try {
+    const existing = await serverManagementService.findActionByIds(serverId, actionId)
     const action = await serverManagementService.updateAction(projectId, serverId, actionId, updates)
     if (!action) {
       return next(createHttpError(404, 'Action not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'update_server_action',
+        targetType: 'server_action',
+        targetId: actionId,
+        targetLabel: action.name,
+        changes: buildActionChangeLog(updates, existing?.action),
+      })
     }
 
     res.json({ status: 'success', data: action })
@@ -386,9 +616,20 @@ export async function deleteServerManagementAction(req: Request, res: Response, 
   const { projectId, serverId, actionId } = req.params
 
   try {
+    const existing = await serverManagementService.findActionByIds(serverId, actionId)
     const deleted = await serverManagementService.deleteAction(projectId, serverId, actionId)
     if (!deleted) {
       return next(createHttpError(404, 'Action not found'))
+    }
+
+    if (req.user?.id) {
+      logAdminActivity({
+        adminId: req.user.id,
+        action: 'delete_server_action',
+        targetType: 'server_action',
+        targetId: actionId,
+        targetLabel: existing?.action.name,
+      })
     }
 
     res.json({ status: 'success', message: 'Action deleted' })
@@ -451,6 +692,22 @@ export async function runServerManagementAction(req: Request, res: Response, nex
       server: resolved.server,
       action: resolved.action,
     })
+
+    if (actionRisk === 'warning' || actionRisk === 'dangerous') {
+      logAdminActivity({
+        adminId: user.id,
+        action: 'trigger_server_action',
+        targetType: 'server_action',
+        targetId: resolved.action.id,
+        targetLabel: resolved.action.name,
+        changes: {
+          risk: actionRisk,
+          runId: run.runId,
+          serverId: resolved.server.id,
+          serverName: resolved.server.name,
+        },
+      })
+    }
 
     res.status(202).json({
       status: 'success',

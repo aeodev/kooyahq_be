@@ -20,6 +20,7 @@ import { announcementRouter } from './modules/announcements/announcement.router'
 import { projectRouter } from './modules/projects/project.router'
 import { userManagementRouter } from './modules/user-management/user-management.router'
 import { githubGatewayRouter } from './modules/gateways/github/github.router'
+import { serverStatusGatewayRouter } from './modules/gateways/server-status/server-status.router'
 import { serverManagementRouter } from './modules/server-managmenet/server-management/server-management.router'
 import { healthRouter } from './routes/health'
 import swaggerUi from 'swagger-ui-express'
@@ -96,6 +97,7 @@ export function createApp() {
   app.use('/api/cesium', cesiumRouter)
   app.use('/api/settings', settingsRouter)
   app.use('/api/gateways/github', githubGatewayRouter)
+  app.use('/api/gateways/server-status', serverStatusGatewayRouter)
   app.use('/api/server-management', serverManagementRouter)
   // Workspace module routes
   app.use('/api/workspaces', workspaceRouter)

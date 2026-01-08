@@ -6,6 +6,9 @@ export type CreateAdminActivityInput = {
   action: AdminAction
   targetType: TargetType
   targetId: string
+  title?: string
+  summary?: string
+  targetLabel?: string
   changes?: Record<string, unknown>
 }
 
@@ -63,8 +66,6 @@ export const adminActivityRepository = {
     return docs.map(toAdminActivity)
   },
 }
-
-
 
 
 

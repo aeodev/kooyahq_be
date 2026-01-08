@@ -91,6 +91,9 @@ export const env = {
     github: {
       secret: process.env.GITHUB_GATEWAY_SECRET,
     },
+    serverStatus: {
+      secret: process.env.SERVER_STATUS_GATEWAY_SECRET,
+    },
   },
   openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
   sendgrid: {

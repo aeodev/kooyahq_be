@@ -70,3 +70,22 @@ Example payloads:
 Accepted statuses: `pull-requested`, `pull-request-build-check-passed`, `pull-request-build-check-failed`, `deploying`, `deployment-failed`, `deployed`. The service also accepts space or dash separated variants (e.g., `pull requested`, `pull request build check passed`).
 
 Branch names must include the ticket key as a full path segment (e.g., `/TT-1/`) so the gateway can resolve tickets without partial matches.
+
+## Server Status Gateway
+
+Set `SERVER_STATUS_GATEWAY_SECRET` in your environment. Monitoring services should `POST` to `/api/gateways/server-status` with either `x-server-status-gateway-secret`, `x-gateway-secret`, or `Authorization: Bearer <secret>`.
+
+Example payload:
+
+```json
+{
+  "status": "warning",
+  "project": "kooyahq",
+  "serverName": "app-node-1",
+  "container": "api",
+  "cpu": "92%",
+  "memory": "81%"
+}
+```
+
+Accepted statuses: `warning`, `danger`.

@@ -195,6 +195,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
           action: 'create_user',
           targetType: 'user',
           targetId: user.id,
+          targetLabel: user.name,
           changes: { name: user.name, email: user.email },
         })
       } catch (logError) {
@@ -287,6 +288,11 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       return next(createHttpError(400, 'No updates provided'))
     }
 
+    const existingUser = await userService.findById(id)
+    if (!existingUser) {
+      return next(createHttpError(404, 'User not found'))
+    }
+
     const updated = await userService.updateEmployee(id, updates)
     if (!updated) {
       return next(createHttpError(404, 'User not found'))
@@ -295,12 +301,27 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
     // Log admin activity
     if (req.user?.id) {
       try {
+        const changes: Record<string, unknown> = {}
+        const normalizeValue = (value: unknown) =>
+          Array.isArray(value) ? [...value].map(String).sort() : value
+
+        Object.entries(updates).forEach(([key, value]) => {
+          const beforeValue = (existingUser as Record<string, unknown>)[key]
+          const afterValue = (updated as Record<string, unknown>)[key] ?? value
+          const beforeNormalized = normalizeValue(beforeValue)
+          const afterNormalized = normalizeValue(afterValue)
+          if (JSON.stringify(beforeNormalized) !== JSON.stringify(afterNormalized)) {
+            changes[key] = { from: beforeValue ?? null, to: afterValue ?? null }
+          }
+        })
+
         await adminActivityService.logActivity({
           adminId: req.user.id,
           action: 'update_user',
           targetType: 'user',
           targetId: id,
-          changes: updates,
+          targetLabel: updated.name,
+          changes: Object.keys(changes).length ? changes : undefined,
         })
       } catch (logError) {
         // Don't fail the request if logging fails
@@ -322,6 +343,7 @@ export async function deleteEmployee(req: Request, res: Response, next: NextFunc
   const { hardDelete } = req.query
 
   try {
+    const existingUser = await userService.findById(id)
     const deleted = await userService.deleteUser(id, hardDelete !== 'true')
     if (!deleted) {
       return next(createHttpError(404, 'User not found'))
@@ -335,6 +357,7 @@ export async function deleteEmployee(req: Request, res: Response, next: NextFunc
           action: 'delete_user',
           targetType: 'user',
           targetId: id,
+          targetLabel: existingUser?.name,
           changes: { hardDelete: hardDelete === 'true' },
         })
       } catch (logError) {
@@ -403,6 +426,7 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
           action: 'create_client',
           targetType: 'user',
           targetId: user.id,
+          targetLabel: user.name,
           changes: { name: user.name, email: user.email },
         })
       } catch (logError) {

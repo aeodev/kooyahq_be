@@ -2,10 +2,52 @@ import { randomUUID } from 'node:crypto'
 import { Client } from 'ssh2'
 import { SocketEmitter } from '../../../utils/socket-emitter'
 import { serverManagementRunRoom } from '../../../utils/socket-rooms'
+import { hasPermission, PERMISSIONS, type Permission } from '../../auth/rbac/permissions'
+import { emailService } from '../../email/email.service'
+import { notificationService } from '../../notifications/notification.service'
+import { userService } from '../../users/user.service'
 import { ServerManagementSocketEvents } from './server-management.events'
 import { serverManagementRepository } from './server-management.repository'
 import { decryptSshKey, isEncryptedPrivateKey, normalizeSshKey } from './server-management.ssh'
 import type { ServerManagementAction, ServerManagementServer } from './server-management.model'
+
+type StatusStreamPayload = {
+  status: Record<string, string>
+  rawOutput: string
+}
+
+type StatusStreamHandlers = {
+  onPayload: (payload: StatusStreamPayload) => void
+  onError: (message: string) => void
+  onClose?: (details: { exitCode: number | null; signal: string | null }) => void
+}
+
+type ServerStatusAlertPayload = {
+  status: 'warning' | 'danger' | 'starting' | 'restarting' | 'shutdown'
+  project: string
+  serverName: string
+  container?: string
+  cpu: string
+  memory: string
+}
+
+const SERVER_STATUS_LABELS: Record<ServerStatusAlertPayload['status'], string> = {
+  warning: 'Warning',
+  danger: 'Danger',
+  starting: 'Starting',
+  restarting: 'Restarting',
+  shutdown: 'Shutdown',
+}
+
+const SERVER_STATUS_RECIPIENT_PERMISSIONS = [
+  PERMISSIONS.SERVER_MANAGEMENT_STATUS_NOTIFY,
+  PERMISSIONS.SERVER_MANAGEMENT_MANAGE,
+]
+
+function isServerStatusRecipient(user: { permissions?: Array<Permission | string> }) {
+  const permissions = Array.isArray(user.permissions) ? (user.permissions as Permission[]) : []
+  return SERVER_STATUS_RECIPIENT_PERMISSIONS.some((permission) => hasPermission({ permissions }, permission))
+}
 
 function buildPrivateKey(sshKey: string): Buffer {
   const normalizedKey = normalizeSshKey(sshKey)
@@ -108,6 +150,71 @@ function sanitizeStatusOutput(rawOutput: string): string {
   } catch {
     return rawOutput
   }
+}
+
+function extractJsonFrames(buffer: string): { frames: string[]; rest: string } {
+  const frames: string[] = []
+  let depth = 0
+  let start = -1
+  let inString = false
+  let escaped = false
+  let lastFrameEnd = 0
+
+  for (let i = 0; i < buffer.length; i += 1) {
+    const char = buffer[i]
+
+    if (inString) {
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (char === '\\') {
+        escaped = true
+        continue
+      }
+      if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+      continue
+    }
+
+    if (char === '{') {
+      if (depth === 0) {
+        start = i
+      }
+      depth += 1
+      continue
+    }
+
+    if (char === '}') {
+      if (depth > 0) {
+        depth -= 1
+        if (depth === 0 && start >= 0) {
+          frames.push(buffer.slice(start, i + 1))
+          lastFrameEnd = i + 1
+          start = -1
+        }
+      }
+    }
+  }
+
+  if (depth > 0 && start >= 0) {
+    return { frames, rest: buffer.slice(start) }
+  }
+
+  return { frames, rest: buffer.slice(lastFrameEnd).trimStart() }
+}
+
+function extractLineFrames(buffer: string): { frames: string[]; rest: string } {
+  const lines = buffer.split(/\r?\n/)
+  const rest = lines.pop() ?? ''
+  const frames = lines.map((line) => line.trim()).filter((line) => line.length > 0)
+  return { frames, rest }
 }
 
 function buildRemoteCommand(server: ServerManagementServer, command: string): string {
@@ -243,6 +350,162 @@ export const serverManagementService = {
       exitCode: result.exitCode,
       signal: result.signal,
     }
+  },
+
+  startStatusStream(params: { server: ServerManagementServer } & StatusStreamHandlers) {
+    const { server, onPayload, onError, onClose } = params
+    const command = server.statusCommand?.trim()
+    if (!command) {
+      throw new Error('Status command is missing')
+    }
+    if (!server.host?.trim()) {
+      throw new Error('Server host is missing')
+    }
+
+    const sshKey = server.sshKey
+    if (!sshKey) {
+      throw new Error('Missing SSH key')
+    }
+
+    let privateKey: Buffer
+    try {
+      privateKey = buildPrivateKey(sshKey)
+    } catch (error) {
+      throw new Error(formatErrorMessage(error, 'Invalid SSH key'))
+    }
+
+    const host = server.host
+    const port = server.port ? Number.parseInt(server.port, 10) : 22
+    const username = server.user || 'root'
+    const connection = new Client()
+    let buffer = ''
+    let closed = false
+
+    const emitPayload = (payload: StatusStreamPayload) => {
+      if (closed) return
+      onPayload(payload)
+    }
+
+    const emitError = (message: string) => {
+      if (closed) return
+      onError(message)
+    }
+
+    const stop = () => {
+      if (closed) return
+      closed = true
+      connection.end()
+    }
+
+    const handleFrame = (frame: string) => {
+      const sanitizedRawOutput = sanitizeStatusOutput(frame)
+      emitPayload({
+        status: sanitizeStatusMap(parseStatusOutput(sanitizedRawOutput)),
+        rawOutput: sanitizedRawOutput,
+      })
+    }
+
+    connection
+      .on('ready', () => {
+        connection.exec(buildRemoteCommand(server, command), (execError, stream) => {
+          if (execError) {
+            emitError(formatErrorMessage(execError, 'Unable to start status command'))
+            stop()
+            return
+          }
+
+          stream.setEncoding('utf8')
+          stream.stderr.setEncoding('utf8')
+
+          stream.on('data', (chunk: string) => {
+            if (closed) return
+            buffer += chunk
+            const { frames, rest } = extractJsonFrames(buffer)
+            buffer = rest
+
+            if (frames.length > 0) {
+              frames.forEach(handleFrame)
+              return
+            }
+
+            if (!buffer.includes('{')) {
+              const lineResult = extractLineFrames(buffer)
+              buffer = lineResult.rest
+              lineResult.frames.forEach(handleFrame)
+            } else if (buffer.length > 200_000) {
+              buffer = buffer.slice(-200_000)
+            }
+          })
+
+          stream.stderr.on('data', (chunk: string) => {
+            const message = chunk.trim()
+            if (message) {
+              emitError(message)
+            }
+          })
+
+          stream.on('error', (streamError: unknown) => {
+            emitError(formatErrorMessage(streamError, 'Status stream error'))
+            stop()
+          })
+
+          stream.on('close', (code: number | null, signal: string | null) => {
+            onClose?.({ exitCode: code, signal })
+            stop()
+          })
+        })
+      })
+      .on('error', (error) => {
+        emitError(formatErrorMessage(error, 'SSH connection error'))
+        stop()
+      })
+      .connect({
+        host,
+        port: Number.isFinite(port) ? port : 22,
+        username,
+        privateKey,
+        readyTimeout: 15000,
+      })
+
+    return { stop }
+  },
+
+  async notifyServerStatus(payload: ServerStatusAlertPayload) {
+    const users = await userService.findAll()
+    const recipients = users.filter(isServerStatusRecipient)
+
+    if (recipients.length === 0) {
+      console.warn('No recipients found for server status alert')
+      return
+    }
+
+    const statusLabel = SERVER_STATUS_LABELS[payload.status] || 'Update'
+    const containerSuffix = payload.container?.trim() ? ` (${payload.container.trim()})` : ''
+    const title = `Server status ${statusLabel}: ${payload.project} / ${payload.serverName}${containerSuffix}`
+    const userIds = recipients.map((user) => user.id)
+    const testEmail = process.env.SERVER_STATUS_TEST_EMAIL?.trim()
+    const emails = testEmail ? [testEmail] : recipients.map((user) => user.email).filter(Boolean)
+
+    const notificationPromise = notificationService.createSystemNotificationForUsers(
+      userIds,
+      title,
+      '/server-management'
+    )
+    const emailPromise =
+      emails.length > 0
+        ? emailService.sendServerStatusEmail(emails, {
+            ...payload,
+            receivedAt: new Date(),
+          })
+        : Promise.resolve()
+
+    const results = await Promise.allSettled([notificationPromise, emailPromise])
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const label = index === 0 ? 'notification' : 'email'
+        console.error(`Failed to send server status ${label}:`, result.reason)
+      }
+    })
   },
 
   startActionRun(params: { userId: string; server: ServerManagementServer; action: ServerManagementAction }) {

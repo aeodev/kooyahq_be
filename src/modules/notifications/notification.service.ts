@@ -147,6 +147,33 @@ export const notificationService = {
     return notificationRepository.getUnreadCount(userId)
   },
 
+  async createSystemNotificationForUsers(userIds: string[], title: string, url?: string): Promise<void> {
+    const normalizedTitle = title?.trim()
+    const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
+    if (uniqueUserIds.length === 0) return
+
+    const notifications = await Promise.all(
+      uniqueUserIds.map((userId) =>
+        notificationRepository.create({
+          userId,
+          type: 'system',
+          ...(normalizedTitle ? { title: normalizedTitle } : {}),
+          ...(url ? { url } : {}),
+        })
+      )
+    )
+
+    await Promise.all(
+      notifications.map(async (notification) => {
+        const unreadCount = await notificationRepository.getUnreadCount(notification.userId)
+        SocketEmitter.emitToUser(notification.userId, 'notification:new', {
+          notification,
+          unreadCount,
+        })
+      })
+    )
+  },
+
   async createSystemNotificationBroadcast(title: string, message?: string): Promise<void> {
     const users = await userService.findAll()
     
@@ -352,5 +379,4 @@ export const notificationService = {
     })
   },
 }
-
 

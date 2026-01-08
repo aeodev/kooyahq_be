@@ -23,6 +23,7 @@ export async function createProject(req: Request, res: Response, next: NextFunct
           action: 'create_project',
           targetType: 'project',
           targetId: project.id,
+          targetLabel: project.name,
           changes: { name: project.name },
         })
       } catch (logError) {
@@ -84,6 +85,11 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
   }
 
   try {
+    const existingProject = await projectService.findById(id)
+    if (!existingProject) {
+      return next(createHttpError(404, 'Project not found'))
+    }
+
     const updates: any = {}
     if (name !== undefined) {
       updates.name = name.trim()
@@ -98,12 +104,17 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
     // Log admin activity
     if (req.user?.id) {
       try {
+        const changes: Record<string, unknown> = {}
+        if (updates.name !== undefined && updates.name !== existingProject.name) {
+          changes.name = { from: existingProject.name, to: updates.name }
+        }
         await adminActivityService.logActivity({
           adminId: req.user.id,
           action: 'update_project',
           targetType: 'project',
           targetId: id,
-          changes: updates,
+          targetLabel: project.name,
+          changes: Object.keys(changes).length ? changes : undefined,
         })
       } catch (logError) {
         // Don't fail the request if logging fails
@@ -127,6 +138,7 @@ export async function deleteProject(req: Request, res: Response, next: NextFunct
   const id = req.params.id
 
   try {
+    const existingProject = await projectService.findById(id)
     const deleted = await projectService.delete(id)
 
     if (!deleted) {
@@ -141,6 +153,7 @@ export async function deleteProject(req: Request, res: Response, next: NextFunct
           action: 'delete_project',
           targetType: 'project',
           targetId: id,
+          targetLabel: existingProject?.name,
         })
       } catch (logError) {
         // Don't fail the request if logging fails
@@ -156,8 +169,6 @@ export async function deleteProject(req: Request, res: Response, next: NextFunct
     next(error)
   }
 }
-
-
 
 
 

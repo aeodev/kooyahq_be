@@ -24,3 +24,13 @@ export interface TimeTrackerEndDayEmailData {
   }>
 }
 
+export interface ServerStatusEmailData {
+  status: 'warning' | 'danger' | 'starting' | 'restarting' | 'shutdown'
+  project: string
+  serverName: string
+  container?: string
+  cpu: string
+  memory: string
+  receivedAt?: Date
+  appUrl?: string
+}
