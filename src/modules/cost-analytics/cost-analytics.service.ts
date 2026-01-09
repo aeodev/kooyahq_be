@@ -2,6 +2,7 @@ import { TimeEntryRepository } from '../time-tracker/time-entry.repository'
 import { userRepository } from '../users/user.repository'
 import type { TimeEntry } from '../time-tracker/time-entry.model'
 import type { User } from '../users/user.model'
+import { resolveMediaUrl } from '../../utils/media-url'
 
 const HOURS_PER_MONTH = 160
 
@@ -146,11 +147,14 @@ export class CostAnalyticsService {
       const activeMinutes = this.calculateActiveMinutes(entry)
       const liveCost = (activeMinutes / 60) * hourlyRate
 
+      // Resolve media URL for profilePic if it exists
+      const profilePic = user.profilePic ? resolveMediaUrl(user.profilePic) : undefined
+      
       activeDevelopers.push({
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
-        profilePic: user.profilePic,
+        profilePic,
         position: user.position,
         projects: entry.projects,
         monthlySalary,
@@ -316,11 +320,13 @@ export class CostAnalyticsService {
     const topPerformers: TopPerformer[] = Array.from(userCostMap.entries())
       .map(([userId, data]) => {
         const user = userMap.get(userId)
+        // Resolve media URL for profilePic if it exists
+        const profilePic = user?.profilePic ? resolveMediaUrl(user.profilePic) : undefined
         return {
           userId,
           userName: user?.name || 'Unknown',
           userEmail: user?.email || '',
-          profilePic: user?.profilePic,
+          profilePic,
           position: user?.position,
           totalHours: data.totalHours,
           totalCost: data.totalCost,

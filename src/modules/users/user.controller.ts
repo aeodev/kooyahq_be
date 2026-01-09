@@ -215,7 +215,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
 export async function updateEmployee(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
-  const { name, email, position, birthday, status, permissions, bio } = req.body
+  const { name, email, position, birthday, status, permissions, bio, monthlySalary } = req.body
 
   const validStatuses = ['online', 'busy', 'away', 'offline']
   const validPermissions = new Set(Object.values(PERMISSIONS))
@@ -229,6 +229,7 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       status?: string
       permissions?: string[]
       bio?: string
+      monthlySalary?: number
     } = {}
 
     if (name !== undefined) {
@@ -282,6 +283,14 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       }
       const sanitized = permissions.filter((p: unknown) => typeof p === 'string' && validPermissions.has(p as any))
       updates.permissions = Array.from(new Set(sanitized))
+    }
+
+    if (monthlySalary !== undefined) {
+      const salary = typeof monthlySalary === 'string' ? parseFloat(monthlySalary) : monthlySalary
+      if (isNaN(salary) || salary < 0) {
+        return next(createHttpError(400, 'Monthly salary must be a valid positive number'))
+      }
+      updates.monthlySalary = salary
     }
 
     if (Object.keys(updates).length === 0) {
