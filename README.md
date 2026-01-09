@@ -73,19 +73,70 @@ Branch names must include the ticket key as a full path segment (e.g., `/TT-1/`)
 
 ## Server Status Gateway
 
-Set `SERVER_STATUS_GATEWAY_SECRET` in your environment. Monitoring services should `POST` to `/api/gateways/server-status` with either `x-server-status-gateway-secret`, `x-gateway-secret`, or `Authorization: Bearer <secret>`.
+Set `SERVER_STATUS_GATEWAY_SECRET` in your environment. The `system-status` monitoring script should `POST` to `/api/gateways/server-status` with either `x-server-status-gateway-secret`, `x-gateway-secret`, or `Authorization: Bearer <secret>`.
 
 Example payload:
 
 ```json
 {
-  "status": "warning",
+  "version": "1.0.0",
+  "timestamp": "2026-01-10T14:32:45+0000",
+  "event_type": "status",
   "project": "kooyahq",
-  "serverName": "app-node-1",
-  "container": "api",
-  "cpu": "92%",
-  "memory": "81%"
+  "status": "warning",
+  "server": {
+    "name": "app-node-1",
+    "hostname": "ip-172-31-0-1",
+    "status": "running",
+    "uptime_seconds": 86400,
+    "process_count": 245
+  },
+  "metrics": {
+    "cpu": {
+      "current_percent": 85.5,
+      "average_15m_percent": 82.3,
+      "is_ready": true
+    },
+    "memory": {
+      "current_percent": 72.1,
+      "average_15m_percent": 70.5,
+      "used_bytes": 7516192768,
+      "total_bytes": 10427904000,
+      "is_ready": true
+    }
+  },
+  "alert_summary": {
+    "total": 2,
+    "by_risk": { "critical": 0, "danger": 0, "warning": 2, "info": 0 },
+    "has_critical": false,
+    "has_danger": false,
+    "has_warning": true
+  },
+  "instance_alerts": [
+    {
+      "risk": "warning",
+      "category": "cpu",
+      "type": "threshold_average",
+      "title": "CPU High",
+      "message": "CPU 15m average (82.3%) exceeds threshold",
+      "details": { "metric": "cpu_average_15m", "value": 82.3, "threshold": 80 }
+    }
+  ],
+  "containers": {
+    "total": 5,
+    "running": 4,
+    "stopped": 1,
+    "restarting": 0,
+    "alerts": []
+  },
+  "health_changes": []
 }
 ```
 
-Accepted statuses: `warning`, `danger`.
+Required fields: `version`, `project`, `server.name`, `status`
+
+Headers:
+- `X-Status-Event`: Event type (`status` or `lifecycle`)
+- `X-Status-Level`: Overall status level
+
+Accepted statuses: `healthy`, `info`, `warning`, `danger`, `critical`, `starting`, `shutdown`, `restarting`.

@@ -22,18 +22,17 @@ type StatusStreamHandlers = {
   onClose?: (details: { exitCode: number | null; signal: string | null }) => void
 }
 
-type ServerStatusAlertPayload = {
-  status: 'warning' | 'danger' | 'starting' | 'restarting' | 'shutdown'
-  project: string
-  serverName: string
-  container?: string
-  cpu: string
-  memory: string
-}
+import type {
+  NormalizedServerStatusPayload,
+  OverallStatus,
+} from '../../gateways/server-status/server-status.controller'
 
-const SERVER_STATUS_LABELS: Record<ServerStatusAlertPayload['status'], string> = {
+const SERVER_STATUS_LABELS: Record<OverallStatus, string> = {
+  healthy: 'Healthy',
+  info: 'Info',
   warning: 'Warning',
   danger: 'Danger',
+  critical: 'Critical',
   starting: 'Starting',
   restarting: 'Restarting',
   shutdown: 'Shutdown',
@@ -470,7 +469,7 @@ export const serverManagementService = {
     return { stop }
   },
 
-  async notifyServerStatus(payload: ServerStatusAlertPayload) {
+  async notifyServerStatus(payload: NormalizedServerStatusPayload) {
     const users = await userService.findAll()
     const recipients = users.filter(isServerStatusRecipient)
 
@@ -481,10 +480,40 @@ export const serverManagementService = {
 
     const statusLabel = SERVER_STATUS_LABELS[payload.status] || 'Update'
     const containerSuffix = payload.container?.trim() ? ` (${payload.container.trim()})` : ''
-    const title = `Server status ${statusLabel}: ${payload.project} / ${payload.serverName}${containerSuffix}`
+    const serverName = payload.server?.name || 'Unknown'
+    const alertCount = payload.alert_summary?.total || 0
+    const alertSuffix = alertCount > 0 ? ` - ${alertCount} alert${alertCount !== 1 ? 's' : ''}` : ''
+    const title = `Server ${statusLabel}: ${payload.project} / ${serverName}${containerSuffix}${alertSuffix}`
     const userIds = recipients.map((user) => user.id)
     const testEmail = process.env.SERVER_STATUS_TEST_EMAIL?.trim()
     const emails = testEmail ? [testEmail] : recipients.map((user) => user.email).filter(Boolean)
+
+    // Build email data from normalized payload
+    const emailData = {
+      status: payload.status,
+      project: payload.project,
+      serverName: payload.server?.name || 'Unknown',
+      hostname: payload.server?.hostname,
+      container: payload.container,
+      uptime_seconds: payload.server?.uptime_seconds,
+      process_count: payload.server?.process_count,
+      metrics: payload.metrics,
+      alert_summary: payload.alert_summary,
+      instance_alerts: payload.instance_alerts,
+      container_alerts: payload.containers?.alerts,
+      health_changes: payload.health_changes,
+      containers: payload.containers
+        ? {
+            total: payload.containers.total,
+            running: payload.containers.running,
+            stopped: payload.containers.stopped,
+            restarting: payload.containers.restarting,
+          }
+        : undefined,
+      lifecycle_event: payload.lifecycle?.event,
+      lifecycle_reason: payload.lifecycle?.reason,
+      receivedAt: new Date(),
+    }
 
     const notificationPromise = notificationService.createSystemNotificationForUsers(
       userIds,
@@ -492,12 +521,7 @@ export const serverManagementService = {
       '/server-management'
     )
     const emailPromise =
-      emails.length > 0
-        ? emailService.sendServerStatusEmail(emails, {
-            ...payload,
-            receivedAt: new Date(),
-          })
-        : Promise.resolve()
+      emails.length > 0 ? emailService.sendServerStatusEmail(emails, emailData) : Promise.resolve()
 
     const results = await Promise.allSettled([notificationPromise, emailPromise])
     results.forEach((result, index) => {
