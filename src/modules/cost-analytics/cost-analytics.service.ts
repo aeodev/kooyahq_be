@@ -65,6 +65,12 @@ export type TopPerformer = {
   projects: string[]
 }
 
+export type OvertimeBreakdown = {
+  regular: { cost: number; hours: number }
+  overtime: { cost: number; hours: number }
+  overtimePercentage: number
+}
+
 export type CostSummaryData = {
   totalCost: number
   totalHours: number
@@ -80,6 +86,22 @@ export type CostSummaryData = {
     cost: number
     hours: number
   }>
+  overtimeBreakdown?: OvertimeBreakdown
+}
+
+export type CostForecast = {
+  projectedCost: number
+  projectedHours: number
+  daysRemaining: number
+  confidence: number
+  dailyAverage: number
+  trend: 'increasing' | 'decreasing' | 'stable'
+}
+
+export type PeriodComparison = {
+  current: { cost: number; hours: number }
+  previous: { cost: number; hours: number }
+  change: { cost: number; hours: number; costPercentage: number; hoursPercentage: number }
 }
 
 export class CostAnalyticsService {
@@ -202,9 +224,14 @@ export class CostAnalyticsService {
     }
   }
 
-  async getCostSummary(startDate: Date, endDate: Date): Promise<CostSummaryData> {
+  async getCostSummary(startDate: Date, endDate: Date, project?: string | null): Promise<CostSummaryData> {
     // Get all completed entries in date range
-    const entries = await this.timeEntryRepo.findByDateRange(null, startDate, endDate)
+    let entries = await this.timeEntryRepo.findByDateRange(null, startDate, endDate)
+    
+    // Filter by project if specified
+    if (project) {
+      entries = entries.filter(e => e.projects.includes(project))
+    }
     
     if (entries.length === 0) {
       return {
@@ -214,6 +241,11 @@ export class CostAnalyticsService {
         topPerformers: [],
         dailyCosts: [],
         monthlyCosts: [],
+        overtimeBreakdown: {
+          regular: { cost: 0, hours: 0 },
+          overtime: { cost: 0, hours: 0 },
+          overtimePercentage: 0,
+        },
       }
     }
 
@@ -360,6 +392,36 @@ export class CostAnalyticsService {
     const totalCost = Array.from(userCostMap.values()).reduce((sum, d) => sum + d.totalCost, 0)
     const totalHours = Array.from(userCostMap.values()).reduce((sum, d) => sum + d.totalHours, 0)
 
+    // Calculate overtime breakdown
+    let regularCost = 0
+    let regularHours = 0
+    let overtimeCost = 0
+    let overtimeHours = 0
+
+    for (const entry of entries) {
+      const user = userMap.get(entry.userId)
+      if (!user) continue
+
+      const monthlySalary = user.monthlySalary || 0
+      const hourlyRate = this.calculateHourlyRate(monthlySalary)
+      const hours = entry.duration / 60
+      const cost = hours * hourlyRate
+
+      if (entry.isOvertime) {
+        overtimeCost += cost
+        overtimeHours += hours
+      } else {
+        regularCost += cost
+        regularHours += hours
+      }
+    }
+
+    const overtimeBreakdown: OvertimeBreakdown = {
+      regular: { cost: regularCost, hours: regularHours },
+      overtime: { cost: overtimeCost, hours: overtimeHours },
+      overtimePercentage: totalCost > 0 ? (overtimeCost / totalCost) * 100 : 0,
+    }
+
     return {
       totalCost,
       totalHours,
@@ -367,6 +429,7 @@ export class CostAnalyticsService {
       topPerformers,
       dailyCosts,
       monthlyCosts,
+      overtimeBreakdown,
     }
   }
 
@@ -445,5 +508,117 @@ export class CostAnalyticsService {
     const projectSet = new Set<string>()
     entries.forEach(e => e.projects.forEach(p => projectSet.add(p)))
     return Array.from(projectSet).sort()
+  }
+
+  async getCostForecast(startDate: Date, endDate: Date, forecastDays: number = 30, project?: string | null): Promise<CostForecast> {
+    // Get historical data
+    const summary = await this.getCostSummary(startDate, endDate, project)
+    
+    if (summary.dailyCosts.length < 2) {
+      // Not enough data for forecast
+      const dailyAverage = summary.dailyCosts.length > 0 
+        ? summary.dailyCosts[0].cost 
+        : 0
+      return {
+        projectedCost: dailyAverage * forecastDays,
+        projectedHours: (summary.dailyCosts.length > 0 ? summary.dailyCosts[0].hours : 0) * forecastDays,
+        daysRemaining: forecastDays,
+        confidence: 0,
+        dailyAverage,
+        trend: 'stable',
+      }
+    }
+
+    // Simple linear regression for trend
+    const costs = summary.dailyCosts.map(d => d.cost)
+    const n = costs.length
+    const x = Array.from({ length: n }, (_, i) => i + 1)
+    
+    const sumX = x.reduce((a, b) => a + b, 0)
+    const sumY = costs.reduce((a, b) => a + b, 0)
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * costs[i], 0)
+    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0)
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+    const intercept = (sumY - slope * sumX) / n
+    
+    // Calculate daily average
+    const dailyAverage = sumY / n
+    
+    // Determine trend
+    let trend: 'increasing' | 'decreasing' | 'stable' = 'stable'
+    if (slope > 0.01) trend = 'increasing'
+    else if (slope < -0.01) trend = 'decreasing'
+    
+    // Project future costs using linear regression
+    const lastX = n
+    const projectedDailyCost = slope * (lastX + forecastDays) + intercept
+    
+    // Use average of recent trend and daily average for better projection
+    const projectedCost = Math.max(0, (projectedDailyCost + dailyAverage) / 2 * forecastDays)
+    
+    // Calculate hours projection
+    const hours = summary.dailyCosts.map(d => d.hours)
+    const sumHours = hours.reduce((a, b) => a + b, 0)
+    const dailyAverageHours = sumHours / n
+    const projectedHours = dailyAverageHours * forecastDays
+    
+    // Calculate confidence based on data consistency
+    const variance = costs.reduce((sum, cost) => sum + Math.pow(cost - dailyAverage, 2), 0) / n
+    const stdDev = Math.sqrt(variance)
+    const coefficientOfVariation = dailyAverage > 0 ? stdDev / dailyAverage : 1
+    const confidence = Math.max(0, Math.min(100, 100 - (coefficientOfVariation * 100)))
+    
+    return {
+      projectedCost,
+      projectedHours,
+      daysRemaining: forecastDays,
+      confidence: Math.round(confidence),
+      dailyAverage,
+      trend,
+    }
+  }
+
+  async getPeriodComparison(
+    currentStart: Date,
+    currentEnd: Date,
+    previousStart: Date,
+    previousEnd: Date,
+    project?: string | null
+  ): Promise<PeriodComparison> {
+    const currentSummary = await this.getCostSummary(currentStart, currentEnd, project)
+    const previousSummary = await this.getCostSummary(previousStart, previousEnd, project)
+    
+    const current = {
+      cost: currentSummary.totalCost,
+      hours: currentSummary.totalHours,
+    }
+    
+    const previous = {
+      cost: previousSummary.totalCost,
+      hours: previousSummary.totalHours,
+    }
+    
+    const change = {
+      cost: current.cost - previous.cost,
+      hours: current.hours - previous.hours,
+      costPercentage: previous.cost > 0 ? ((current.cost - previous.cost) / previous.cost) * 100 : 0,
+      hoursPercentage: previous.hours > 0 ? ((current.hours - previous.hours) / previous.hours) * 100 : 0,
+    }
+    
+    return {
+      current,
+      previous,
+      change,
+    }
+  }
+
+  async getOvertimeBreakdown(startDate: Date, endDate: Date, project?: string | null): Promise<OvertimeBreakdown> {
+    const summary = await this.getCostSummary(startDate, endDate, project)
+    return summary.overtimeBreakdown || {
+      regular: { cost: 0, hours: 0 },
+      overtime: { cost: 0, hours: 0 },
+      overtimePercentage: 0,
+    }
   }
 }

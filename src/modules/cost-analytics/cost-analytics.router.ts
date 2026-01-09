@@ -2,13 +2,17 @@ import { Router } from 'express'
 import { authenticate } from '../../middleware/authenticate'
 import { requirePermission } from '../../middleware/require-permission'
 import { PERMISSIONS } from '../auth/rbac/permissions'
-import { getLiveCost, getCostSummary, getProjectDetail, getProjectList } from './cost-analytics.controller'
+import { getLiveCost, getCostSummary, getProjectDetail, getProjectList, getCostForecast, getPeriodComparison } from './cost-analytics.controller'
+import { budgetRouter } from './budget.router'
 
 export const costAnalyticsRouter = Router()
 
 // All routes require authentication and SYSTEM_FULL_ACCESS permission
 costAnalyticsRouter.use(authenticate)
 costAnalyticsRouter.use(requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS))
+
+// Budget routes
+costAnalyticsRouter.use('/budgets', budgetRouter)
 
 /**
  * @swagger
@@ -99,3 +103,88 @@ costAnalyticsRouter.get('/projects', getProjectList)
  *         description: No data found for this project
  */
 costAnalyticsRouter.get('/project/:projectName', getProjectDetail)
+
+/**
+ * @swagger
+ * /cost-analytics/forecast:
+ *   get:
+ *     summary: Get cost forecast based on historical trends
+ *     tags: [Cost Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for historical data (defaults to 30 days ago)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for historical data (defaults to today)
+ *       - in: query
+ *         name: project
+ *         schema:
+ *           type: string
+ *         description: Optional project name to forecast
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: number
+ *         description: Number of days to forecast (defaults to 30)
+ *     responses:
+ *       200:
+ *         description: Cost forecast data
+ */
+costAnalyticsRouter.get('/forecast', getCostForecast)
+
+/**
+ * @swagger
+ * /cost-analytics/compare:
+ *   get:
+ *     summary: Compare costs between two periods
+ *     tags: [Cost Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: currentStart
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: Start date of current period
+ *       - in: query
+ *         name: currentEnd
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: End date of current period
+ *       - in: query
+ *         name: previousStart
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: Start date of previous period
+ *       - in: query
+ *         name: previousEnd
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: End date of previous period
+ *       - in: query
+ *         name: project
+ *         schema:
+ *           type: string
+ *         description: Optional project name to compare
+ *     responses:
+ *       200:
+ *         description: Period comparison data
+ */
+costAnalyticsRouter.get('/compare', getPeriodComparison)
