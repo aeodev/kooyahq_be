@@ -36,18 +36,6 @@ function parseClientUrls(value: string | undefined): string[] {
   return value.split(',').map(url => url.trim()).filter(Boolean)
 }
 
-function validateAwsCredentials(accessKeyId?: string, secretAccessKey?: string) {
-  const hasAccessKey = Boolean(accessKeyId)
-  const hasSecretKey = Boolean(secretAccessKey)
-  if (hasAccessKey !== hasSecretKey) {
-    throw new Error('Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together.')
-  }
-}
-
-const storageEnvPrefix = normalizePathPrefix(process.env.S3_ENV_PREFIX || nodeEnv)
-const s3AccessKeyId = process.env.AWS_ACCESS_KEY_ID || undefined
-const s3SecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || undefined
-validateAwsCredentials(s3AccessKeyId, s3SecretAccessKey)
 const refreshTokenExpiresInDays = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 30)
 const normalizedRefreshTokenDays = Number.isFinite(refreshTokenExpiresInDays) && refreshTokenExpiresInDays > 0
   ? refreshTokenExpiresInDays
@@ -71,9 +59,9 @@ export const env = {
   s3: {
     bucket: requireEnv('S3_BUCKET'),
     region: requireEnv('S3_REGION'),
-    envPrefix: storageEnvPrefix,
-    accessKeyId: s3AccessKeyId,
-    secretAccessKey: s3SecretAccessKey,
+    envPrefix: requireEnv('S3_ENV_PREFIX'),
+    accessKeyId: requireEnv('S3_ACCESS_KEY_ID'),
+    secretAccessKey: requireEnv('S3_SECRET_ACCESS_KEY'),
   },
   livekit: {
     url: requireEnv('LIVEKIT_URL'),
@@ -89,20 +77,23 @@ export const env = {
   },
   gateways: {
     github: {
-      secret: process.env.GITHUB_GATEWAY_SECRET,
+      secret: requireEnv('GITHUB_GATEWAY_SECRET'),
     },
     serverStatus: {
-      secret: process.env.SERVER_STATUS_GATEWAY_SECRET,
+      secret: requireEnv('SERVER_STATUS_GATEWAY_SECRET'),
     },
   },
-  openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
+  openRouter: {
+    apiKey: requireEnv('OPENROUTER_API_KEY'),
+    baseUrl: requireEnv('OPENROUTER_BASE_URL'),
+    defaultModel: requireEnv('OPENROUTER_DEFAULT_MODEL'),
+  },
   sendgrid: {
     apiKey: requireEnv('SENDGRID_API_KEY'),
     fromEmail: requireEnv('SENDGRID_FROM_EMAIL'),
   },
   polly: {
     region: process.env.AWS_POLLY_REGION || 'us-east-1',
-    // Uses existing AWS credentials from s3 config
   },
   refreshToken: {
     expiresInDays: normalizedRefreshTokenDays,

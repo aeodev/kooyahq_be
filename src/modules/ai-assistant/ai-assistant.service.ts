@@ -142,7 +142,7 @@ async function callOpenRouter(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.openRouterApiKey}`,
+        'Authorization': `Bearer ${env.openRouter.apiKey}`,
         'HTTP-Referer': 'https://kooyahq.com',
         'X-Title': 'KooyaHQ',
       },
@@ -203,7 +203,7 @@ export const aiAssistantService = {
     const conversationId = existingConversationId || randomUUID()
 
     // Check if OpenRouter is configured
-    if (!env.openRouterApiKey) {
+    if (!env.openRouter.apiKey) {
       const error = new ConfigurationError('AI assistant is not configured. Please set up the OpenRouter API key.')
       SocketEmitter.emitToUser(userId, AIAssistantSocketEvents.ERROR, {
         conversationId,

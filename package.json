@@ -1,15 +1,12 @@
 {
-  "name": "backend",
-  "version": "0.1.0",
+  "name": "kooyahq-backend",
+  "version": "1.2.0",
   "type": "commonjs",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
-    "seed:workspace": "ts-node scripts/seed-workspace.ts",
-    "fix:indexes": "ts-node scripts/fix-board-indexes.ts",
-    "smoke:board-members": "ts-node scripts/smoke-board-members.ts"
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
