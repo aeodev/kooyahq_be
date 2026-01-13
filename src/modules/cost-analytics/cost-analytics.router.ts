@@ -7,9 +7,15 @@ import { budgetRouter } from './budget.router'
 
 export const costAnalyticsRouter = Router()
 
-// All routes require authentication and SYSTEM_FULL_ACCESS permission
+// All routes require authentication
 costAnalyticsRouter.use(authenticate)
-costAnalyticsRouter.use(requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS))
+
+// View routes require at least COST_ANALYTICS_VIEW permission
+costAnalyticsRouter.use(requirePermission(
+  PERMISSIONS.COST_ANALYTICS_VIEW,
+  PERMISSIONS.COST_ANALYTICS_EDIT,
+  PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
+))
 
 // Budget routes
 costAnalyticsRouter.use('/budgets', budgetRouter)

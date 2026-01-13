@@ -14,9 +14,8 @@ import {
 
 export const budgetRouter = Router()
 
-// All routes require authentication and SYSTEM_FULL_ACCESS permission
+// All routes require authentication (permissions inherited from parent router)
 budgetRouter.use(authenticate)
-budgetRouter.use(requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS))
 
 /**
  * @swagger
@@ -66,7 +65,7 @@ budgetRouter.use(requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS))
  *       400:
  *         description: Invalid input
  */
-budgetRouter.post('/', createBudget)
+budgetRouter.post('/', requirePermission(PERMISSIONS.COST_ANALYTICS_EDIT, PERMISSIONS.COST_ANALYTICS_FULL_ACCESS), createBudget)
 
 /**
  * @swagger
@@ -155,7 +154,7 @@ budgetRouter.get('/:id', getBudget)
  *       404:
  *         description: Budget not found
  */
-budgetRouter.put('/:id', updateBudget)
+budgetRouter.put('/:id', requirePermission(PERMISSIONS.COST_ANALYTICS_EDIT, PERMISSIONS.COST_ANALYTICS_FULL_ACCESS), updateBudget)
 
 /**
  * @swagger
@@ -177,7 +176,7 @@ budgetRouter.put('/:id', updateBudget)
  *       404:
  *         description: Budget not found
  */
-budgetRouter.delete('/:id', deleteBudget)
+budgetRouter.delete('/:id', requirePermission(PERMISSIONS.COST_ANALYTICS_EDIT, PERMISSIONS.COST_ANALYTICS_FULL_ACCESS), deleteBudget)
 
 /**
  * @swagger

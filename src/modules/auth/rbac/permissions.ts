@@ -82,6 +82,10 @@ export const PERMISSIONS = {
   TIME_ENTRY_UPDATE: 'time-entry:update',
   TIME_ENTRY_DELETE: 'time-entry:delete',
 
+  COST_ANALYTICS_FULL_ACCESS: 'cost-analytics:fullAccess',
+  COST_ANALYTICS_VIEW: 'cost-analytics:view',
+  COST_ANALYTICS_EDIT: 'cost-analytics:edit',
+
   GAME_FULL_ACCESS: 'game:fullAccess',
   GAME_READ: 'game:read',
   GAME_PLAY: 'game:play',
