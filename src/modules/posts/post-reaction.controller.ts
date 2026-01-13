@@ -27,7 +27,10 @@ export async function togglePostReaction(req: Request, res: Response, next: Next
       try {
         const post = await postService.findById(postId)
         if (post && post.authorId !== userId) {
-          await notificationService.createReactionNotification(post.authorId, userId, postId, reaction.id)
+          await notificationService.createReactionNotification(post.authorId, userId, postId, reaction.id, {
+            reactionType: type,
+            summary: `Reaction: ${type}`,
+          })
         }
       } catch (notifError) {
         // Don't fail the request if notification fails
@@ -91,4 +94,3 @@ export async function deletePostReaction(req: Request, res: Response, next: Next
     next(error)
   }
 }
-

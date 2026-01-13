@@ -158,9 +158,15 @@ export async function createBoard(req: Request, res: Response, next: NextFunctio
       new Set(normalizedMembers.filter((m) => m.userId !== userId).map((m) => m.userId)),
     )
     try {
+      const invitationMetadata = {
+        summary: board.name,
+        boardName: board.name,
+        boardPrefix: board.prefix,
+        workspaceId: board.workspaceId,
+      }
       await Promise.all(
         invitedIds.map((memberId) =>
-          notificationService.createBoardMemberNotification(memberId, board.id, userId),
+          notificationService.createBoardMemberNotification(memberId, board.id, userId, invitationMetadata),
         ),
       )
     } catch (notifyError) {
@@ -472,9 +478,15 @@ export async function updateBoard(req: Request, res: Response, next: NextFunctio
       const addedIds = updates.members
         .filter((member) => !previousIds.has(member.userId) && member.userId !== userId)
         .map((member) => member.userId)
+      const memberMetadata = {
+        summary: updated.name,
+        boardName: updated.name,
+        boardPrefix: updated.prefix,
+        workspaceId: updated.workspaceId,
+      }
       await Promise.all(
         addedIds.map((memberId) =>
-          notificationService.createBoardMemberNotification(memberId, updated.id, userId),
+          notificationService.createBoardMemberNotification(memberId, updated.id, userId, memberMetadata),
         ),
       )
     }

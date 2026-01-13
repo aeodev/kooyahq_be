@@ -48,6 +48,42 @@ function isServerStatusRecipient(user: { permissions?: Array<Permission | string
   return SERVER_STATUS_RECIPIENT_PERMISSIONS.some((permission) => hasPermission({ permissions }, permission))
 }
 
+type AlertLike = { type?: unknown }
+
+function getAlertType(alert: AlertLike): string {
+  return typeof alert.type === 'string' ? alert.type : ''
+}
+
+function isThresholdCurrentAlert(alert: AlertLike): boolean {
+  return getAlertType(alert) === 'threshold_current'
+}
+
+function isThresholdAverageAlert(alert: AlertLike): boolean {
+  return getAlertType(alert) === 'threshold_average'
+}
+
+function shouldSendServerStatusEmail(payload: NormalizedServerStatusPayload): boolean {
+  const instanceAlerts = Array.isArray(payload.instance_alerts) ? payload.instance_alerts : []
+  const containerAlerts = payload.containers?.alerts ?? []
+  const healthChanges = payload.health_changes ?? []
+
+  const hasAverageThreshold = instanceAlerts.some(isThresholdAverageAlert)
+  const hasCurrentThreshold = instanceAlerts.some(isThresholdCurrentAlert)
+  const hasNonThresholdInstanceAlert = instanceAlerts.some((alert) => {
+    const type = getAlertType(alert)
+    return type !== 'threshold_current' && type !== 'threshold_average'
+  })
+
+  const hasOtherSignals =
+    hasNonThresholdInstanceAlert ||
+    containerAlerts.length > 0 ||
+    healthChanges.length > 0 ||
+    Boolean(payload.lifecycle?.event)
+
+  const isSpikeOnly = hasCurrentThreshold && !hasAverageThreshold && !hasOtherSignals
+  return !isSpikeOnly
+}
+
 function buildPrivateKey(sshKey: string): Buffer {
   const normalizedKey = normalizeSshKey(sshKey)
   if (!normalizedKey) {
@@ -487,6 +523,22 @@ export const serverManagementService = {
     const userIds = recipients.map((user) => user.id)
     const testEmail = process.env.SERVER_STATUS_TEST_EMAIL?.trim()
     const emails = testEmail ? [testEmail] : recipients.map((user) => user.email).filter(Boolean)
+    const allowEmail = shouldSendServerStatusEmail(payload)
+    const notificationMetadata = {
+      summary: alertCount > 0 ? `${alertCount} alert${alertCount !== 1 ? 's' : ''}` : `Status: ${statusLabel}`,
+      status: payload.status,
+      project: payload.project,
+      serverName: payload.server?.name,
+      hostname: payload.server?.hostname,
+      container: payload.container,
+      alertTotal: payload.alert_summary?.total,
+      alertCritical: payload.alert_summary?.by_risk?.critical,
+      alertDanger: payload.alert_summary?.by_risk?.danger,
+      alertWarning: payload.alert_summary?.by_risk?.warning,
+      alertInfo: payload.alert_summary?.by_risk?.info,
+      lifecycleEvent: payload.lifecycle?.event,
+      lifecycleReason: payload.lifecycle?.reason,
+    }
 
     // Build email data from normalized payload
     const emailData = {
@@ -518,10 +570,11 @@ export const serverManagementService = {
     const notificationPromise = notificationService.createSystemNotificationForUsers(
       userIds,
       title,
-      '/server-management'
+      '/server-management',
+      notificationMetadata
     )
     const emailPromise =
-      emails.length > 0 ? emailService.sendServerStatusEmail(emails, emailData) : Promise.resolve()
+      allowEmail && emails.length > 0 ? emailService.sendServerStatusEmail(emails, emailData) : Promise.resolve()
 
     const results = await Promise.allSettled([notificationPromise, emailPromise])
     results.forEach((result, index) => {

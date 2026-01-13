@@ -42,6 +42,21 @@ const canModifyTickets = (board: { createdBy: string; members: Array<{ userId: s
   return role === 'owner' || role === 'admin' || role === 'member'
 }
 
+const buildTicketNotificationMetadata = (
+  ticket: { ticketKey?: string; title?: string },
+  board: { name?: string; prefix?: string; workspaceId?: string },
+) => {
+  const summaryParts = [ticket.ticketKey, ticket.title].filter(Boolean)
+  return {
+    summary: summaryParts.length ? summaryParts.join(' ') : undefined,
+    ticketKey: ticket.ticketKey,
+    ticketTitle: ticket.title,
+    boardName: board.name,
+    boardPrefix: board.prefix,
+    workspaceId: board.workspaceId,
+  }
+}
+
 export async function createTicket(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
   const {
@@ -145,13 +160,15 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
     // Notify if ticket was assigned on creation
     if (assigneeId && assigneeId !== userId) {
       try {
+        const assignmentMetadata = buildTicketNotificationMetadata(ticket, board)
         await notificationService.createCardAssignmentNotification(
           assigneeId,
           ticket.id,
           userId,
           ticket.reporterId,
           board.prefix,
-          ticket.ticketKey
+          ticket.ticketKey,
+          assignmentMetadata
         )
       } catch (notifError) {
         console.error('Failed to create assignment notification:', notifError)
@@ -662,13 +679,15 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     // Notify if column changed (ticket moved)
     if (data.columnId !== undefined && data.columnId !== previousColumnId) {
       try {
+        const moveMetadata = buildTicketNotificationMetadata(updated, board)
         await notificationService.createCardMovedNotification(
           ticket.id,
           userId,
           ticket.assigneeId,
           ticket.reporterId,
           board.prefix,
-          ticket.ticketKey
+          ticket.ticketKey,
+          moveMetadata
         )
       } catch (notifError) {
         console.error('Failed to create ticket movement notification:', notifError)
@@ -679,23 +698,30 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     if (data.assigneeId !== undefined && data.assigneeId !== previousAssigneeId) {
       try {
         if (data.assigneeId && data.assigneeId !== userId) {
+          const assignmentMetadata = buildTicketNotificationMetadata(updated, board)
           await notificationService.createCardAssignmentNotification(
             data.assigneeId,
             id,
             userId,
             ticket.reporterId,
             board.prefix,
-            ticket.ticketKey
+            ticket.ticketKey,
+            assignmentMetadata
           )
         } else if (!data.assigneeId && ticket.reporterId && ticket.reporterId !== userId) {
           // Notify reporter when ticket is unassigned
           const url = `/workspace/${board.prefix}/${ticket.ticketKey}`
-          const notification = await notificationRepository.create({
+          const assignmentMetadata = {
+            ...buildTicketNotificationMetadata(updated, board),
+            assignmentAction: 'unassigned',
+          }
+          const notification = await notificationService.create({
             userId: ticket.reporterId,
             type: 'card_assigned',
             cardId: id,
             mentionId: userId,
             url,
+            metadata: assignmentMetadata,
           })
           const unreadCount = await notificationRepository.getUnreadCount(ticket.reporterId)
           SocketEmitter.emitToUser(ticket.reporterId, 'notification:new', {

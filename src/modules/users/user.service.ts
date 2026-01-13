@@ -1,4 +1,4 @@
-import { toPublicUser, type PublicUser, type User } from './user.model'
+import type { PublicUser, PublicUserOptions, User } from './user.model'
 import { userRepository, type CreateUserInput } from './user.repository'
 import { deleteStorageObject, isStoragePath } from '../../lib/storage'
 
@@ -7,36 +7,36 @@ export const userService = {
     return userRepository.findById(id)
   },
 
-  async findByEmail(email: string): Promise<PublicUser | undefined> {
-    return userRepository.findByEmail(email)
+  async findByEmail(email: string, options?: PublicUserOptions): Promise<PublicUser | undefined> {
+    return userRepository.findByEmail(email, options)
   },
 
   async findByEmailRaw(email: string): Promise<User | undefined> {
     return userRepository.findByEmailRaw(email)
   },
 
-  async getPublicProfile(id: string): Promise<PublicUser | undefined> {
-    return userRepository.getPublicProfile(id)
+  async getPublicProfile(id: string, options?: PublicUserOptions): Promise<PublicUser | undefined> {
+    return userRepository.getPublicProfile(id, options)
   },
 
-  async create(input: CreateUserInput) {
-    return userRepository.create(input)
+  async create(input: CreateUserInput, options?: PublicUserOptions) {
+    return userRepository.create(input, options)
   },
 
-  async findAll() {
-    return userRepository.findAll()
+  async findAll(options?: PublicUserOptions) {
+    return userRepository.findAll(options)
   },
 
-  async findPublicByIds(ids: string[]) {
-    return userRepository.findPublicByIds(ids)
+  async findPublicByIds(ids: string[], options?: PublicUserOptions) {
+    return userRepository.findPublicByIds(ids, options)
   },
 
   async searchUsers(params: {
     page?: number
     limit?: number
     search?: string
-  }) {
-    return userRepository.searchUsers(params)
+  }, options?: PublicUserOptions) {
+    return userRepository.searchUsers(params, options)
   },
 
   async deleteUser(id: string, softDelete = true) {
@@ -63,9 +63,13 @@ export const userService = {
     return deleted
   },
 
-  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string; status?: string }) {
+  async updateProfile(
+    id: string,
+    updates: { profilePic?: string; banner?: string; bio?: string; status?: string },
+    options?: PublicUserOptions,
+  ) {
     const existing = await userRepository.findById(id)
-    const updated = await userRepository.updateProfile(id, updates)
+    const updated = await userRepository.updateProfile(id, updates, options)
 
     if (existing) {
       if (updates.profilePic && existing.profilePic && existing.profilePic !== updates.profilePic && isStoragePath(existing.profilePic)) {
@@ -87,7 +91,11 @@ export const userService = {
     return updated
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string }) {
-    return userRepository.updateEmployee(id, updates)
+  async updateEmployee(
+    id: string,
+    updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string; monthlySalary?: number },
+    options?: PublicUserOptions,
+  ) {
+    return userRepository.updateEmployee(id, updates, options)
   },
 }

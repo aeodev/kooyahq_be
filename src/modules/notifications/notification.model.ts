@@ -2,6 +2,8 @@ import { Schema, model, models, type Document } from 'mongoose'
 
 export type NotificationType = 'post_created' | 'comment' | 'reaction' | 'mention' | 'system' | 'card_assigned' | 'card_comment' | 'card_moved' | 'board_member_added' | 'game_invitation'
 
+export type NotificationMetadata = Record<string, unknown>
+
 export interface NotificationDocument extends Document {
   userId: string
   type: NotificationType
@@ -13,6 +15,7 @@ export interface NotificationDocument extends Document {
   boardId?: string
   title?: string
   url?: string
+  metadata?: NotificationMetadata
   read: boolean
   createdAt: Date
   updatedAt: Date
@@ -57,6 +60,9 @@ const notificationSchema = new Schema<NotificationDocument>(
     url: {
       type: String,
     },
+    metadata: {
+      type: Schema.Types.Mixed,
+    },
     read: {
       type: Boolean,
       default: false,
@@ -82,6 +88,7 @@ export type Notification = {
   boardId?: string
   title?: string
   url?: string
+  metadata?: NotificationMetadata
   read: boolean
   createdAt: string
   updatedAt: string
@@ -100,11 +107,11 @@ export function toNotification(doc: NotificationDocument): Notification {
     boardId: doc.boardId,
     title: doc.title,
     url: doc.url,
+    metadata: doc.metadata,
     read: doc.read ?? false,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   }
 }
-
 
 

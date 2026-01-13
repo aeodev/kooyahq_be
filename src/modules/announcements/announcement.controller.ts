@@ -5,6 +5,7 @@ import { notificationService } from '../notifications/notification.service'
 import { emailService } from '../email/email.service'
 import { userService } from '../users/user.service'
 import { sanitizeHtmlContent } from '../../utils/rich-text-sanitizer'
+import { cleanHtml } from '../../utils/text.utils'
 
 export async function createAnnouncement(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -37,9 +38,11 @@ export async function createAnnouncement(req: Request, res: Response, next: Next
   }
 
   try {
+    const sanitizedContent = sanitizeHtmlContent(content.trim())
+    const summary = cleanHtml(sanitizedContent).slice(0, 160)
     const announcement = await announcementService.create({
       title: title.trim(),
-      content: sanitizeHtmlContent(content.trim()),
+      content: sanitizedContent,
       authorId: userId,
       isActive: isActive !== false,
       expiresAt: parsedExpiresAt ?? null,
@@ -48,7 +51,12 @@ export async function createAnnouncement(req: Request, res: Response, next: Next
     // Broadcast system notification if announcement is active
     if (announcement.isActive) {
       try {
-        await notificationService.createSystemNotificationBroadcast(announcement.title)
+        await notificationService.createSystemNotificationBroadcast(announcement.title, {
+          summary,
+          announcementId: announcement.id,
+          authorName: announcement.author.name,
+          expiresAt: announcement.expiresAt,
+        })
       } catch (notifError) {
         console.error('Failed to create system notification broadcast:', notifError)
       }

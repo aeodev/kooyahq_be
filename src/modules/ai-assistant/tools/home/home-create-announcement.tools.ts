@@ -5,6 +5,7 @@ import { notificationService } from '../../../notifications/notification.service
 import { emailService } from '../../../email/email.service'
 import { userService } from '../../../users/user.service'
 import { SocketEmitter } from '../../../../utils/socket-emitter'
+import { cleanHtml } from '../../../../utils/text.utils'
 
 export const createAnnouncementTool: AITool = {
   name: 'create_announcement',
@@ -70,6 +71,7 @@ export const createAnnouncementTool: AITool = {
     }
 
     try {
+      const summary = cleanHtml(content.trim()).slice(0, 160)
       const announcement = await announcementService.create({
         title: title.trim(),
         content: content.trim(),
@@ -81,7 +83,12 @@ export const createAnnouncementTool: AITool = {
       // Broadcast system notification and send emails if announcement is active
       if (announcement.isActive) {
         try {
-          await notificationService.createSystemNotificationBroadcast(announcement.title)
+          await notificationService.createSystemNotificationBroadcast(announcement.title, {
+            summary,
+            announcementId: announcement.id,
+            authorName: announcement.author.name,
+            expiresAt: announcement.expiresAt,
+          })
         } catch (notifError) {
           console.error('Failed to create system notification broadcast:', notifError)
         }
@@ -141,4 +148,3 @@ export const createAnnouncementTool: AITool = {
     }
   },
 }
-

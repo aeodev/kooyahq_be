@@ -97,7 +97,9 @@ export function registerGameHandlers(socket: AuthenticatedSocket): void {
     
     // Create notification for the invited user
     try {
-      await notificationService.createGameInvitationNotification(invitedUserId, userId, gameType)
+      await notificationService.createGameInvitationNotification(invitedUserId, userId, gameType, {
+        summary: `Game: ${gameType}`,
+      })
     } catch (error) {
       console.error('Failed to create game invitation notification:', error)
     }

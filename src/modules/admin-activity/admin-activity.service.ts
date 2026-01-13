@@ -12,6 +12,7 @@ const SENSITIVE_KEY_PATTERNS = [
   /api[-_]?key/i,
   /access[-_]?key/i,
   /command/i,
+  /salary/i,
 ]
 
 const MAX_ARRAY_ITEMS = 12
@@ -216,7 +217,6 @@ export const adminActivityService = {
     return adminActivityRepository.findAll(params.limit, params.startDate, params.endDate)
   },
 }
-
 
 
 

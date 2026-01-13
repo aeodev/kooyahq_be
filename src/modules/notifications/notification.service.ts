@@ -1,6 +1,6 @@
 import { notificationRepository, type CreateNotificationInput } from './notification.repository'
 import { userService } from '../users/user.service'
-import type { Notification } from './notification.model'
+import type { Notification, NotificationMetadata } from './notification.model'
 import { SocketEmitter } from '../../utils/socket-emitter'
 
 export type NotificationWithData = Notification & {
@@ -12,9 +12,19 @@ export type NotificationWithData = Notification & {
   }
 }
 
+const normalizeMetadata = (metadata?: NotificationMetadata): NotificationMetadata | undefined => {
+  if (!metadata) return undefined
+  const entries = Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null)
+  if (entries.length === 0) return undefined
+  return Object.fromEntries(entries)
+}
+
 export const notificationService = {
   async create(input: CreateNotificationInput): Promise<Notification> {
-    return notificationRepository.create(input)
+    return notificationRepository.create({
+      ...input,
+      metadata: normalizeMetadata(input.metadata),
+    })
   },
 
   async createPostCreatedNotification(authorId: string, postId: string): Promise<void> {
@@ -22,7 +32,13 @@ export const notificationService = {
     // For now, we'll skip this to avoid spam. Can be enabled later if needed.
   },
 
-  async createCommentNotification(postAuthorId: string, commentAuthorId: string, postId: string, commentId: string): Promise<void> {
+  async createCommentNotification(
+    postAuthorId: string,
+    commentAuthorId: string,
+    postId: string,
+    commentId: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user commented on their own post
     if (postAuthorId === commentAuthorId) {
       return
@@ -33,6 +49,8 @@ export const notificationService = {
       type: 'comment',
       postId,
       commentId,
+      mentionId: commentAuthorId,
+      metadata: normalizeMetadata(metadata),
     })
 
     const unreadCount = await notificationRepository.getUnreadCount(postAuthorId)
@@ -42,7 +60,13 @@ export const notificationService = {
     })
   },
 
-  async createReactionNotification(postAuthorId: string, reactionAuthorId: string, postId: string, reactionId: string): Promise<void> {
+  async createReactionNotification(
+    postAuthorId: string,
+    reactionAuthorId: string,
+    postId: string,
+    reactionId: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user reacted to their own post
     if (postAuthorId === reactionAuthorId) {
       return
@@ -53,6 +77,8 @@ export const notificationService = {
       type: 'reaction',
       postId,
       reactionId,
+      mentionId: reactionAuthorId,
+      metadata: normalizeMetadata(metadata),
     })
 
     const unreadCount = await notificationRepository.getUnreadCount(postAuthorId)
@@ -62,7 +88,13 @@ export const notificationService = {
     })
   },
 
-  async createMentionNotification(mentionedUserIds: string[], mentionerId: string, postId?: string, commentId?: string): Promise<void> {
+  async createMentionNotification(
+    mentionedUserIds: string[],
+    mentionerId: string,
+    postId?: string,
+    commentId?: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user mentioned themselves
     const filteredUserIds = mentionedUserIds.filter((id) => id !== mentionerId)
 
@@ -74,6 +106,7 @@ export const notificationService = {
           postId,
           commentId,
           mentionId: mentionerId,
+          metadata: normalizeMetadata(metadata),
         })
       )
     )
@@ -99,7 +132,16 @@ export const notificationService = {
     // Get actor info for mentions, card_comment, card_assigned, card_moved, and board_member_added
     const actorIds = [...new Set(
       notifications
-        .filter((n) => n.mentionId && (n.type === 'mention' || n.type === 'card_comment' || n.type === 'card_assigned' || n.type === 'card_moved' || n.type === 'board_member_added' || n.type === 'game_invitation'))
+        .filter((n) => n.mentionId && (
+          n.type === 'mention' ||
+          n.type === 'comment' ||
+          n.type === 'reaction' ||
+          n.type === 'card_comment' ||
+          n.type === 'card_assigned' ||
+          n.type === 'card_moved' ||
+          n.type === 'board_member_added' ||
+          n.type === 'game_invitation'
+        ))
         .map((n) => n.mentionId!)
     )]
     
@@ -117,7 +159,16 @@ export const notificationService = {
     const notificationsWithData = notifications.map((notification) => {
       const notificationWithData: NotificationWithData = { ...notification }
       
-      if (notification.mentionId && (notification.type === 'mention' || notification.type === 'card_comment' || notification.type === 'card_assigned' || notification.type === 'card_moved' || notification.type === 'board_member_added' || notification.type === 'game_invitation')) {
+      if (notification.mentionId && (
+        notification.type === 'mention' ||
+        notification.type === 'comment' ||
+        notification.type === 'reaction' ||
+        notification.type === 'card_comment' ||
+        notification.type === 'card_assigned' ||
+        notification.type === 'card_moved' ||
+        notification.type === 'board_member_added' ||
+        notification.type === 'game_invitation'
+      )) {
         const actor = actorMap.get(notification.mentionId)
         if (actor) {
           notificationWithData.actor = {
@@ -147,7 +198,12 @@ export const notificationService = {
     return notificationRepository.getUnreadCount(userId)
   },
 
-  async createSystemNotificationForUsers(userIds: string[], title: string, url?: string): Promise<void> {
+  async createSystemNotificationForUsers(
+    userIds: string[],
+    title: string,
+    url?: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     const normalizedTitle = title?.trim()
     const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
     if (uniqueUserIds.length === 0) return
@@ -159,6 +215,7 @@ export const notificationService = {
           type: 'system',
           ...(normalizedTitle ? { title: normalizedTitle } : {}),
           ...(url ? { url } : {}),
+          metadata: normalizeMetadata(metadata),
         })
       )
     )
@@ -174,7 +231,7 @@ export const notificationService = {
     )
   },
 
-  async createSystemNotificationBroadcast(title: string, message?: string): Promise<void> {
+  async createSystemNotificationBroadcast(title: string, metadata?: NotificationMetadata): Promise<void> {
     const users = await userService.findAll()
     
     const notifications = await Promise.all(
@@ -183,6 +240,7 @@ export const notificationService = {
           userId: user.id,
           type: 'system',
           title,
+          metadata: normalizeMetadata(metadata),
         })
       )
     )
@@ -199,7 +257,15 @@ export const notificationService = {
     )
   },
 
-  async createCardAssignmentNotification(assigneeId: string, cardId: string, assignedById: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
+  async createCardAssignmentNotification(
+    assigneeId: string,
+    cardId: string,
+    assignedById: string,
+    cardReporterId?: string,
+    boardPrefix?: string,
+    ticketKey?: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user assigned themselves
     if (assigneeId === assignedById) {
       return
@@ -217,6 +283,7 @@ export const notificationService = {
         cardId,
         mentionId: assignedById, // Use mentionId to track who assigned
         url,
+        metadata: normalizeMetadata(metadata),
       })
     )
 
@@ -229,6 +296,7 @@ export const notificationService = {
           cardId,
           mentionId: assignedById,
           url,
+          metadata: normalizeMetadata(metadata),
         })
       )
     }
@@ -247,7 +315,16 @@ export const notificationService = {
     )
   },
 
-  async createCardCommentNotification(cardId: string, commenterId: string, commentId: string, cardAssigneeId?: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
+  async createCardCommentNotification(
+    cardId: string,
+    commenterId: string,
+    commentId: string,
+    cardAssigneeId?: string,
+    cardReporterId?: string,
+    boardPrefix?: string,
+    ticketKey?: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     const url = boardPrefix && ticketKey ? `/workspace/${boardPrefix}/${ticketKey}` : undefined
 
     const notificationPromises: Promise<Notification>[] = []
@@ -262,6 +339,7 @@ export const notificationService = {
           commentId,
           mentionId: commenterId, // Use mentionId to track who commented
           url,
+          metadata: normalizeMetadata(metadata),
         })
       )
     }
@@ -276,6 +354,7 @@ export const notificationService = {
           commentId,
           mentionId: commenterId,
           url,
+          metadata: normalizeMetadata(metadata),
         })
       )
     }
@@ -294,7 +373,15 @@ export const notificationService = {
     )
   },
 
-  async createCardMovedNotification(cardId: string, movedById: string, cardAssigneeId?: string, cardReporterId?: string, boardPrefix?: string, ticketKey?: string): Promise<void> {
+  async createCardMovedNotification(
+    cardId: string,
+    movedById: string,
+    cardAssigneeId?: string,
+    cardReporterId?: string,
+    boardPrefix?: string,
+    ticketKey?: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     const url = boardPrefix && ticketKey ? `/workspace/${boardPrefix}/${ticketKey}` : undefined
 
     const notificationPromises: Promise<Notification>[] = []
@@ -308,6 +395,7 @@ export const notificationService = {
           cardId,
           mentionId: movedById, // Use mentionId to track who moved
           url,
+          metadata: normalizeMetadata(metadata),
         })
       )
     }
@@ -321,6 +409,7 @@ export const notificationService = {
           cardId,
           mentionId: movedById,
           url,
+          metadata: normalizeMetadata(metadata),
         })
       )
     }
@@ -339,7 +428,12 @@ export const notificationService = {
     )
   },
 
-  async createBoardMemberNotification(userId: string, boardId: string, addedById: string): Promise<void> {
+  async createBoardMemberNotification(
+    userId: string,
+    boardId: string,
+    addedById: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user added themselves
     if (userId === addedById) {
       return
@@ -350,6 +444,7 @@ export const notificationService = {
       type: 'board_member_added',
       boardId,
       mentionId: addedById, // Use mentionId to track who added them
+      metadata: normalizeMetadata(metadata),
     })
 
     const unreadCount = await notificationRepository.getUnreadCount(userId)
@@ -359,7 +454,12 @@ export const notificationService = {
     })
   },
 
-  async createGameInvitationNotification(invitedUserId: string, inviterId: string, gameType: string): Promise<void> {
+  async createGameInvitationNotification(
+    invitedUserId: string,
+    inviterId: string,
+    gameType: string,
+    metadata?: NotificationMetadata
+  ): Promise<void> {
     // Don't notify if user invited themselves
     if (invitedUserId === inviterId) {
       return
@@ -370,6 +470,7 @@ export const notificationService = {
       type: 'game_invitation',
       title: `Game invitation: ${gameType}`,
       mentionId: inviterId, // Use mentionId to track who invited
+      metadata: normalizeMetadata({ gameType, ...metadata }),
     })
 
     const unreadCount = await notificationRepository.getUnreadCount(invitedUserId)
@@ -379,4 +480,3 @@ export const notificationService = {
     })
   },
 }
-

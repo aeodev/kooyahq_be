@@ -1,4 +1,4 @@
-import { UserModel, toPublicUser, toUser, type PublicUser, type User } from './user.model'
+import { UserModel, toPublicUser, toUser, type PublicUser, type PublicUserOptions, type User } from './user.model'
 
 export type CreateUserInput = {
   email: string
@@ -16,12 +16,12 @@ export const userRepository = {
     return doc ? toUser(doc) : undefined
   },
 
-  async findByEmail(email: string): Promise<PublicUser | undefined> {
+  async findByEmail(email: string, options?: PublicUserOptions): Promise<PublicUser | undefined> {
     const doc = await UserModel.findOne({
       email: email.toLowerCase(),
       deletedAt: undefined,
     }).exec()
-    return doc ? toPublicUser(toUser(doc)) : undefined
+    return doc ? toPublicUser(toUser(doc), options) : undefined
   },
 
   async findByEmailRaw(email: string): Promise<User | undefined> {
@@ -32,12 +32,12 @@ export const userRepository = {
     return doc ? toUser(doc) : undefined
   },
 
-  async getPublicProfile(id: string): Promise<PublicUser | undefined> {
+  async getPublicProfile(id: string, options?: PublicUserOptions): Promise<PublicUser | undefined> {
     const doc = await UserModel.findById(id).exec()
-    return doc ? toPublicUser(toUser(doc)) : undefined
+    return doc ? toPublicUser(toUser(doc), options) : undefined
   },
 
-  async create(input: CreateUserInput): Promise<PublicUser> {
+  async create(input: CreateUserInput, options?: PublicUserOptions): Promise<PublicUser> {
     const doc = await UserModel.create({
       email: input.email.toLowerCase(),
       name: input.name,
@@ -48,28 +48,28 @@ export const userRepository = {
       bio: input.bio ?? '',
     })
 
-    return toPublicUser(toUser(doc))
+    return toPublicUser(toUser(doc), options)
   },
 
-  async findAll(): Promise<PublicUser[]> {
+  async findAll(options?: PublicUserOptions): Promise<PublicUser[]> {
     const docs = await UserModel.find({ deletedAt: undefined }).sort({ name: 1 }).exec()
-    return docs.map((doc) => toPublicUser(toUser(doc)))
+    return docs.map((doc) => toPublicUser(toUser(doc), options))
   },
 
-  async findPublicByIds(ids: string[]): Promise<PublicUser[]> {
+  async findPublicByIds(ids: string[], options?: PublicUserOptions): Promise<PublicUser[]> {
     if (!Array.isArray(ids) || ids.length === 0) return []
     const docs = await UserModel.find({
       _id: { $in: ids },
       deletedAt: undefined,
     }).exec()
-    return docs.map((doc) => toPublicUser(toUser(doc)))
+    return docs.map((doc) => toPublicUser(toUser(doc), options))
   },
 
   async searchUsers(params: {
     page?: number
     limit?: number
     search?: string
-  }): Promise<{ data: PublicUser[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  }, options?: PublicUserOptions): Promise<{ data: PublicUser[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const page = params.page || 1
     const limit = params.limit || 50
     const skip = (page - 1) * limit
@@ -92,7 +92,7 @@ export const userRepository = {
     ])
 
     return {
-      data: docs.map((doc) => toPublicUser(toUser(doc))),
+      data: docs.map((doc) => toPublicUser(toUser(doc), options)),
       pagination: {
         page,
         limit,
@@ -116,16 +116,24 @@ export const userRepository = {
     }
   },
 
-  async updateProfile(id: string, updates: { profilePic?: string; banner?: string; bio?: string; status?: string }): Promise<PublicUser | undefined> {
+  async updateProfile(
+    id: string,
+    updates: { profilePic?: string; banner?: string; bio?: string; status?: string },
+    options?: PublicUserOptions,
+  ): Promise<PublicUser | undefined> {
     const doc = await UserModel.findByIdAndUpdate(
       id,
       { $set: updates },
       { new: true }
     ).exec()
-    return doc ? toPublicUser(toUser(doc)) : undefined
+    return doc ? toPublicUser(toUser(doc), options) : undefined
   },
 
-  async updateEmployee(id: string, updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string; monthlySalary?: number }): Promise<PublicUser | undefined> {
+  async updateEmployee(
+    id: string,
+    updates: { name?: string; email?: string; position?: string; birthday?: string; status?: string; permissions?: string[]; bio?: string; monthlySalary?: number },
+    options?: PublicUserOptions,
+  ): Promise<PublicUser | undefined> {
     const updateData: Record<string, unknown> = {}
 
     if (updates.name !== undefined) {
@@ -158,6 +166,6 @@ export const userRepository = {
       { $set: updateData },
       { new: true }
     ).exec()
-    return doc ? toPublicUser(toUser(doc)) : undefined
+    return doc ? toPublicUser(toUser(doc), options) : undefined
   },
 }

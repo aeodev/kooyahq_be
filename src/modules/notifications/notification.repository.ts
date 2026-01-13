@@ -1,4 +1,4 @@
-import { NotificationModel, toNotification, type Notification, type NotificationType } from './notification.model'
+import { NotificationModel, toNotification, type Notification, type NotificationMetadata, type NotificationType } from './notification.model'
 
 export type CreateNotificationInput = {
   userId: string
@@ -11,6 +11,7 @@ export type CreateNotificationInput = {
   boardId?: string
   title?: string
   url?: string
+  metadata?: NotificationMetadata
 }
 
 type NotificationQueryOptions = {
@@ -77,5 +78,4 @@ export const notificationRepository = {
     return !!result
   },
 }
-
 

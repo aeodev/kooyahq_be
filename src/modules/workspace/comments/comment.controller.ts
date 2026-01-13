@@ -63,11 +63,10 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     const sanitizedContent = sanitizeRichTextDoc(content)
     const comment = await commentService.create(ticketId, userId, sanitizedContent)
 
+    const textPreview = cleanHtml(sanitizedContent.content).substring(0, 100)
+
     // Create activity log
     try {
-      // Extract text preview from rich text content
-      const textPreview = cleanHtml(sanitizedContent.content).substring(0, 100)
-
       await activityRepository.create({
         workspaceId: board.workspaceId,
         boardId: ticket.boardId,
@@ -94,7 +93,16 @@ export async function createComment(req: Request, res: Response, next: NextFunct
         ticket.assigneeId,
         ticket.reporterId,
         board.prefix,
-        ticket.ticketKey
+        ticket.ticketKey,
+        {
+          summary: textPreview,
+          commentPreview: textPreview,
+          ticketKey: ticket.ticketKey,
+          ticketTitle: ticket.title,
+          boardName: board.name,
+          boardPrefix: board.prefix,
+          workspaceId: board.workspaceId,
+        }
       )
     } catch (notifError) {
       console.error('Failed to create ticket comment notification:', notifError)

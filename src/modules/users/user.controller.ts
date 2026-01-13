@@ -3,13 +3,18 @@ import { userService } from './user.service'
 import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
-import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS } from '../auth/rbac/permissions'
+import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS, hasPermission, type Permission } from '../auth/rbac/permissions'
+
+function canViewSalary(user?: { permissions?: Permission[] }) {
+  return !!user && hasPermission(user, PERMISSIONS.USERS_MANAGE)
+}
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
 
   try {
-    const user = await userService.getPublicProfile(id)
+    const includeSalary = canViewSalary(req.user)
+    const user = await userService.getPublicProfile(id, { includeSalary })
 
     if (!user) {
       return next(createHttpError(404, 'User not found'))
@@ -27,6 +32,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 export async function getAllUsers(req: Request, res: Response, next: NextFunction) {
   try {
     const { page, limit, search } = req.query
+    const includeSalary = canViewSalary(req.user)
 
     // If pagination/search params provided, use searchUsers
     if (page || limit || search) {
@@ -34,7 +40,7 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
         page: page ? parseInt(page as string, 10) : undefined,
         limit: limit ? parseInt(limit as string, 10) : undefined,
         search: search as string | undefined,
-      })
+      }, { includeSalary })
 
       res.json({
         status: 'success',
@@ -43,7 +49,7 @@ export async function getAllUsers(req: Request, res: Response, next: NextFunctio
       })
     } else {
       // Otherwise, return all users (backward compatibility)
-      const users = await userService.findAll()
+      const users = await userService.findAll({ includeSalary })
       res.json({
         status: 'success',
         data: users,
@@ -62,7 +68,8 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
   }
 
   try {
-    const userProfile = await userService.getPublicProfile(userId)
+    const includeSalary = canViewSalary(req.user)
+    const userProfile = await userService.getPublicProfile(userId, { includeSalary })
     if (!userProfile) {
       return next(createHttpError(404, 'User not found'))
     }
@@ -117,7 +124,8 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
       return next(createHttpError(400, 'No updates provided'))
     }
 
-    const updated = await userService.updateProfile(userId, updates)
+    const includeSalary = canViewSalary(req.user)
+    const updated = await userService.updateProfile(userId, updates, { includeSalary })
     if (!updated) {
       return next(createHttpError(404, 'User not found'))
     }
@@ -178,6 +186,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       return next(createHttpError(409, 'Email already in use'))
     }
 
+    const includeSalary = canViewSalary(req.user)
     const user = await userService.create({
       email: normalizedEmail,
       name: nameValue,
@@ -186,7 +195,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       status: status || 'online',
       permissions: sanitizedPermissions,
       bio: typeof bio === 'string' ? bio.trim() : undefined,
-    })
+    }, { includeSalary })
 
     if (req.user?.id) {
       try {
@@ -302,7 +311,8 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
       return next(createHttpError(404, 'User not found'))
     }
 
-    const updated = await userService.updateEmployee(id, updates)
+    const includeSalary = canViewSalary(req.user)
+    const updated = await userService.updateEmployee(id, updates, { includeSalary })
     if (!updated) {
       return next(createHttpError(404, 'User not found'))
     }
@@ -421,11 +431,12 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
     }
 
     // Create client user
+    const includeSalary = canViewSalary(req.user)
     const user = await userService.create({
       email: normalizedEmail,
       name: nameValue,
       permissions,
-    })
+    }, { includeSalary })
 
     // Log admin activity
     if (req.user?.id) {

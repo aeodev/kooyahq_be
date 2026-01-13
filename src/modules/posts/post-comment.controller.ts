@@ -4,6 +4,7 @@ import { notificationService } from '../notifications/notification.service'
 import { postService } from './post.service'
 import { createHttpError } from '../../utils/http-error'
 import { sanitizeHtmlContent } from '../../utils/rich-text-sanitizer'
+import { cleanHtml } from '../../utils/text.utils'
 
 export async function createPostComment(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id
@@ -19,22 +20,30 @@ export async function createPostComment(req: Request, res: Response, next: NextF
   }
 
   try {
+    const sanitizedContent = sanitizeHtmlContent(content.trim())
+    const commentPreview = cleanHtml(sanitizedContent).slice(0, 160)
     const comment = await postCommentService.create({
       postId,
       userId,
-      content: sanitizeHtmlContent(content.trim()),
+      content: sanitizedContent,
     })
     
     // Create notification for post author
     try {
       const post = await postService.findById(postId)
       if (post && post.authorId !== userId) {
-        await notificationService.createCommentNotification(post.authorId, userId, postId, comment.id)
+        await notificationService.createCommentNotification(post.authorId, userId, postId, comment.id, {
+          summary: commentPreview,
+          commentPreview,
+        })
       }
       
       // Create mention notifications
       if (comment.mentions.length > 0) {
-        await notificationService.createMentionNotification(comment.mentions, userId, postId, comment.id)
+        await notificationService.createMentionNotification(comment.mentions, userId, postId, comment.id, {
+          summary: commentPreview,
+          commentPreview,
+        })
       }
     } catch (notifError) {
       // Don't fail the request if notification fails

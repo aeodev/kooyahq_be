@@ -99,7 +99,11 @@ export type User = {
   updatedAt: string
 }
 
-export type PublicUser = User
+export type PublicUser = Omit<User, 'monthlySalary'> & { monthlySalary?: number }
+
+export type PublicUserOptions = {
+  includeSalary?: boolean
+}
 
 export function toUser(doc: UserDocument): User {
   return {
@@ -120,10 +124,26 @@ export function toUser(doc: UserDocument): User {
   }
 }
 
-export function toPublicUser(user: User): PublicUser {
-  return {
-    ...user,
+export function toPublicUser(user: User, options: PublicUserOptions = {}): PublicUser {
+  const publicUser: PublicUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    permissions: user.permissions,
+    position: user.position,
+    birthday: user.birthday,
     profilePic: resolveMediaUrl(user.profilePic),
     banner: resolveMediaUrl(user.banner),
+    bio: user.bio,
+    status: user.status,
+    deletedAt: user.deletedAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
   }
+
+  if (options.includeSalary) {
+    publicUser.monthlySalary = user.monthlySalary ?? 0
+  }
+
+  return publicUser
 }
