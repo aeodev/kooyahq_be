@@ -1,4 +1,4 @@
-import { UserModel, toPublicUser, toUser, type PublicUser, type PublicUserOptions, type User } from './user.model'
+import { UserModel, toPublicUser, toUser, type PublicUser, type PublicUserOptions, type User, type UserPreferences } from './user.model'
 
 export type CreateUserInput = {
   email: string
@@ -167,5 +167,29 @@ export const userRepository = {
       { new: true }
     ).exec()
     return doc ? toPublicUser(toUser(doc), options) : undefined
+  },
+
+  async updatePreferences(id: string, preferences: Partial<UserPreferences>): Promise<User | undefined> {
+    const updateData: Record<string, unknown> = {}
+
+    if (preferences.themeColors !== undefined) {
+      updateData['preferences.themeColors'] = preferences.themeColors
+    }
+    if (preferences.fontSize !== undefined) {
+      updateData['preferences.fontSize'] = preferences.fontSize
+    }
+    if (preferences.sidebarCollapsed !== undefined) {
+      updateData['preferences.sidebarCollapsed'] = preferences.sidebarCollapsed
+    }
+    if (preferences.heyKooyaEnabled !== undefined) {
+      updateData['preferences.heyKooyaEnabled'] = preferences.heyKooyaEnabled
+    }
+
+    const doc = await UserModel.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    ).exec()
+    return doc ? toUser(doc) : undefined
   },
 }

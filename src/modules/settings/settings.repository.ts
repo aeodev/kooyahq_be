@@ -40,6 +40,7 @@ export const settingsRepository = {
       settings = await SettingsModel.create({
         key: 'global',
         theme: DEFAULT_THEME_SETTINGS,
+        themeMandatory: false,
       })
     }
 
@@ -52,6 +53,21 @@ export const settingsRepository = {
       {
         $set: {
           theme,
+          updatedBy: userId,
+        },
+      },
+      { new: true, upsert: true }
+    )
+
+    return toSettings(settings)
+  },
+
+  async updateThemeMandatory(themeMandatory: boolean, userId: string): Promise<Settings> {
+    const settings = await SettingsModel.findOneAndUpdate(
+      { key: 'global' },
+      {
+        $set: {
+          themeMandatory,
           updatedBy: userId,
         },
       },

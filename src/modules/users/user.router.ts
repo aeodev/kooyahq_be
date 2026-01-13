@@ -12,6 +12,8 @@ import {
   deleteEmployee,
   createUser,
   createClient,
+  getPreferences,
+  updatePreferences,
 } from './user.controller'
 
 export const userRouter = Router()
@@ -30,6 +32,10 @@ userRouter.put(
   ]),
   updateProfile
 )
+
+// Preferences routes
+userRouter.get('/preferences', authenticate, getPreferences)
+userRouter.put('/preferences', authenticate, updatePreferences)
 
 userRouter.get('/', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getAllUsers)
 userRouter.get('/:id', authenticate, requirePermission(PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE), getUserById)

@@ -1,5 +1,16 @@
 import { Schema, model, models, type Document } from 'mongoose'
 import { resolveMediaUrl } from '../../utils/media-url'
+import type { ThemeColors } from '../settings/settings.model'
+
+export interface UserPreferences {
+  themeColors?: {
+    light?: ThemeColors | null
+    dark?: ThemeColors | null
+  }
+  fontSize?: 'small' | 'medium' | 'large'
+  sidebarCollapsed?: boolean
+  heyKooyaEnabled?: boolean
+}
 
 export interface UserDocument extends Document {
   email: string
@@ -12,6 +23,7 @@ export interface UserDocument extends Document {
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
   monthlySalary?: number
+  preferences?: UserPreferences
   deletedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -65,6 +77,42 @@ const userSchema = new Schema<UserDocument>(
       default: 0,
       min: 0,
     },
+    preferences: {
+      type: {
+        themeColors: {
+          light: {
+            primary: String,
+            secondary: String,
+            accent: String,
+            destructive: String,
+            muted: String,
+            background: String,
+            foreground: String,
+            border: String,
+          },
+          dark: {
+            primary: String,
+            secondary: String,
+            accent: String,
+            destructive: String,
+            muted: String,
+            background: String,
+            foreground: String,
+            border: String,
+          },
+        },
+        fontSize: {
+          type: String,
+          enum: ['small', 'medium', 'large'],
+        },
+        sidebarCollapsed: Boolean,
+      },
+      default: {
+        themeColors: { light: null, dark: null },
+        fontSize: 'medium',
+        sidebarCollapsed: false,
+      },
+    },
     deletedAt: {
       type: Date,
       default: undefined,
@@ -94,6 +142,7 @@ export type User = {
   bio?: string
   status?: 'online' | 'busy' | 'away' | 'offline'
   monthlySalary?: number
+  preferences?: UserPreferences
   deletedAt?: string
   createdAt: string
   updatedAt: string
@@ -103,6 +152,13 @@ export type PublicUser = Omit<User, 'monthlySalary'> & { monthlySalary?: number 
 
 export type PublicUserOptions = {
   includeSalary?: boolean
+}
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  themeColors: { light: null, dark: null },
+  fontSize: 'medium',
+  sidebarCollapsed: false,
+  heyKooyaEnabled: false,
 }
 
 export function toUser(doc: UserDocument): User {
@@ -118,6 +174,7 @@ export function toUser(doc: UserDocument): User {
     bio: doc.bio,
     status: doc.status || 'online',
     monthlySalary: doc.monthlySalary || 0,
+    preferences: doc.preferences || DEFAULT_PREFERENCES,
     deletedAt: doc.deletedAt?.toISOString(),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

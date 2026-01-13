@@ -1,13 +1,26 @@
 import { settingsRepository } from './settings.repository'
-import type { ThemeSettings } from './settings.model'
+import type { ThemeSettings, Settings } from './settings.model'
+
+export type ThemeSettingsWithMandatory = {
+  light: ThemeSettings['light']
+  dark: ThemeSettings['dark']
+  themeMandatory: boolean
+}
 
 export const settingsService = {
-  async getThemeSettings(): Promise<ThemeSettings> {
-    const settings = await settingsRepository.getSettings()
-    return settings.theme
+  async getSettings(): Promise<Settings> {
+    return settingsRepository.getSettings()
   },
 
-  async updateThemeSettings(theme: ThemeSettings, userId: string): Promise<ThemeSettings> {
+  async getThemeSettings(): Promise<ThemeSettingsWithMandatory> {
+    const settings = await settingsRepository.getSettings()
+    return {
+      ...settings.theme,
+      themeMandatory: settings.themeMandatory,
+    }
+  },
+
+  async updateThemeSettings(theme: ThemeSettings, userId: string): Promise<ThemeSettingsWithMandatory> {
     // Validate theme structure
     if (!theme.light || !theme.dark) {
       throw new Error('Theme must include both light and dark modes')
@@ -24,7 +37,18 @@ export const settingsService = {
     }
 
     const updated = await settingsRepository.updateTheme(theme, userId)
-    return updated.theme
+    return {
+      ...updated.theme,
+      themeMandatory: updated.themeMandatory,
+    }
+  },
+
+  async updateThemeMandatory(themeMandatory: boolean, userId: string): Promise<ThemeSettingsWithMandatory> {
+    const updated = await settingsRepository.updateThemeMandatory(themeMandatory, userId)
+    return {
+      ...updated.theme,
+      themeMandatory: updated.themeMandatory,
+    }
   },
 }
 

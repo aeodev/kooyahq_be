@@ -4,6 +4,7 @@ import { createHttpError } from '../../utils/http-error'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
 import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS, hasPermission, type Permission } from '../auth/rbac/permissions'
+import type { UserPreferences } from './user.model'
 
 function canViewSalary(user?: { permissions?: Permission[] }) {
   return !!user && hasPermission(user, PERMISSIONS.USERS_MANAGE)
@@ -458,6 +459,77 @@ export async function createClient(req: Request, res: Response, next: NextFuncti
       status: 'success',
       data: user,
       message: 'Client created successfully',
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getPreferences(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const preferences = await userService.getPreferences(userId)
+    res.json({
+      status: 'success',
+      data: preferences,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updatePreferences(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const preferences: Partial<UserPreferences> = {}
+    const { themeColors, fontSize, sidebarCollapsed } = req.body
+
+    // Validate and set themeColors
+    if (themeColors !== undefined) {
+      if (themeColors === null) {
+        preferences.themeColors = { light: null, dark: null }
+      } else if (typeof themeColors === 'object') {
+        preferences.themeColors = {
+          light: themeColors.light ?? null,
+          dark: themeColors.dark ?? null,
+        }
+      }
+    }
+
+    // Validate and set fontSize
+    if (fontSize !== undefined) {
+      if (!['small', 'medium', 'large'].includes(fontSize)) {
+        return next(createHttpError(400, 'Invalid fontSize. Must be small, medium, or large'))
+      }
+      preferences.fontSize = fontSize
+    }
+
+    // Validate and set sidebarCollapsed
+    if (sidebarCollapsed !== undefined) {
+      if (typeof sidebarCollapsed !== 'boolean') {
+        return next(createHttpError(400, 'sidebarCollapsed must be a boolean'))
+      }
+      preferences.sidebarCollapsed = sidebarCollapsed
+    }
+
+    if (Object.keys(preferences).length === 0) {
+      return next(createHttpError(400, 'No preferences provided'))
+    }
+
+    const updated = await userService.updatePreferences(userId, preferences)
+    res.json({
+      status: 'success',
+      data: updated,
     })
   } catch (error) {
     next(error)

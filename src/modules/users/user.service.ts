@@ -1,6 +1,13 @@
-import type { PublicUser, PublicUserOptions, User } from './user.model'
+import { toPublicUser, type PublicUser, type PublicUserOptions, type User, type UserPreferences } from './user.model'
 import { userRepository, type CreateUserInput } from './user.repository'
 import { deleteStorageObject, isStoragePath } from '../../lib/storage'
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  themeColors: { light: null, dark: null },
+  fontSize: 'medium',
+  sidebarCollapsed: false,
+  heyKooyaEnabled: false,
+}
 
 export const userService = {
   findById(id: string) {
@@ -97,5 +104,15 @@ export const userService = {
     options?: PublicUserOptions,
   ) {
     return userRepository.updateEmployee(id, updates, options)
+  },
+
+  async getPreferences(id: string): Promise<UserPreferences> {
+    const user = await userRepository.findById(id)
+    return user?.preferences || DEFAULT_PREFERENCES
+  },
+
+  async updatePreferences(id: string, preferences: Partial<UserPreferences>): Promise<UserPreferences> {
+    const updated = await userRepository.updatePreferences(id, preferences)
+    return updated?.preferences || DEFAULT_PREFERENCES
   },
 }

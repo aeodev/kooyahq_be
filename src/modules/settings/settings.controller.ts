@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { settingsService } from './settings.service'
+import { settingsService, type ThemeSettingsWithMandatory } from './settings.service'
 import { SocketEmitter } from '../../utils/socket-emitter'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 import type { ThemeSettings } from './settings.model'
@@ -36,10 +36,10 @@ function diffThemeSettings(before: ThemeSettings, after: ThemeSettings): string[
 
 export async function getThemeSettings(req: Request, res: Response, next: NextFunction) {
   try {
-    const theme = await settingsService.getThemeSettings()
+    const themeSettings = await settingsService.getThemeSettings()
     res.json({
       success: true,
-      data: theme,
+      data: themeSettings,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -105,6 +105,74 @@ export async function updateThemeSettings(req: Request, res: Response, next: Nex
     res.json({
       success: true,
       data: updatedTheme,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateThemeMandatory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.id
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'User not authenticated',
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    const { themeMandatory } = req.body
+    if (typeof themeMandatory !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'themeMandatory must be a boolean',
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    const existingSettings = await settingsService.getThemeSettings()
+    const updatedSettings = await settingsService.updateThemeMandatory(themeMandatory, userId)
+
+    // Emit socket event to all connected clients for real-time updates
+    try {
+      SocketEmitter.emitToAll('settings:theme-mandatory-updated', {
+        themeMandatory: updatedSettings.themeMandatory,
+        userId,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (socketError) {
+      console.error('Failed to emit settings:theme-mandatory-updated socket event:', socketError)
+    }
+
+    try {
+      await adminActivityService.logActivity({
+        adminId: userId,
+        action: 'update_system_settings',
+        targetType: 'system',
+        targetId: 'theme-mandatory',
+        targetLabel: 'Theme Mandatory Setting',
+        changes: {
+          themeMandatory: {
+            from: existingSettings.themeMandatory,
+            to: updatedSettings.themeMandatory,
+          },
+        },
+      })
+    } catch (logError) {
+      console.error('Failed to log admin activity:', logError)
+    }
+
+    res.json({
+      success: true,
+      data: updatedSettings,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

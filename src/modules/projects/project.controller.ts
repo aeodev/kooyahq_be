@@ -4,7 +4,7 @@ import { projectService } from './project.service'
 import { adminActivityService } from '../admin-activity/admin-activity.service'
 
 export async function createProject(req: Request, res: Response, next: NextFunction) {
-  const { name } = req.body
+  const { name, emoji, iconUrl } = req.body
 
   if (!name || !name.trim()) {
     return next(createHttpError(400, 'Project name is required'))
@@ -13,6 +13,8 @@ export async function createProject(req: Request, res: Response, next: NextFunct
   try {
     const project = await projectService.create({
       name: name.trim(),
+      emoji: emoji?.trim(),
+      iconUrl: iconUrl?.trim(),
     })
 
     // Log admin activity
@@ -78,7 +80,7 @@ export async function getProject(req: Request, res: Response, next: NextFunction
 
 export async function updateProject(req: Request, res: Response, next: NextFunction) {
   const id = req.params.id
-  const { name } = req.body
+  const { name, emoji, iconUrl } = req.body
 
   if (name !== undefined && !name.trim()) {
     return next(createHttpError(400, 'Project name cannot be empty'))
@@ -94,6 +96,12 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
     if (name !== undefined) {
       updates.name = name.trim()
     }
+    if (emoji !== undefined) {
+      updates.emoji = emoji?.trim() || null
+    }
+    if (iconUrl !== undefined) {
+      updates.iconUrl = iconUrl?.trim() || null
+    }
 
     const project = await projectService.update(id, updates)
 
@@ -107,6 +115,12 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
         const changes: Record<string, unknown> = {}
         if (updates.name !== undefined && updates.name !== existingProject.name) {
           changes.name = { from: existingProject.name, to: updates.name }
+        }
+        if (updates.emoji !== undefined && updates.emoji !== existingProject.emoji) {
+          changes.emoji = { from: existingProject.emoji || null, to: updates.emoji || null }
+        }
+        if (updates.iconUrl !== undefined && updates.iconUrl !== existingProject.iconUrl) {
+          changes.iconUrl = { from: existingProject.iconUrl || null, to: updates.iconUrl || null }
         }
         await adminActivityService.logActivity({
           adminId: req.user.id,

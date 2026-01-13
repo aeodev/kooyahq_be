@@ -19,6 +19,7 @@ export interface ThemeSettings {
 export interface SettingsDocument extends Document {
   key: 'global'
   theme: ThemeSettings
+  themeMandatory: boolean
   updatedBy?: Schema.Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -45,6 +46,7 @@ const settingsSchema = new Schema<SettingsDocument>(
       light: { type: themeColorsSchema, required: true },
       dark: { type: themeColorsSchema, required: true },
     },
+    themeMandatory: { type: Boolean, default: false },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
@@ -56,6 +58,7 @@ export type Settings = {
   id: string
   key: 'global'
   theme: ThemeSettings
+  themeMandatory: boolean
   updatedBy: string | null
   createdAt: string
   updatedAt: string
@@ -66,6 +69,7 @@ export function toSettings(doc: SettingsDocument): Settings {
     id: doc.id,
     key: doc.key,
     theme: doc.theme,
+    themeMandatory: doc.themeMandatory ?? false,
     updatedBy: doc.updatedBy ? doc.updatedBy.toString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
