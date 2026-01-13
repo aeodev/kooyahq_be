@@ -27,6 +27,11 @@ function getUserInitials(name: string): string {
     .join('')
 }
 
+function formatPriority(priority: string): string {
+  if (!priority) return 'N/A'
+  return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`
+}
+
 /**
  * Generate HTML email template for time tracker end day summary
  */
@@ -61,6 +66,29 @@ export function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailD
       </td>
       <td style="padding: 16px; border-bottom: 1px solid ${COLORS.border}; text-align: right; font-weight: 600; color: ${COLORS.primary}; font-feature-settings: 'tnum';">
         ${formatDuration(entry.duration)}
+      </td>
+    </tr>
+  `
+    )
+    .join('')
+
+  const workspaceTickets = data.workspaceTickets || []
+  const workspaceTicketsHtml = workspaceTickets
+    .map(
+      (ticket, index) => `
+    <tr style="background-color: ${index % 2 === 0 ? COLORS.white : COLORS.background};">
+      <td style="padding: 12px 14px; border-bottom: 1px solid ${COLORS.border};">
+        <div style="font-weight: 600; color: ${COLORS.textDark};">${ticket.ticketKey}</div>
+        <div style="font-size: 12px; color: ${COLORS.textMuted};">${ticket.project}</div>
+      </td>
+      <td style="padding: 12px 14px; border-bottom: 1px solid ${COLORS.border}; color: ${COLORS.textDark};">
+        ${ticket.title}
+      </td>
+      <td style="padding: 12px 14px; border-bottom: 1px solid ${COLORS.border}; color: ${COLORS.textDark};">
+        ${ticket.status || 'N/A'}
+      </td>
+      <td style="padding: 12px 14px; border-bottom: 1px solid ${COLORS.border}; text-align: right; font-weight: 600; color: ${COLORS.primary};">
+        ${formatPriority(ticket.priority)}
       </td>
     </tr>
   `
@@ -208,6 +236,51 @@ export function generateTimeTrackerEndDayEmailHtml(data: TimeTrackerEndDayEmailD
                   <td align="center" style="padding: 48px 32px;">
                     <p style="margin: 0; font-size: 16px; color: ${COLORS.textLight};">
                       No time entries recorded for this day.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              `}
+            </td>
+          </tr>
+
+          <!-- Workspace Summary -->
+          <tr>
+            <td style="padding: 0 40px 32px 40px;">
+              <p style="margin: 0 0 8px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 600; color: ${COLORS.textDark};">
+                Workspace Summary
+              </p>
+              <p style="margin: 0 0 16px 0; font-size: 13px; color: ${COLORS.textLight};">
+                Tickets assigned during your tracked time or currently assigned
+              </p>
+              ${workspaceTickets.length > 0 ? `
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid ${COLORS.border}; overflow: hidden;">
+                <thead>
+                  <tr style="background-color: ${COLORS.secondary};">
+                    <th style="padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
+                      Ticket
+                    </th>
+                    <th style="padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
+                      Title
+                    </th>
+                    <th style="padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
+                      Status
+                    </th>
+                    <th style="padding: 12px 14px; text-align: right; font-size: 12px; font-weight: 600; color: ${COLORS.primaryDark}; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid ${COLORS.primary};">
+                      Priority
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${workspaceTicketsHtml}
+                </tbody>
+              </table>
+              ` : `
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${COLORS.background}; border: 1px solid ${COLORS.border};">
+                <tr>
+                  <td align="center" style="padding: 32px;">
+                    <p style="margin: 0; font-size: 14px; color: ${COLORS.textLight};">
+                      No workspace tickets assigned during this time.
                     </p>
                   </td>
                 </tr>

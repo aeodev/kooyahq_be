@@ -14,6 +14,7 @@ import { userService } from '../../users/user.service'
 import type { Ticket } from './ticket.model'
 import { ticketCache } from '../cache/ticket.cache'
 import { sanitizeRichTextDoc } from '../../../utils/rich-text-sanitizer'
+import { improveTicketContent } from './ticket-improve.service'
 
 type BoardRole = 'owner' | 'admin' | 'member' | 'viewer' | 'none'
 
@@ -683,6 +684,87 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     res.json({
       success: true,
       data: updated,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function improveTicket(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params
+  const userId = req.user?.id
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const ticket = await ticketService.findById(id)
+    if (!ticket) {
+      return next(createHttpError(404, 'Ticket not found'))
+    }
+
+    const board = await boardService.findById(ticket.boardId)
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (!canModifyTickets(board, req.user)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const improved = await improveTicketContent({
+      title: ticket.title,
+      description: ticket.description,
+      acceptanceCriteria: ticket.acceptanceCriteria,
+      attachments: ticket.attachments,
+    })
+
+    res.json({
+      success: true,
+      data: improved,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function improveTicketDraft(req: Request, res: Response, next: NextFunction) {
+  const { boardId } = req.params
+  const userId = req.user?.id
+  const { title, description, acceptanceCriteria, attachments } = req.body
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return next(createHttpError(400, 'Ticket title is required'))
+  }
+
+  try {
+    const board = await boardService.findById(boardId)
+
+    if (!board) {
+      return next(createHttpError(404, 'Board not found'))
+    }
+
+    if (!canModifyTickets(board, req.user)) {
+      return next(createHttpError(403, 'Forbidden'))
+    }
+
+    const improved = await improveTicketContent({
+      title: title.trim(),
+      description,
+      acceptanceCriteria,
+      attachments,
+    })
+
+    res.json({
+      success: true,
+      data: improved,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

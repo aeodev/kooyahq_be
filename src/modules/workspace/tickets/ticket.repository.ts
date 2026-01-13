@@ -366,6 +366,28 @@ export const ticketRepository = {
     return docs.map((doc) => toTicket(doc))
   },
 
+  async findAllAssignedByUserId(userId: string): Promise<Ticket[]> {
+    const docs = await TicketModel.find({
+      assigneeId: userId,
+      deletedAt: { $exists: false },
+      $or: [{ archivedAt: { $exists: false } }, { archivedAt: null }],
+    })
+      .sort({ updatedAt: -1 })
+      .exec()
+    return docs.map((doc) => toTicket(doc))
+  },
+
+  async findAssignedByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Ticket[]> {
+    const docs = await TicketModel.find({
+      assigneeId: userId,
+      createdAt: { $gte: startDate, $lte: endDate },
+      deletedAt: { $exists: false },
+    })
+      .sort({ createdAt: -1 })
+      .exec()
+    return docs.map((doc) => toTicket(doc))
+  },
+
   async addViewer(ticketId: string, userId: string): Promise<Ticket | null> {
     const doc = await TicketModel.findById(ticketId).exec()
     if (!doc) {

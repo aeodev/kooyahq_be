@@ -28,7 +28,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 
     await sgMail.send(msg)
   } catch (error) {
-    console.error('SendGrid email error:', error)
+    const err = error as { response?: { body?: unknown } }
+    console.error('SendGrid email error:', err?.response?.body || error)
     // Re-throw to allow caller to handle
     throw error
   }
@@ -65,4 +66,3 @@ export async function sendBulkEmail(options: SendEmailOptions): Promise<void> {
     throw error
   }
 }
-

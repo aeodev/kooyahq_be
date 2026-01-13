@@ -47,5 +47,17 @@ export const activityRepository = {
       .limit(100)
     return docs.map(toActivity)
   },
+
+  async findAssigneeChangesForUser(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<Activity[]> {
+    const docs = await ActivityModel.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+      changes: { $elemMatch: { field: 'assigneeId', newValue: userId } },
+    }).sort({ createdAt: -1 })
+    return docs.map(toActivity)
+  },
 }
 

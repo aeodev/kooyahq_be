@@ -6,6 +6,8 @@ import {
   getTicketsByBoard,
   getTicketById,
   updateTicket,
+  improveTicket,
+  improveTicketDraft,
   bulkUpdateRanks,
   addRelatedTicket,
   removeRelatedTicket,
@@ -61,6 +63,12 @@ ticketRouter.post(
   '/boards/:boardId/tickets',
   authenticate,
   createTicket
+)
+
+ticketRouter.post(
+  '/boards/:boardId/tickets/improve',
+  authenticate,
+  improveTicketDraft
 )
 
 /**
@@ -207,6 +215,12 @@ ticketRouter.put(
   '/tickets/:id',
   authenticate,
   updateTicket
+)
+
+ticketRouter.post(
+  '/tickets/:id/improve',
+  authenticate,
+  improveTicket
 )
 
 /**

@@ -19,6 +19,7 @@ import {
   getAnalytics,
   getMyEntriesByDateRange,
   getDayEndedStatus,
+  getWorkspaceSummary,
 } from './time-entry.controller'
 
 export const timeEntryRouter = Router()
@@ -157,6 +158,24 @@ timeEntryRouter.get(
   '/timer/day-ended-status',
   requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
   getDayEndedStatus
+)
+
+/**
+ * @swagger
+ * /time-entries/timer/workspace-summary:
+ *   get:
+ *     summary: Get workspace summary for user's workday
+ *     tags: [Time Entries]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Workspace summary
+ */
+timeEntryRouter.get(
+  '/timer/workspace-summary',
+  requirePermission(PERMISSIONS.TIME_ENTRY_READ, PERMISSIONS.TIME_ENTRY_FULL_ACCESS),
+  getWorkspaceSummary
 )
 
 /**

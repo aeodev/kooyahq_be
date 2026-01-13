@@ -22,6 +22,13 @@ export interface TimeTrackerEndDayEmailData {
     projects: string[]
     duration: number // in minutes
   }>
+  workspaceTickets?: Array<{
+    ticketKey: string
+    title: string
+    project: string
+    status: string
+    priority: 'highest' | 'high' | 'medium' | 'low' | 'lowest'
+  }>
 }
 
 // Risk level for alerts

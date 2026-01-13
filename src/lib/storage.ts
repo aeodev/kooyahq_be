@@ -14,6 +14,8 @@ const s3Client = new S3Client({
     : undefined,
 })
 
+export type StoragePath = string & { __brand: 'StoragePath' }
+
 function normalizeSegment(value: string): string {
   return value
     .split('/')
@@ -43,7 +45,7 @@ function buildStoragePath(folder: string, originalName?: string): string {
   return [safeFolder, fileName].filter(Boolean).join('/')
 }
 
-export function isStoragePath(value?: string): value is string {
+export function isStoragePath(value?: string): value is StoragePath {
   if (!value) return false
   const trimmed = value.trim()
   if (!trimmed) return false

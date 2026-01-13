@@ -70,6 +70,16 @@ export async function getDayEndedStatus(req: Request, res: Response) {
   })
 }
 
+export async function getWorkspaceSummary(req: Request, res: Response) {
+  const userId = req.user!.id
+  const workspaceTickets = await service.getWorkspaceSummary(userId)
+
+  res.json({
+    status: 'success',
+    data: { workspaceTickets },
+  })
+}
+
 export async function pauseTimer(req: Request, res: Response) {
   const userId = req.user!.id
   const entry = await service.pauseTimer(userId)
@@ -235,4 +245,3 @@ export async function getMyEntriesByDateRange(req: Request, res: Response) {
   const entries = await service.getUserEntriesByDateRange(userId, startDate, endDate)
   res.json({ status: 'success', data: entries })
 }
-

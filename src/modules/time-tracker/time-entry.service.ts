@@ -3,6 +3,10 @@ import { TimeEntryAuditRepository } from './time-entry-audit.repository'
 import { DayEndRepository } from './day-end.repository'
 import type { AuditAction } from './time-entry-audit.model'
 import { userRepository } from '../users/user.repository'
+import { activityRepository } from '../workspace/activities/activity.repository'
+import { boardService } from '../workspace/boards/board.service'
+import { ticketRepository } from '../workspace/tickets/ticket.repository'
+import type { Ticket } from '../workspace/tickets/ticket.model'
 import { HttpError } from '../../utils/http-error'
 import { SocketEmitter, TimeEntrySocketEvents } from '../../utils/socket-emitter'
 import type { TimeEntry } from './time-entry.model'
@@ -60,6 +64,14 @@ export type AnalyticsResult = {
   }>
 }
 
+type WorkspaceTicketSummary = {
+  ticketKey: string
+  title: string
+  project: string
+  status: string
+  priority: 'highest' | 'high' | 'medium' | 'low' | 'lowest'
+}
+
 export class TimeEntryService {
   constructor(
     private timeEntryRepo = new TimeEntryRepository(),
@@ -79,6 +91,71 @@ export class TimeEntryService {
       // Don't fail the main operation if audit logging fails
       console.error('Failed to log audit:', error)
     }
+  }
+
+  private getWorkdayStart(entries: TimeEntry[], fallback: Date): Date {
+    let earliest = fallback
+    for (const entry of entries) {
+      const candidateValue = entry.startTime || entry.createdAt
+      if (!candidateValue) continue
+      const candidate = new Date(candidateValue)
+      if (Number.isNaN(candidate.getTime())) continue
+      if (candidate < earliest) {
+        earliest = candidate
+      }
+    }
+    return earliest
+  }
+
+  private async buildWorkspaceSummaryTickets(
+    userId: string,
+    rangeStart: Date,
+    rangeEnd: Date,
+  ): Promise<WorkspaceTicketSummary[]> {
+    const [currentAssigned, assignedByCreation, assignmentActivities] = await Promise.all([
+      ticketRepository.findAllAssignedByUserId(userId),
+      ticketRepository.findAssignedByDateRange(userId, rangeStart, rangeEnd),
+      activityRepository.findAssigneeChangesForUser(userId, rangeStart, rangeEnd),
+    ])
+
+    const ticketMap = new Map<string, Ticket>()
+    for (const ticket of [...currentAssigned, ...assignedByCreation]) {
+      ticketMap.set(ticket.id, ticket)
+    }
+
+    const activityTicketIds = assignmentActivities
+      .map((activity) => activity.ticketId)
+      .filter((ticketId): ticketId is string => Boolean(ticketId))
+    const missingIds = activityTicketIds.filter((ticketId) => !ticketMap.has(ticketId))
+    if (missingIds.length > 0) {
+      const fetched = await Promise.all(missingIds.map((ticketId) => ticketRepository.findById(ticketId)))
+      for (const ticket of fetched) {
+        if (ticket) ticketMap.set(ticket.id, ticket)
+      }
+    }
+
+    const tickets = Array.from(ticketMap.values())
+    const boardIds = Array.from(new Set(tickets.map((ticket) => ticket.boardId)))
+    const boards = await Promise.all(boardIds.map((boardId) => boardService.findById(boardId)))
+    const boardMap = new Map(boardIds.map((boardId, index) => [boardId, boards[index]]))
+
+    const summaries = tickets.map((ticket) => {
+      const board = boardMap.get(ticket.boardId) || null
+      const columnName = board?.columns.find((col) => col.id === ticket.columnId)?.name || 'Unknown'
+      return {
+        ticketKey: ticket.ticketKey,
+        title: ticket.title,
+        project: board?.name || 'Unknown Board',
+        status: columnName,
+        priority: ticket.priority,
+      }
+    })
+
+    return summaries.sort((a, b) => {
+      const projectCompare = a.project.localeCompare(b.project)
+      if (projectCompare !== 0) return projectCompare
+      return a.ticketKey.localeCompare(b.ticketKey)
+    })
   }
 
   async startTimer(userId: string, input: StartTimerInput): Promise<PublicTimeEntry> {
@@ -189,10 +266,18 @@ export class TimeEntryService {
     await this.dayEndRepo.create(userId, endedAt)
     
     // Fetch ALL today's entries for the email (not just the ones that were active)
-    const startOfDay = new Date()
+    const startOfDay = new Date(endedAt)
     startOfDay.setHours(0, 0, 0, 0)
     const allTodayEntries = await this.timeEntryRepo.findByUserIdAndDateRange(userId, startOfDay, endedAt)
     const publicEntries = await Promise.all(allTodayEntries.map(entry => this.toPublicTimeEntry(entry, userId)))
+    const workdayStart = this.getWorkdayStart(allTodayEntries, startOfDay)
+
+    let workspaceTickets: WorkspaceTicketSummary[] = []
+    try {
+      workspaceTickets = await this.buildWorkspaceSummaryTickets(userId, workdayStart, endedAt)
+    } catch (workspaceError) {
+      console.error('Failed to build workspace summary:', workspaceError)
+    }
 
     // Send email summary to the user
     try {
@@ -219,6 +304,7 @@ export class TimeEntryService {
           totalMinutes,
           entryCount: publicEntries.length,
           entries: emailEntries,
+          workspaceTickets,
         })
       }
     } catch (emailError) {
@@ -227,6 +313,14 @@ export class TimeEntryService {
     }
 
     return publicEntries
+  }
+
+  async getWorkspaceSummary(userId: string, endedAt: Date = new Date()): Promise<WorkspaceTicketSummary[]> {
+    const startOfDay = new Date(endedAt)
+    startOfDay.setHours(0, 0, 0, 0)
+    const entries = await this.timeEntryRepo.findByUserIdAndDateRange(userId, startOfDay, endedAt)
+    const workdayStart = this.getWorkdayStart(entries, startOfDay)
+    return this.buildWorkspaceSummaryTickets(userId, workdayStart, endedAt)
   }
 
   async getDayEndedAt(userId: string, date: Date): Promise<Date | null> {
@@ -488,4 +582,3 @@ export class TimeEntryService {
     }
   }
 }
-

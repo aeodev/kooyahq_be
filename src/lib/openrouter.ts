@@ -37,9 +37,13 @@ export interface OpenRouterToolCall {
   }
 }
 
+export type OpenRouterMessageContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' } }
+
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | null
+  content: string | OpenRouterMessageContentPart[] | null
   tool_calls?: OpenRouterToolCall[]
   tool_call_id?: string
 }
