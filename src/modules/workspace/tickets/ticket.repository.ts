@@ -47,8 +47,8 @@ export type CreateTicketInput = {
 export type UpdateTicketInput = {
   title?: string
   description?: Record<string, any>
-  parentTicketId?: string
-  rootEpicId?: string
+  parentTicketId?: string | null
+  rootEpicId?: string | null
   columnId?: string
   rank?: string
   points?: number | null
@@ -389,54 +389,44 @@ export const ticketRepository = {
   },
 
   async addViewer(ticketId: string, userId: string): Promise<Ticket | null> {
-    const doc = await TicketModel.findById(ticketId).exec()
-    if (!doc) {
-      return null
+    const now = new Date()
+
+    const updatedExisting = await TicketModel.findOneAndUpdate(
+      { _id: ticketId, 'viewedBy.userId': userId },
+      { $set: { 'viewedBy.$.viewedAgainAt': now } },
+      { new: true },
+    ).exec()
+
+    if (updatedExisting) {
+      return toTicket(updatedExisting)
     }
 
-    const existingViewerIndex = doc.viewedBy.findIndex((v: { userId: string }) => v.userId === userId)
+    const updatedNew = await TicketModel.findOneAndUpdate(
+      { _id: ticketId },
+      { $push: { viewedBy: { userId, viewedAt: now } } },
+      { new: true },
+    ).exec()
 
-    if (existingViewerIndex >= 0) {
-      // Update existing viewer's viewedAgainAt timestamp (keep viewedAt as first view time)
-      doc.viewedBy[existingViewerIndex].viewedAgainAt = new Date()
-    } else {
-      // Add new viewer with viewedAt as first view time
-      doc.viewedBy.push({
-        userId,
-        viewedAt: new Date(),
-      })
-    }
-
-    await doc.save()
-    return toTicket(doc)
+    return updatedNew ? toTicket(updatedNew) : null
   },
 
   async addRelatedTicket(ticketId: string, relatedTicketId: string): Promise<Ticket | null> {
-    const doc = await TicketModel.findById(ticketId).exec()
-    if (!doc) {
-      return null
-    }
+    const updated = await TicketModel.findOneAndUpdate(
+      { _id: ticketId },
+      { $addToSet: { relatedTickets: relatedTicketId } },
+      { new: true },
+    ).exec()
 
-    // Check if already related
-    if (doc.relatedTickets.includes(relatedTicketId)) {
-      return toTicket(doc)
-    }
-
-    // Add to array
-    doc.relatedTickets.push(relatedTicketId)
-    await doc.save()
-    return toTicket(doc)
+    return updated ? toTicket(updated) : null
   },
 
   async removeRelatedTicket(ticketId: string, relatedTicketId: string): Promise<Ticket | null> {
-    const doc = await TicketModel.findById(ticketId).exec()
-    if (!doc) {
-      return null
-    }
+    const updated = await TicketModel.findOneAndUpdate(
+      { _id: ticketId },
+      { $pull: { relatedTickets: relatedTicketId } },
+      { new: true },
+    ).exec()
 
-    // Remove from array
-    doc.relatedTickets = doc.relatedTickets.filter((id: string) => id !== relatedTicketId)
-    await doc.save()
-    return toTicket(doc)
+    return updated ? toTicket(updated) : null
   },
 }

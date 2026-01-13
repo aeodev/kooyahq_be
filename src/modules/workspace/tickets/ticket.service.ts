@@ -1,9 +1,58 @@
+import { randomUUID } from 'node:crypto'
 import { boardService } from '../boards/board.service'
 import { ticketRepository, type CreateTicketInput } from './ticket.repository'
 import type { TicketGithubStatus } from './ticket.model'
 
 function generateRank(): string {
   return `rank_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+type ChecklistItemInput = {
+  id?: string
+  text?: string
+  isCompleted?: boolean
+  completed?: boolean
+}
+
+const normalizeAcceptanceCriteria = (
+  input: unknown,
+): Array<{ id: string; text: string; isCompleted: boolean }> => {
+  if (!Array.isArray(input)) return []
+
+  return input
+    .map((item) => {
+      if (typeof item === 'string') {
+        const text = item.trim()
+        if (!text) return null
+        return {
+          id: randomUUID(),
+          text,
+          isCompleted: false,
+        }
+      }
+
+      if (!item || typeof item !== 'object') return null
+
+      const candidate = item as ChecklistItemInput
+      const text = typeof candidate.text === 'string' ? candidate.text.trim() : ''
+      if (!text) return null
+
+      const id = typeof candidate.id === 'string' && candidate.id.trim()
+        ? candidate.id.trim()
+        : randomUUID()
+
+      const isCompleted =
+        typeof candidate.isCompleted === 'boolean'
+          ? candidate.isCompleted
+          : typeof candidate.completed === 'boolean'
+            ? candidate.completed
+            : false
+
+      return { id, text, isCompleted }
+    })
+    .filter(
+      (item): item is { id: string; text: string; isCompleted: boolean } => item !== null,
+    )
 }
 
 export const ticketService = {
@@ -104,6 +153,7 @@ export const ticketService = {
 
     const ticket = await ticketRepository.create({
       ...input,
+      acceptanceCriteria: normalizeAcceptanceCriteria(input.acceptanceCriteria),
       rank: input.rank || generateRank(),
     })
 
@@ -148,8 +198,8 @@ export const ticketService = {
     updates: {
       title?: string
       description?: Record<string, any>
-      parentTicketId?: string
-      rootEpicId?: string
+      parentTicketId?: string | null
+      rootEpicId?: string | null
       columnId?: string
       rank?: string
       points?: number | null
@@ -324,6 +374,10 @@ export const ticketService = {
         // Clear completedAt if moved away from done column
         updates.completedAt = null
       }
+    }
+
+    if (updates.acceptanceCriteria !== undefined) {
+      updates.acceptanceCriteria = normalizeAcceptanceCriteria(updates.acceptanceCriteria)
     }
 
     const updated = await ticketRepository.update(ticketId, updates)

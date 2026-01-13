@@ -1,4 +1,4 @@
-import { TimeEntryRepository, type CreateTimeEntryInput } from './time-entry.repository'
+import { TimeEntryRepository, type WorkspaceTicketEntryInput } from './time-entry.repository'
 import { TimeEntryAuditRepository } from './time-entry-audit.repository'
 import { DayEndRepository } from './day-end.repository'
 import type { AuditAction } from './time-entry-audit.model'
@@ -72,6 +72,8 @@ type WorkspaceTicketSummary = {
   priority: 'highest' | 'high' | 'medium' | 'low' | 'lowest'
 }
 
+const WORKSPACE_TICKET_TASK_PREFIX = '[Workspace Ticket]'
+
 export class TimeEntryService {
   constructor(
     private timeEntryRepo = new TimeEntryRepository(),
@@ -105,6 +107,11 @@ export class TimeEntryService {
       }
     }
     return earliest
+  }
+
+  private formatWorkspaceTicketTask(ticket: WorkspaceTicketSummary): string {
+    const priority = ticket.priority ? ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1) : 'Unknown'
+    return `${WORKSPACE_TICKET_TASK_PREFIX} ${ticket.ticketKey} - Priority: ${priority} - ${ticket.title}`
   }
 
   private async buildWorkspaceSummaryTickets(
@@ -310,6 +317,27 @@ export class TimeEntryService {
     } catch (emailError) {
       console.error('Failed to send time tracker end day email:', emailError)
       // Don't fail the end day operation if email fails
+    }
+
+    if (workspaceTickets.length > 0) {
+      try {
+        const hasTicketEntries = await this.timeEntryRepo.hasWorkspaceTicketEntries(
+          userId,
+          startOfDay,
+          endedAt,
+          WORKSPACE_TICKET_TASK_PREFIX
+        )
+
+        if (!hasTicketEntries) {
+          const ticketEntries: WorkspaceTicketEntryInput[] = workspaceTickets.map((ticket) => ({
+            project: ticket.project,
+            task: this.formatWorkspaceTicketTask(ticket),
+          }))
+          await this.timeEntryRepo.createWorkspaceTicketEntries(userId, ticketEntries, endedAt)
+        }
+      } catch (ticketEntryError) {
+        console.error('Failed to save workspace ticket entries:', ticketEntryError)
+      }
     }
 
     return publicEntries

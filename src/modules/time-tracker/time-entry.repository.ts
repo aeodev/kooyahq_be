@@ -7,6 +7,11 @@ export type CreateTimeEntryInput = {
   isOvertime?: boolean
 }
 
+export type WorkspaceTicketEntryInput = {
+  project: string
+  task: string
+}
+
 export class TimeEntryRepository {
   async create(input: CreateTimeEntryInput): Promise<TimeEntry> {
     const startTime = new Date()
@@ -315,5 +320,40 @@ export class TimeEntryRepository {
     }).sort({ createdAt: -1 })
     return docs.map(toTimeEntry)
   }
-}
 
+  async hasWorkspaceTicketEntries(userId: string, startDate: Date, endDate: Date, taskPrefix: string): Promise<boolean> {
+    const escapedPrefix = taskPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const exists = await TimeEntryModel.exists({
+      userId,
+      createdAt: { $gte: startDate, $lte: endDate },
+      'tasks.text': { $regex: new RegExp(`^${escapedPrefix}`) },
+    })
+    return Boolean(exists)
+  }
+
+  async createWorkspaceTicketEntries(
+    userId: string,
+    entries: WorkspaceTicketEntryInput[],
+    timestamp: Date,
+  ): Promise<TimeEntry[]> {
+    if (entries.length === 0) return []
+
+    const docs = entries.map((entry) => ({
+      userId,
+      projects: [entry.project],
+      duration: 0,
+      startTime: timestamp,
+      endTime: timestamp,
+      isActive: false,
+      isPaused: false,
+      pausedDuration: 0,
+      isOvertime: false,
+      tasks: entry.task
+        ? [{ text: entry.task, addedAt: timestamp, duration: 0 }]
+        : [],
+    }))
+
+    const createdDocs = await TimeEntryModel.insertMany(docs)
+    return createdDocs.map(toTimeEntry)
+  }
+}

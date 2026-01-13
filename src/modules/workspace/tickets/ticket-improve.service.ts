@@ -9,6 +9,8 @@ type TicketImproveInput = {
   description?: unknown
   acceptanceCriteria?: Array<{ text?: string; completed?: boolean; isCompleted?: boolean }>
   attachments?: Array<{ url?: string; type?: string; name?: string }>
+  ticketType?: string
+  userCommand?: string
 }
 
 type TicketImproveResult = {
@@ -290,6 +292,8 @@ export async function improveTicketContent(input: TicketImproveInput): Promise<T
     description: descriptionWithPlaceholders,
     acceptanceCriteria,
     imagePlaceholders: placeholders.map((item) => item.placeholder),
+    ticketType: input.ticketType,
+    userCommand: input.userCommand,
   })
 
   const messages: OpenRouterMessage[] = [

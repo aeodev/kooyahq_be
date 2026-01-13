@@ -241,7 +241,7 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
   }
 
   try {
-    const ticket = await ticketService.findById(id)
+    let ticket = await ticketService.findById(id)
 
     if (!ticket) {
       return next(createHttpError(404, 'Ticket not found'))
@@ -263,8 +263,10 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
       // Don't fail the request if tracking fails
     })
 
+    const epicContextId = ticket.rootEpicId || (ticket.ticketType === 'epic' ? ticket.id : null)
+
     // Fetch related data in parallel - optimize queries
-    const [history, comments, parent, children, epicTickets, parentSiblings, manualRelated] = await Promise.all([
+    const [history, comments, parent, children, rootEpic, epicTickets, parentSiblings, manualRelated] = await Promise.all([
       // Get ticket history/activities
       activityRepository.findByTicketId(id),
       // Get comments
@@ -273,8 +275,10 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
       ticket.parentTicketId ? ticketService.findById(ticket.parentTicketId) : Promise.resolve(null),
       // Get child tickets (parallel)
       ticketService.findByParentTicketId(id),
+      // Get root epic if exists (parallel)
+      ticket.rootEpicId ? ticketService.findById(ticket.rootEpicId) : Promise.resolve(null),
       // Get epic tickets if exists (parallel)
-      ticket.rootEpicId ? ticketService.findByRootEpicId(ticket.rootEpicId) : Promise.resolve([]),
+      epicContextId ? ticketService.findByRootEpicId(epicContextId) : Promise.resolve([]),
       // Get siblings if has parent but no epic (parallel)
       (!ticket.rootEpicId && ticket.parentTicketId) 
         ? ticketService.findByParentTicketId(ticket.parentTicketId) 
@@ -285,6 +289,41 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
         : Promise.resolve([]),
     ])
 
+    const validParent = Boolean(parent)
+    const validRootEpic = Boolean(rootEpic && rootEpic.ticketType === 'epic')
+    const validManualRelated = Array.isArray(manualRelated)
+      ? manualRelated.filter(
+          (item): item is Ticket => Boolean(item && item.ticketType !== 'subtask' && item.ticketType !== 'epic')
+        )
+      : []
+
+    const relationUpdates: { parentTicketId?: string | null; rootEpicId?: string | null; relatedTickets?: string[] } = {}
+
+    if (ticket.parentTicketId && !validParent) {
+      relationUpdates.parentTicketId = null
+    }
+
+    if (ticket.rootEpicId && !validRootEpic) {
+      relationUpdates.rootEpicId = null
+    }
+
+    if (ticket.relatedTickets && ticket.relatedTickets.length > 0) {
+      const validRelatedIds = validManualRelated.map((item) => item.id)
+      if (validRelatedIds.length !== ticket.relatedTickets.length) {
+        relationUpdates.relatedTickets = validRelatedIds
+      }
+    }
+
+    if (Object.keys(relationUpdates).length > 0) {
+      const updatedTicket = await ticketRepository.update(ticket.id, relationUpdates)
+      ticket = updatedTicket ?? {
+        ...ticket,
+        parentTicketId: relationUpdates.parentTicketId === null ? undefined : ticket.parentTicketId,
+        rootEpicId: relationUpdates.rootEpicId === null ? undefined : ticket.rootEpicId,
+        relatedTickets: relationUpdates.relatedTickets ?? ticket.relatedTickets,
+      }
+    }
+
     // Build related tickets structure from parallel results
     const related: {
       parent: Ticket | undefined | null
@@ -293,7 +332,7 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
       epicTickets: Ticket[]
       manualRelated: Ticket[]
     } = {
-      parent: parent || null,
+      parent: validParent ? parent : null,
       children: children || [],
       siblings: [],
       epicTickets: [],
@@ -301,35 +340,39 @@ export async function getTicketById(req: Request, res: Response, next: NextFunct
     }
 
     // Process epic tickets
-    if (ticket.rootEpicId && Array.isArray(epicTickets)) {
+    if (epicContextId && Array.isArray(epicTickets) && (ticket.ticketType === 'epic' || validRootEpic)) {
       // Filter out the current ticket and any tickets that are epics themselves
       // Epic tickets section should only show non-epic tickets (tasks, bugs, stories, subtasks) in the same epic
-      related.epicTickets = epicTickets.filter(
+      const filteredEpicTickets = epicTickets.filter(
         (t: Ticket) => t.id !== id && t.ticketType !== 'epic'
       )
-      
-      // Determine siblings based on epic and parent
-      if (ticket.parentTicketId) {
-        // If has parent, siblings are children (already filtered)
-        related.siblings = related.children.filter((t: Ticket) => t.id !== id)
+      if (ticket.ticketType === 'epic') {
+        const childIds = new Set(related.children.map((child) => child.id))
+        related.epicTickets = filteredEpicTickets.filter((item) => !childIds.has(item.id))
       } else {
-        // If no parent, siblings are other tickets in the same epic without a parent
-        // Also filter out epics from siblings
-        related.siblings = epicTickets.filter(
-          (t: Ticket) => t.id !== id && !t.parentTicketId && t.ticketType !== 'epic'
-        )
+        related.epicTickets = filteredEpicTickets
       }
-    } else if (ticket.parentTicketId && Array.isArray(parentSiblings)) {
+      
+      // Determine siblings based on epic and parent (non-epic tickets only)
+      if (ticket.ticketType !== 'epic') {
+        if (ticket.parentTicketId) {
+          // If has parent, siblings are children (already filtered)
+          related.siblings = related.children.filter((t: Ticket) => t.id !== id)
+        } else {
+          // If no parent, siblings are other tickets in the same epic without a parent
+          // Also filter out epics from siblings
+          related.siblings = epicTickets.filter(
+            (t: Ticket) => t.id !== id && !t.parentTicketId && t.ticketType !== 'epic'
+          )
+        }
+      }
+    } else if (ticket.parentTicketId && validParent && Array.isArray(parentSiblings)) {
       // If has parent but no epic, siblings are other tickets with same parent
       related.siblings = parentSiblings.filter((t: Ticket) => t.id !== id)
     }
 
     // Process manually related tickets
-    if (Array.isArray(manualRelated)) {
-      related.manualRelated = manualRelated.filter(
-        (t): t is Ticket => t !== undefined && t !== null && t.ticketType !== 'subtask'
-      )
-    }
+    related.manualRelated = validManualRelated
 
     const relatedTickets = related
 
@@ -694,6 +737,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
 export async function improveTicket(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params
   const userId = req.user?.id
+  const userCommand = typeof req.body?.userCommand === 'string' ? req.body.userCommand : undefined
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
@@ -719,6 +763,8 @@ export async function improveTicket(req: Request, res: Response, next: NextFunct
       description: ticket.description,
       acceptanceCriteria: ticket.acceptanceCriteria,
       attachments: ticket.attachments,
+      ticketType: ticket.ticketType,
+      userCommand,
     })
 
     res.json({
@@ -734,7 +780,7 @@ export async function improveTicket(req: Request, res: Response, next: NextFunct
 export async function improveTicketDraft(req: Request, res: Response, next: NextFunction) {
   const { boardId } = req.params
   const userId = req.user?.id
-  const { title, description, acceptanceCriteria, attachments } = req.body
+  const { title, description, acceptanceCriteria, attachments, ticketType, userCommand } = req.body
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
@@ -760,6 +806,8 @@ export async function improveTicketDraft(req: Request, res: Response, next: Next
       description,
       acceptanceCriteria,
       attachments,
+      ticketType: typeof ticketType === 'string' ? ticketType : undefined,
+      userCommand: typeof userCommand === 'string' ? userCommand : undefined,
     })
 
     res.json({
