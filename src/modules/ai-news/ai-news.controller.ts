@@ -47,7 +47,9 @@ function validateAndFilterItems(items: any[]): NewsItem[] {
       source: item.source,
       url: item.url.trim(),
       publishedAt: item.publishedAt,
-      imageUrl: item.imageUrl?.trim() || undefined,
+      imageUrl: item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
+        ? item.imageUrl.trim()
+        : undefined,
     }))
 }
 
@@ -77,7 +79,7 @@ async function queryMongoDB(
     source: item.source,
     url: item.url,
     publishedAt: item.publishedAt.toISOString(),
-    imageUrl: item.imageUrl,
+    imageUrl: item.imageUrl || undefined,
   }))
 
   // Validate and filter items, then take only the requested limit
@@ -208,14 +210,13 @@ export async function refreshAINews(req: Request, res: Response) {
     // Clear cache first
     await clearCache()
 
-    // Get existing items from MongoDB to compare
+    // Get ALL existing URLs from MongoDB to properly detect new items
     const existingItems = await NewsItemModel.find()
-      .sort({ publishedAt: -1 })
-      .limit(50)
+      .select('url')
       .lean()
     const existingUrls = new Set(existingItems.map((item) => item.url))
 
-    // Fetch all news (saves to MongoDB)
+    // Fetch all news from RSS feeds (this saves to MongoDB via upsert)
     const allItems = await fetchAllNews()
 
     // Find new items (items not in existing set)

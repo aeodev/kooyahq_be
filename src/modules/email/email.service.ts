@@ -6,8 +6,6 @@ import {
   generateTimeTrackerEndDayEmailHtml,
 } from './templates'
 
-const TIME_TRACKER_RECIPIENT = 'julius@kooya.ph'
-
 export const emailService = {
   /**
    * Send announcement email to all users
@@ -29,9 +27,14 @@ export const emailService = {
   },
 
   /**
-   * Send time tracker end day summary email to julius@kooya.ph
+   * Send time tracker end day summary email to the user
    */
   async sendTimeTrackerEndDayEmail(data: TimeTrackerEndDayEmailData): Promise<void> {
+    if (!data.userEmail) {
+      console.warn('No user email provided for time tracker end day email')
+      return
+    }
+
     const html = generateTimeTrackerEndDayEmailHtml(data)
     const formattedDate = new Date(data.date).toLocaleDateString('en-US', {
       month: 'short',
@@ -41,7 +44,7 @@ export const emailService = {
     const subject = `Daily Time Summary - ${data.userName} - ${formattedDate}`
 
     await sendEmail({
-      to: TIME_TRACKER_RECIPIENT,
+      to: data.userEmail,
       subject,
       html,
     })

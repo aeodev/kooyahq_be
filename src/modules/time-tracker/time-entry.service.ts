@@ -194,7 +194,7 @@ export class TimeEntryService {
     const allTodayEntries = await this.timeEntryRepo.findByUserIdAndDateRange(userId, startOfDay, endedAt)
     const publicEntries = await Promise.all(allTodayEntries.map(entry => this.toPublicTimeEntry(entry, userId)))
 
-    // Send email summary to julius@kooya.ph
+    // Send email summary to the user
     try {
       const user = await userRepository.findById(userId)
       if (user) {
