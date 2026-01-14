@@ -5,6 +5,7 @@ import { adminActivityService } from '../admin-activity/admin-activity.service'
 import { authRepository } from '../auth/auth.repository'
 import { buildAuthUser, DEFAULT_NEW_USER_PERMISSIONS, PERMISSIONS, hasPermission, type Permission } from '../auth/rbac/permissions'
 import type { UserPreferences } from './user.model'
+import { activeUsersManager } from '../../lib/active-users'
 
 function canViewSalary(user?: { permissions?: Permission[] }) {
   return !!user && hasPermission(user, PERMISSIONS.USERS_MANAGE)
@@ -129,6 +130,11 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     const updated = await userService.updateProfile(userId, updates, { includeSalary })
     if (!updated) {
       return next(createHttpError(404, 'User not found'))
+    }
+
+    // Broadcast status change if status was updated
+    if (updates.status) {
+      activeUsersManager.broadcastUserStatusUpdate(userId, updates.status)
     }
 
     res.json({
@@ -316,6 +322,11 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
     const updated = await userService.updateEmployee(id, updates, { includeSalary })
     if (!updated) {
       return next(createHttpError(404, 'User not found'))
+    }
+
+    // Broadcast status change if status was updated
+    if (updates.status) {
+      activeUsersManager.broadcastUserStatusUpdate(id, updates.status)
     }
 
     // Log admin activity

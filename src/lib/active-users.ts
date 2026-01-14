@@ -68,6 +68,7 @@ class ActiveUsersManager {
       name: u!.name,
       email: u!.email,
       profilePic: u!.profilePic,
+      status: u!.status,
     }))
 
     SocketEmitter.emitToAll('game:active-users', { users: activeUsers })
@@ -76,7 +77,7 @@ class ActiveUsersManager {
   /**
    * Get active users list for initial load
    */
-  async getActiveUsers(): Promise<Array<{ id: string; name: string; email: string; profilePic?: string }>> {
+  async getActiveUsers(): Promise<Array<{ id: string; name: string; email: string; profilePic?: string; status?: string }>> {
     const userIds = this.getActiveUserIds()
     const users = await Promise.all(userIds.map((id) => userService.getPublicProfile(id)))
     return users.filter(Boolean).map((u) => ({
@@ -84,7 +85,15 @@ class ActiveUsersManager {
       name: u!.name,
       email: u!.email,
       profilePic: u!.profilePic,
+      status: u!.status,
     }))
+  }
+
+  /**
+   * Broadcast a single user's status update to all connected clients
+   */
+  broadcastUserStatusUpdate(userId: string, status: string): void {
+    SocketEmitter.emitToAll('user:status-update', { userId, status })
   }
 
   /**
