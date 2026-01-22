@@ -86,6 +86,11 @@ export const PERMISSIONS = {
   COST_ANALYTICS_VIEW: 'cost-analytics:view',
   COST_ANALYTICS_EDIT: 'cost-analytics:edit',
 
+  FINANCE_FULL_ACCESS: 'finance:fullAccess',
+  FINANCE_VIEW: 'finance:view',
+  FINANCE_EDIT: 'finance:edit',
+  FINANCE_MANAGE_EMPLOYEE_COSTS: 'finance:manageEmployeeCosts',
+
   GAME_FULL_ACCESS: 'game:fullAccess',
   GAME_READ: 'game:read',
   GAME_PLAY: 'game:play',

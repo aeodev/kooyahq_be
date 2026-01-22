@@ -32,7 +32,10 @@ import { linkPreviewRouter } from './modules/link-preview/link-preview.router'
 import { cesiumRouter } from './modules/cesium/cesium.router'
 import { settingsRouter } from './modules/settings/settings.router'
 import { seoRouter } from './modules/seo/seo.router'
-import { costAnalyticsRouter } from './modules/cost-analytics/cost-analytics.router'
+import { financeRouter } from './modules/finance/finance.router'
+import { legacyCostAnalyticsRouter } from './modules/finance/compatibility/legacy-cost-analytics.router'
+// Legacy import kept for backward compatibility during migration
+// import { costAnalyticsRouter } from './modules/cost-analytics/cost-analytics.router'
 
 export function createApp() {
   const app = express()
@@ -97,7 +100,19 @@ export function createApp() {
   app.use('/api/media', mediaRouter)
   app.use('/api/cesium', cesiumRouter)
   app.use('/api/settings', settingsRouter)
-  app.use('/api/cost-analytics', costAnalyticsRouter)
+  // Finance module (unified - includes analytics, budgets, expenses)
+  app.use('/api/finance', financeRouter)
+  
+  // Legacy cost-analytics routes (deprecated - migrate to /api/finance/*)
+  // These routes are kept for backward compatibility during the deprecation window
+  app.use('/api/cost-analytics', legacyCostAnalyticsRouter)
+  // Budget routes under cost-analytics also forward to finance/budgets
+  app.use('/api/cost-analytics/budgets', async (req, res, next) => {
+    console.warn(`[DEPRECATION WARNING] /api/cost-analytics/budgets${req.path} is deprecated. Please migrate to /api/finance/budgets${req.path}`)
+    // Forward to the finance budgets router
+    req.url = `/budgets${req.url}`
+    financeRouter(req, res, next)
+  })
   app.use('/api/gateways/github', githubGatewayRouter)
   app.use('/api/gateways/server-status', serverStatusGatewayRouter)
   app.use('/api/server-management', serverManagementRouter)

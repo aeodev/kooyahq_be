@@ -13,6 +13,9 @@ const SENSITIVE_KEY_PATTERNS = [
   /access[-_]?key/i,
   /command/i,
   /salary/i,
+  /monthlySalary/i,
+  /hourlyRate/i,
+  /^rate$/i, // Exact match for 'rate' to avoid false positives
 ]
 
 const MAX_ARRAY_ITEMS = 12
