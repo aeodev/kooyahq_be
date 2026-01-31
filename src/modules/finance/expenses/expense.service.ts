@@ -6,7 +6,7 @@
  * - notes field for free text (not description)
  */
 
-import { ExpenseRepository } from '../expense.repository'
+import { ExpenseRepository, type ExpenseFilters } from '../expense.repository'
 import type { Expense, CreateExpenseInput, UpdateExpenseInput } from '../expense.model'
 
 export class ExpenseService {

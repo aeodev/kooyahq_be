@@ -142,7 +142,7 @@ export const chatRepository = {
     return doc ? toConversation(doc) : undefined
   },
 
-  async update(
+  async updateConversation(
     conversationId: string,
     userId: string,
     updates: UpdateConversationInput
@@ -291,7 +291,7 @@ export const chatRepository = {
     if (!doc) return undefined
 
     // Check if already read
-    const alreadyRead = doc.readBy.some((r) => r.userId === userId)
+    const alreadyRead = doc.readBy.some((r: { userId: string }) => r.userId === userId)
     if (alreadyRead) {
       return toMessage(doc)
     }
@@ -322,7 +322,7 @@ export const chatRepository = {
     return result.modifiedCount || 0
   },
 
-  async update(messageId: string, senderId: string, updates: UpdateMessageInput): Promise<Message | undefined> {
+  async updateMessage(messageId: string, senderId: string, updates: UpdateMessageInput): Promise<Message | undefined> {
     const doc = await MessageModel.findById(messageId).exec()
     if (!doc || doc.senderId !== senderId) return undefined
 

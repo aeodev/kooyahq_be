@@ -2,6 +2,8 @@ import { Schema, model, models, type Document } from 'mongoose'
 
 import type { RecurringFrequency, RecurringStatus } from '../recurring-expenses/recurring-expense.model'
 
+export type { RecurringFrequency, RecurringStatus }
+
 export interface RecurringEmployeeCostDocument extends Document {
   employeeId: string
   amount: number

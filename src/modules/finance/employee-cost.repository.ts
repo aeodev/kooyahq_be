@@ -11,9 +11,18 @@ export type EmployeeCostFilters = {
   search?: string
 }
 
+type EmployeeCostQuery = {
+  employeeId?: string
+  effectiveDate?: {
+    $gte?: Date
+    $lte?: Date
+  }
+  $or?: Array<Record<string, unknown>>
+}
+
 export class EmployeeCostRepository {
-  private buildQuery(filters: EmployeeCostFilters): Record<string, unknown> {
-    const query: Record<string, unknown> = {}
+  private buildQuery(filters: EmployeeCostFilters): EmployeeCostQuery {
+    const query: EmployeeCostQuery = {}
 
     if (filters.employeeId) {
       query.employeeId = filters.employeeId

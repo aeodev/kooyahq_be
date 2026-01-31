@@ -321,7 +321,7 @@ export async function updateMessage(req: Request, res: Response, next: NextFunct
 
   try {
     const { chatRepository } = await import('./chat.repository')
-    const updated = await chatRepository.update(id, userId, { content: content.trim() })
+    const updated = await chatRepository.updateMessage(id, userId, { content: content.trim() })
     if (!updated) {
       return next(createHttpError(404, 'Message not found or unauthorized'))
     }

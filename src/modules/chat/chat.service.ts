@@ -4,13 +4,15 @@ import { userService } from '../users/user.service'
 import { fetchLinkPreview } from '../link-preview/link-preview.service'
 import type { Conversation, Message } from './chat.model'
 
-export type ConversationWithParticipants = Conversation & {
-  participants: Array<{
-    id: string
-    name: string
-    email: string
-    profilePic?: string
-  }>
+type ParticipantSummary = {
+  id: string
+  name: string
+  email: string
+  profilePic?: string
+}
+
+export type ConversationWithParticipants = Omit<Conversation, 'participants' | 'lastMessage'> & {
+  participants: ParticipantSummary[]
   lastMessage?: Message
 }
 
@@ -451,7 +453,7 @@ export const chatService = {
       throw new Error('Only group conversations can be updated')
     }
 
-    const updated = await chatRepository.update(conversationId, userId, updates)
+    const updated = await chatRepository.updateConversation(conversationId, userId, updates)
     if (!updated) {
       throw new Error('Failed to update conversation or insufficient permissions')
     }

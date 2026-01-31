@@ -287,7 +287,7 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
     if (!content || typeof content !== 'string' || !content.trim()) return
 
     try {
-      const updated = await chatRepository.update(messageId, userId, { content: content.trim() })
+      const updated = await chatRepository.updateMessage(messageId, userId, { content: content.trim() })
       if (updated) {
         // Broadcast to conversation room
         const conversation = await chatRepository.findConversationById(updated.conversationId, userId)
