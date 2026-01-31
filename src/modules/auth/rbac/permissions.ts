@@ -101,6 +101,12 @@ export const PERMISSIONS = {
   CESIUM_TOKEN: 'cesium:token',
 
   AI_ASSISTANT_ACCESS: 'ai-assistant:access',
+
+  CHAT_FULL_ACCESS: 'chat:fullAccess',
+  CHAT_READ: 'chat:read',
+  CHAT_SEND: 'chat:send',
+  CHAT_CREATE_GROUP: 'chat:createGroup',
+  CHAT_MANAGE_GROUP: 'chat:manageGroup',
 } as const
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
@@ -130,6 +136,8 @@ export const DEFAULT_NEW_USER_PERMISSIONS: Permission[] = [
   PERMISSIONS.ANNOUNCEMENT_READ,
   PERMISSIONS.BOARD_VIEW,
   PERMISSIONS.CESIUM_TOKEN,
+  PERMISSIONS.CHAT_READ,
+  PERMISSIONS.CHAT_SEND,
   // Note: No TIME_ENTRY, PRESENCE, or AI_ASSISTANT by default
   // Admins must explicitly assign Employee template for these
 ]

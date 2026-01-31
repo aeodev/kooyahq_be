@@ -34,6 +34,7 @@ import { settingsRouter } from './modules/settings/settings.router'
 import { seoRouter } from './modules/seo/seo.router'
 import { financeRouter } from './modules/finance/finance.router'
 import { legacyCostAnalyticsRouter } from './modules/finance/compatibility/legacy-cost-analytics.router'
+import { chatRouter } from './modules/chat/chat.router'
 // Legacy import kept for backward compatibility during migration
 // import { costAnalyticsRouter } from './modules/cost-analytics/cost-analytics.router'
 
@@ -95,6 +96,7 @@ export function createApp() {
   app.use('/api/presence', presenceRouter)
   app.use('/api/meet', meetRouter)
   app.use('/api/games', gameRouter)
+  app.use('/api/chat', chatRouter)
   app.use('/api/announcements', announcementRouter)
   app.use('/api/projects', projectRouter)
   app.use('/api/media', mediaRouter)

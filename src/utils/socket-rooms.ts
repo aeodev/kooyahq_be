@@ -38,6 +38,14 @@ export function aiNewsRoom(): string {
   return 'ai-news:all'
 }
 
+export function chatRoom(conversationId: string): string {
+  return `chat:${conversationId}`
+}
+
+export function chatUserRoom(userId: string): string {
+  return `chat:user:${userId}`
+}
+
 
 
 
