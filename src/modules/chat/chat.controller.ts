@@ -6,13 +6,16 @@ export async function getConversations(req: Request, res: Response, next: NextFu
   const userId = req.user?.id
   const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined
+  const archived = req.query.archived === 'true'
 
   if (!userId) {
     return next(createHttpError(401, 'Unauthorized'))
   }
 
   try {
-    const result = await chatService.getConversations(userId, { page, limit })
+    const result = archived
+      ? await chatService.getArchivedConversations(userId, { page, limit })
+      : await chatService.getConversations(userId, { page, limit })
     res.json({
       status: 'success',
       data: result.conversations,
@@ -268,16 +271,23 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
     return next(createHttpError(401, 'Unauthorized'))
   }
 
-  if (!content || typeof content !== 'string' || !content.trim()) {
-    return next(createHttpError(400, 'Message content is required'))
+  // Allow empty content if attachments exist
+  const hasAttachments = attachments && Array.isArray(attachments) && attachments.length > 0
+  const hasContent = content && typeof content === 'string' && content.trim()
+  
+  if (!hasContent && !hasAttachments) {
+    return next(createHttpError(400, 'Message content or attachments are required'))
   }
 
   try {
+    const messageContent = hasContent ? content.trim() : ''
+    const messageType = hasAttachments && !hasContent ? 'image' : (type || 'text')
+    
     const message = await chatService.sendMessage(id, userId, {
       conversationId: id,
       senderId: userId,
-      content: content.trim(),
-      type: type || 'text',
+      content: messageContent,
+      type: messageType,
       attachments,
       replyTo,
     })
@@ -403,6 +413,72 @@ export async function getTeamContacts(req: Request, res: Response, next: NextFun
       data: teamMembers,
     })
   } catch (error) {
+    next(error)
+  }
+}
+
+export async function archiveConversation(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+  const { id } = req.params
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const conversation = await chatService.archiveConversation(id, userId)
+    res.json({
+      status: 'success',
+      data: conversation,
+    })
+  } catch (error: any) {
+    if (error.message === 'Conversation not found or access denied') {
+      return next(createHttpError(404, error.message))
+    }
+    next(error)
+  }
+}
+
+export async function unarchiveConversation(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+  const { id } = req.params
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    const conversation = await chatService.unarchiveConversation(id, userId)
+    res.json({
+      status: 'success',
+      data: conversation,
+    })
+  } catch (error: any) {
+    if (error.message === 'Conversation not found or access denied') {
+      return next(createHttpError(404, error.message))
+    }
+    next(error)
+  }
+}
+
+export async function deleteConversation(req: Request, res: Response, next: NextFunction) {
+  const userId = req.user?.id
+  const { id } = req.params
+
+  if (!userId) {
+    return next(createHttpError(401, 'Unauthorized'))
+  }
+
+  try {
+    await chatService.deleteConversation(id, userId)
+    res.json({
+      status: 'success',
+      message: 'Conversation deleted',
+    })
+  } catch (error: any) {
+    if (error.message === 'Conversation not found or access denied') {
+      return next(createHttpError(404, error.message))
+    }
     next(error)
   }
 }

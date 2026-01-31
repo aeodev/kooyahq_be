@@ -129,6 +129,43 @@ export const chatService = {
     }
   },
 
+  async getArchivedConversations(
+    userId: string,
+    options: { page?: number; limit?: number } = {}
+  ): Promise<{ conversations: ConversationWithParticipants[]; total: number }> {
+    const { conversations, total } = await chatRepository.findArchivedByUserId(userId, options)
+
+    // Fetch participants and last messages
+    const conversationsWithData = await Promise.all(
+      conversations.map(async (conv) => {
+        const participants = await Promise.all(
+          conv.participants.map((id) => userService.getPublicProfile(id))
+        )
+
+        let lastMessage: Message | undefined
+        if (conv.lastMessageId) {
+          lastMessage = await chatRepository.findMessageById(conv.lastMessageId)
+        }
+
+        return {
+          ...conv,
+          participants: participants.filter((p): p is NonNullable<typeof p> => p !== undefined).map((p) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            profilePic: p.profilePic,
+          })),
+          lastMessage,
+        }
+      })
+    )
+
+    return {
+      conversations: conversationsWithData,
+      total,
+    }
+  },
+
   async getConversation(conversationId: string, userId: string): Promise<ConversationWithParticipants> {
     const conversation = await chatRepository.findConversationById(conversationId, userId)
     if (!conversation) {
@@ -167,22 +204,38 @@ export const chatService = {
       throw new Error('Conversation not found or access denied')
     }
 
-    // Validate content
-    if (!input.content || !input.content.trim()) {
-      throw new Error('Message content is required')
+    // Allow empty content if attachments exist
+    const hasAttachments = input.attachments && input.attachments.length > 0
+    const hasContent = input.content && typeof input.content === 'string' && input.content.trim()
+    
+    if (!hasContent && !hasAttachments) {
+      throw new Error('Message content or attachments are required')
     }
 
-    if (input.content.length > 5000) {
+    if (hasContent && input.content.length > 5000) {
       throw new Error('Message content too long (max 5000 characters)')
+    }
+    
+    console.log('📤 Service sendMessage:', {
+      hasContent,
+      hasAttachments,
+      content: hasContent ? input.content.substring(0, 50) : '(empty)',
+      attachmentsCount: input.attachments?.length || 0
+    })
+
+    // Get sender info first
+    const sender = await userService.getPublicProfile(senderId)
+    if (!sender) {
+      throw new Error('Sender not found')
     }
 
     // Detect URLs in message content
     const urlRegex = /(https?:\/\/[^\s]+)/g
     const urls = input.content.match(urlRegex) || []
-    
+
     // Prepare attachments (start with existing)
     const attachments = [...(input.attachments || [])]
-    
+
     // Fetch link previews asynchronously (don't block message sending)
     // Note: Previews will be added to the message later via socket events if needed
     // For now, we'll let the frontend handle link preview fetching for better UX
@@ -207,23 +260,20 @@ export const chatService = {
     }
 
     // Create message
+    const messageContent = hasContent ? input.content.trim() : ''
+    const messageType = hasAttachments && !hasContent ? 'image' : (input.type || 'text')
+    
     const message = await chatRepository.createMessage({
       conversationId,
       senderId,
-      content: input.content.trim(),
-      type: input.type || 'text',
+      content: messageContent,
+      type: messageType,
       attachments,
       replyTo: input.replyTo,
     })
 
     // Update conversation last message
-    await chatRepository.updateLastMessage(conversationId, message.id, new Date(message.createdAt))
-
-    // Get sender info
-    const sender = await userService.getPublicProfile(senderId)
-    if (!sender) {
-      throw new Error('Sender not found')
-    }
+    await chatRepository.updateLastMessage(conversationId, message.id, new Date(message.createdAt), sender.name)
 
     return {
       ...message,
@@ -234,6 +284,106 @@ export const chatService = {
         profilePic: sender.profilePic,
       },
     }
+  },
+
+  async saveAndDistribute(
+    conversationId: string,
+    senderId: string,
+    input: CreateMessageInput & { cid: string }
+  ): Promise<MessageWithSender> {
+    // 1. Verify conversation exists and user is participant
+    const conversation = await chatRepository.findConversationById(conversationId, senderId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    // 2. Validate content - allow empty if attachments exist
+    const hasAttachments = input.attachments && input.attachments.length > 0
+    const hasContent = input.content && typeof input.content === 'string' && input.content.trim()
+    
+    if (!hasContent && !hasAttachments) {
+      throw new Error('Message content or attachments are required')
+    }
+
+    if (hasContent && input.content.length > 5000) {
+      throw new Error('Message content too long (max 5000 characters)')
+    }
+    
+    console.log('📤 Service saveAndDistribute:', {
+      hasContent,
+      hasAttachments,
+      content: hasContent ? input.content.substring(0, 50) : '(empty)',
+      attachmentsCount: input.attachments?.length || 0
+    })
+
+    // 3. Get sender info first
+    const sender = await userService.getPublicProfile(senderId)
+    if (!sender) {
+      throw new Error('Sender not found')
+    }
+
+    // 4. Create message with CID
+    const message = await chatRepository.createMessage({
+      conversationId,
+      senderId,
+      content: input.content.trim(),
+      type: input.type || 'text',
+      attachments: input.attachments,
+      replyTo: input.replyTo,
+      cid: input.cid, // Store CID for idempotency
+    })
+
+    // 5. Update conversation last message
+    await chatRepository.updateLastMessage(conversationId, message.id, new Date(message.createdAt), sender.name)
+
+    return {
+      ...message,
+      sender: {
+        id: sender.id,
+        name: sender.name,
+        email: sender.email,
+        profilePic: sender.profilePic,
+      },
+    }
+  },
+
+  async getMessagesSince(
+    conversationId: string,
+    userId: string,
+    lastMessageId?: string,
+    lastSyncTimestamp?: string
+  ): Promise<MessageWithSender[]> {
+    // Verify conversation exists and user is participant
+    const conversation = await chatRepository.findConversationById(conversationId, userId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    const messages = await chatRepository.findMessagesSince(conversationId, lastMessageId, lastSyncTimestamp)
+
+    // Fetch sender info for each message
+    const senderIds = [...new Set(messages.map((m) => m.senderId))]
+    const senders = await Promise.all(senderIds.map((id) => userService.getPublicProfile(id)))
+
+    const senderMap = new Map(
+      senders.filter((s): s is NonNullable<typeof s> => s !== undefined).map((s) => [s.id, s])
+    )
+
+    return messages.map((msg) => {
+      const sender = senderMap.get(msg.senderId)
+      if (!sender) {
+        throw new Error(`Sender ${msg.senderId} not found`)
+      }
+      return {
+        ...msg,
+        sender: {
+          id: sender.id,
+          name: sender.name,
+          email: sender.email,
+          profilePic: sender.profilePic,
+        },
+      }
+    })
   },
 
   async getMessages(
@@ -427,5 +577,45 @@ export const chatService = {
       }))
 
     return teamMembers
+  },
+
+  async archiveConversation(conversationId: string, userId: string): Promise<ConversationWithParticipants> {
+    const conversation = await chatRepository.findConversationById(conversationId, userId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    const archived = await chatRepository.archiveConversation(conversationId, userId)
+    if (!archived) {
+      throw new Error('Failed to archive conversation')
+    }
+
+    return this.getConversation(conversationId, userId)
+  },
+
+  async unarchiveConversation(conversationId: string, userId: string): Promise<ConversationWithParticipants> {
+    const conversation = await chatRepository.findConversationById(conversationId, userId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    const unarchived = await chatRepository.unarchiveConversation(conversationId, userId)
+    if (!unarchived) {
+      throw new Error('Failed to unarchive conversation')
+    }
+
+    return this.getConversation(conversationId, userId)
+  },
+
+  async deleteConversation(conversationId: string, userId: string): Promise<void> {
+    const conversation = await chatRepository.findConversationById(conversationId, userId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    const deleted = await chatRepository.deleteConversation(conversationId, userId)
+    if (!deleted) {
+      throw new Error('Failed to delete conversation')
+    }
   },
 }

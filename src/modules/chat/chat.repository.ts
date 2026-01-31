@@ -40,6 +40,7 @@ export type CreateMessageInput = {
     [key: string]: any // Allow additional metadata
   }>
   replyTo?: string
+  cid?: string // Client Correlation ID for idempotency
 }
 
 export type UpdateMessageInput = {
@@ -92,7 +93,12 @@ export const chatRepository = {
     const limit = options.limit && options.limit > 0 ? options.limit : 50
     const skip = (page - 1) * limit
 
-    const filter = { participants: userId }
+    // Exclude conversations archived or deleted by this user
+    const filter = {
+      participants: userId,
+      [`archivedBy.${userId}`]: { $exists: false },
+      [`deletedBy.${userId}`]: { $exists: false },
+    }
 
     const [docs, total] = await Promise.all([
       ConversationModel.find(filter)
@@ -164,11 +170,30 @@ export const chatRepository = {
   async updateLastMessage(
     conversationId: string,
     messageId: string,
-    timestamp: Date
+    timestamp: Date,
+    senderName?: string
   ): Promise<Conversation | undefined> {
+    // Get message and sender info for denormalization
+    const message = await MessageModel.findById(messageId).exec()
+    if (!message) return undefined
+
+    // Use provided sender name or default
+    const resolvedSenderName = senderName || 'Unknown User'
+
+    const updateData = {
+      lastMessageId: messageId,
+      lastMessageAt: timestamp,
+      lastMessage: {
+        content: message.content.substring(0, 200), // Truncate for preview
+        senderId: message.senderId,
+        senderName: resolvedSenderName,
+        createdAt: message.createdAt,
+      }
+    }
+
     const doc = await ConversationModel.findByIdAndUpdate(
       conversationId,
-      { lastMessageId: messageId, lastMessageAt: timestamp },
+      updateData,
       { new: true }
     ).exec()
     return doc ? toConversation(doc) : undefined
@@ -224,6 +249,36 @@ export const chatRepository = {
       total,
       hasMore,
     }
+  },
+
+  async findMessagesSince(
+    conversationId: string,
+    lastMessageId?: string,
+    lastSyncTimestamp?: string
+  ): Promise<Message[]> {
+    const filter: any = {
+      conversationId,
+      deletedAt: { $exists: false }
+    }
+
+    // Build query based on what sync point we have
+    if (lastMessageId) {
+      // Find messages after the last known message ID
+      const lastMessage = await MessageModel.findById(lastMessageId).exec()
+      if (lastMessage) {
+        filter.createdAt = { $gt: lastMessage.createdAt }
+      }
+    } else if (lastSyncTimestamp) {
+      // Find messages after the last sync timestamp
+      filter.createdAt = { $gt: new Date(lastSyncTimestamp) }
+    }
+
+    const docs = await MessageModel.find(filter)
+      .sort({ createdAt: 1 }) // Oldest first for sync
+      .limit(100) // Limit to prevent overwhelming the client
+      .exec()
+
+    return docs.map(toMessage)
   },
 
   async findMessageById(id: string): Promise<Message | undefined> {
@@ -297,5 +352,62 @@ export const chatRepository = {
       senderId: { $ne: userId }, // Don't count own messages
       'readBy.userId': { $ne: userId },
     }).exec()
+  },
+
+  async archiveConversation(conversationId: string, userId: string): Promise<Conversation | undefined> {
+    const doc = await ConversationModel.findByIdAndUpdate(
+      conversationId,
+      { $set: { [`archivedBy.${userId}`]: new Date() } },
+      { new: true }
+    ).exec()
+    return doc ? toConversation(doc) : undefined
+  },
+
+  async unarchiveConversation(conversationId: string, userId: string): Promise<Conversation | undefined> {
+    const doc = await ConversationModel.findByIdAndUpdate(
+      conversationId,
+      { $unset: { [`archivedBy.${userId}`]: '' } },
+      { new: true }
+    ).exec()
+    return doc ? toConversation(doc) : undefined
+  },
+
+  async deleteConversation(conversationId: string, userId: string): Promise<Conversation | undefined> {
+    const doc = await ConversationModel.findByIdAndUpdate(
+      conversationId,
+      { $set: { [`deletedBy.${userId}`]: new Date() } },
+      { new: true }
+    ).exec()
+    return doc ? toConversation(doc) : undefined
+  },
+
+  async findArchivedByUserId(
+    userId: string,
+    options: ConversationQueryOptions = {}
+  ): Promise<{ conversations: Conversation[]; total: number }> {
+    const page = options.page && options.page > 0 ? options.page : 1
+    const limit = options.limit && options.limit > 0 ? options.limit : 50
+    const skip = (page - 1) * limit
+
+    // Only get conversations archived by this user (not deleted)
+    const filter = {
+      participants: userId,
+      [`archivedBy.${userId}`]: { $exists: true },
+      [`deletedBy.${userId}`]: { $exists: false },
+    }
+
+    const [docs, total] = await Promise.all([
+      ConversationModel.find(filter)
+        .sort({ [`archivedBy.${userId}`]: -1, lastMessageAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      ConversationModel.countDocuments(filter).exec(),
+    ])
+
+    return {
+      conversations: docs.map(toConversation),
+      total,
+    }
   },
 }

@@ -18,6 +18,9 @@ import {
   markConversationAsRead,
   getUnreadCount,
   getTeamContacts,
+  archiveConversation,
+  unarchiveConversation,
+  deleteConversation,
 } from './chat.controller'
 
 export const chatRouter = Router()
@@ -116,4 +119,23 @@ chatRouter.get(
   '/team-contacts',
   requirePermission(PERMISSIONS.CHAT_READ, PERMISSIONS.CHAT_FULL_ACCESS),
   getTeamContacts
+)
+
+// Archive/Delete routes
+chatRouter.post(
+  '/conversations/:id/archive',
+  requirePermission(PERMISSIONS.CHAT_SEND, PERMISSIONS.CHAT_FULL_ACCESS),
+  archiveConversation
+)
+
+chatRouter.post(
+  '/conversations/:id/unarchive',
+  requirePermission(PERMISSIONS.CHAT_SEND, PERMISSIONS.CHAT_FULL_ACCESS),
+  unarchiveConversation
+)
+
+chatRouter.delete(
+  '/conversations/:id',
+  requirePermission(PERMISSIONS.CHAT_SEND, PERMISSIONS.CHAT_FULL_ACCESS),
+  deleteConversation
 )
