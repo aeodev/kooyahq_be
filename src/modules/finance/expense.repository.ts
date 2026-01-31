@@ -5,38 +5,12 @@ export type ExpenseFilters = {
   endDate?: Date
   category?: string
   vendor?: string
-  projectId?: string
-  workspaceId?: string
   createdBy?: string
   search?: string
 }
 
 export class ExpenseRepository {
-  async create(input: CreateExpenseInput, createdBy: string): Promise<Expense> {
-    const doc = new ExpenseModel({
-      amount: input.amount,
-      currency: input.currency || 'PHP',
-      category: input.category,
-      vendor: input.vendor,
-      notes: input.notes,
-      effectiveDate: input.effectiveDate,
-      endDate: input.endDate,
-      isRecurringMonthly: input.isRecurringMonthly ?? false,
-      projectId: input.projectId,
-      workspaceId: input.workspaceId,
-      metadata: input.metadata,
-      createdBy,
-    })
-    await doc.save()
-    return toExpense(doc)
-  }
-
-  async findById(id: string): Promise<Expense | null> {
-    const doc = await ExpenseModel.findById(id)
-    return doc ? toExpense(doc) : null
-  }
-
-  async listExpenses(filters: ExpenseFilters): Promise<Expense[]> {
+  private buildQuery(filters: ExpenseFilters): Record<string, unknown> {
     const query: Record<string, unknown> = {}
 
     if (filters.startDate || filters.endDate) {
@@ -57,14 +31,6 @@ export class ExpenseRepository {
       query.vendor = filters.vendor
     }
 
-    if (filters.projectId) {
-      query.projectId = filters.projectId
-    }
-
-    if (filters.workspaceId) {
-      query.workspaceId = filters.workspaceId
-    }
-
     if (filters.createdBy) {
       query.createdBy = filters.createdBy
     }
@@ -77,8 +43,52 @@ export class ExpenseRepository {
       ]
     }
 
-    const docs = await ExpenseModel.find(query).sort({ effectiveDate: -1, createdAt: -1 })
+    return query
+  }
+
+  async create(input: CreateExpenseInput, createdBy: string): Promise<Expense> {
+    const doc = new ExpenseModel({
+      amount: input.amount,
+      currency: input.currency || 'PHP',
+      category: input.category,
+      vendor: input.vendor,
+      notes: input.notes,
+      effectiveDate: input.effectiveDate,
+      createdBy,
+    })
+    await doc.save()
+    return toExpense(doc)
+  }
+
+  async findById(id: string): Promise<Expense | null> {
+    const doc = await ExpenseModel.findById(id)
+    return doc ? toExpense(doc) : null
+  }
+
+  async listExpenses(filters: ExpenseFilters): Promise<Expense[]> {
+    const docs = await ExpenseModel.find(this.buildQuery(filters)).sort({ effectiveDate: -1, createdAt: -1 })
     return docs.map(toExpense)
+  }
+
+  async listExpensesPaginated(filters: ExpenseFilters, page: number, limit: number): Promise<{ data: Expense[]; total: number }> {
+    const query = this.buildQuery(filters)
+    const skip = (page - 1) * limit
+    const [docs, total] = await Promise.all([
+      ExpenseModel.find(query).sort({ effectiveDate: -1, createdAt: -1 }).skip(skip).limit(limit),
+      ExpenseModel.countDocuments(query),
+    ])
+    return { data: docs.map(toExpense), total }
+  }
+
+  async getOptions(): Promise<{ vendors: string[]; categories: string[] }> {
+    const [vendors, categories] = await Promise.all([
+      ExpenseModel.distinct('vendor', { vendor: { $nin: [null, ''] } }),
+      ExpenseModel.distinct('category', { category: { $nin: [null, ''] } }),
+    ])
+    return {
+      vendors: vendors.filter(Boolean),
+      categories: categories.filter(Boolean),
+    }
   }
 
   async updateExpense(id: string, input: UpdateExpenseInput): Promise<Expense | null> {
@@ -90,11 +100,6 @@ export class ExpenseRepository {
     if (input.vendor !== undefined) updateData.vendor = input.vendor
     if (input.notes !== undefined) updateData.notes = input.notes
     if (input.effectiveDate !== undefined) updateData.effectiveDate = input.effectiveDate
-    if (input.endDate !== undefined) updateData.endDate = input.endDate === null ? undefined : input.endDate
-    if (input.isRecurringMonthly !== undefined) updateData.isRecurringMonthly = input.isRecurringMonthly
-    if (input.projectId !== undefined) updateData.projectId = input.projectId === null ? undefined : input.projectId
-    if (input.workspaceId !== undefined) updateData.workspaceId = input.workspaceId === null ? undefined : input.workspaceId
-    if (input.metadata !== undefined) updateData.metadata = input.metadata
 
     const doc = await ExpenseModel.findByIdAndUpdate(id, updateData, { new: true })
     return doc ? toExpense(doc) : null

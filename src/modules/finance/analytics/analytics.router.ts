@@ -3,7 +3,7 @@
  * 
  * SECURITY:
  * - Default routes return SAFE (sanitized) data without monthlySalary/hourlyRate
- * - Privileged routes (/live/privileged, /summary/privileged, etc.) require USERS_MANAGE
+ * - Privileged routes (/live/privileged, /summary/privileged, etc.) require SYSTEM_FULL_ACCESS
  */
 
 import { Router } from 'express'
@@ -27,16 +27,8 @@ export const analyticsRouter = Router()
 // All routes require authentication
 analyticsRouter.use(authenticate)
 
-// Base permission check - need FINANCE_VIEW (or equivalent)
-analyticsRouter.use(requirePermission(
-  PERMISSIONS.FINANCE_VIEW,
-  PERMISSIONS.FINANCE_EDIT,
-  PERMISSIONS.FINANCE_FULL_ACCESS,
-  // Legacy permissions for backward compatibility
-  PERMISSIONS.COST_ANALYTICS_VIEW,
-  PERMISSIONS.COST_ANALYTICS_EDIT,
-  PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-))
+// Finance analytics is restricted to super admins
+analyticsRouter.use(requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS))
 
 // ============================================================================
 // SAFE (DEFAULT) ROUTES - No salary/rate exposure
@@ -149,7 +141,7 @@ analyticsRouter.get('/compare', getPeriodComparison)
 analyticsRouter.get('/project/:projectName', getProjectDetail)
 
 // ============================================================================
-// PRIVILEGED ROUTES - Require USERS_MANAGE permission
+// PRIVILEGED ROUTES - Require SYSTEM_FULL_ACCESS
 // Include salary/rate data
 // ============================================================================
 
@@ -162,17 +154,17 @@ analyticsRouter.get('/project/:projectName', getProjectDetail)
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       **PRIVILEGED ENDPOINT** - Requires USERS_MANAGE permission.
+ *       **PRIVILEGED ENDPOINT** - Requires SYSTEM_FULL_ACCESS permission.
  *       Returns full developer data including monthlySalary and hourlyRate.
  *     responses:
  *       200:
  *         description: Live cost data with salary/rate information
  *       403:
- *         description: Forbidden - requires USERS_MANAGE permission
+ *         description: Forbidden - requires SYSTEM_FULL_ACCESS permission
  */
 analyticsRouter.get(
   '/live/privileged',
-  requirePermission(PERMISSIONS.USERS_MANAGE),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getLiveCostPrivileged
 )
 
@@ -185,17 +177,17 @@ analyticsRouter.get(
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       **PRIVILEGED ENDPOINT** - Requires USERS_MANAGE permission.
+ *       **PRIVILEGED ENDPOINT** - Requires SYSTEM_FULL_ACCESS permission.
  *       Returns full developer data including hourlyRate.
  *     responses:
  *       200:
  *         description: Cost summary with salary/rate information
  *       403:
- *         description: Forbidden - requires USERS_MANAGE permission
+ *         description: Forbidden - requires SYSTEM_FULL_ACCESS permission
  */
 analyticsRouter.get(
   '/summary/privileged',
-  requirePermission(PERMISSIONS.USERS_MANAGE),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getCostSummaryPrivileged
 )
 
@@ -208,7 +200,7 @@ analyticsRouter.get(
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       **PRIVILEGED ENDPOINT** - Requires USERS_MANAGE permission.
+ *       **PRIVILEGED ENDPOINT** - Requires SYSTEM_FULL_ACCESS permission.
  *       Returns full developer data including hourlyRate.
  *     parameters:
  *       - in: path
@@ -220,12 +212,12 @@ analyticsRouter.get(
  *       200:
  *         description: Project cost data with salary/rate information
  *       403:
- *         description: Forbidden - requires USERS_MANAGE permission
+ *         description: Forbidden - requires SYSTEM_FULL_ACCESS permission
  *       404:
  *         description: No data found for this project
  */
 analyticsRouter.get(
   '/project/:projectName/privileged',
-  requirePermission(PERMISSIONS.USERS_MANAGE),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getProjectDetailPrivileged
 )

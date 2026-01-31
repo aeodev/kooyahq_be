@@ -3,7 +3,7 @@
  * 
  * SECURITY CRITICAL: This service implements data sanitization to prevent salary/rate leakage.
  * - Default methods return SAFE DTOs (no monthlySalary/hourlyRate)
- * - Privileged methods return full data (requires USERS_MANAGE permission)
+ * - Privileged methods return full data (requires SYSTEM_FULL_ACCESS)
  * 
  * The controller layer MUST enforce permission checks for privileged endpoints.
  */
@@ -108,12 +108,12 @@ export class AnalyticsService {
   }
 
   // ============================================================================
-  // PRIVILEGED METHODS - Include salary/rate (requires USERS_MANAGE)
+  // PRIVILEGED METHODS - Include salary/rate (requires SYSTEM_FULL_ACCESS)
   // ============================================================================
 
   /**
    * Get live cost data with FULL data including salary/rates
-   * SECURITY: Controller MUST verify USERS_MANAGE permission before calling
+   * SECURITY: Controller MUST verify SYSTEM_FULL_ACCESS before calling
    */
   async getLiveCostDataPrivileged(): Promise<PrivilegedLiveCostData> {
     const activeEntries = await this.timeEntryRepo.findAllActive()
@@ -205,7 +205,7 @@ export class AnalyticsService {
 
   /**
    * Get cost summary with FULL data including salary/rates
-   * SECURITY: Controller MUST verify USERS_MANAGE permission before calling
+   * SECURITY: Controller MUST verify SYSTEM_FULL_ACCESS before calling
    */
   async getCostSummaryPrivileged(startDate: Date, endDate: Date, project?: string | null): Promise<PrivilegedCostSummaryData> {
     let entries = await this.timeEntryRepo.findByDateRange(null, startDate, endDate)
@@ -408,7 +408,7 @@ export class AnalyticsService {
 
   /**
    * Get project detail with FULL data including hourlyRate
-   * SECURITY: Controller MUST verify USERS_MANAGE permission before calling
+   * SECURITY: Controller MUST verify SYSTEM_FULL_ACCESS before calling
    */
   async getProjectDetailPrivileged(projectName: string, startDate: Date, endDate: Date): Promise<PrivilegedProjectCostSummary | null> {
     const allEntries = await this.timeEntryRepo.findByDateRange(null, startDate, endDate)

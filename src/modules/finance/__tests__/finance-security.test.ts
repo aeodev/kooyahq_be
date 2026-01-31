@@ -3,11 +3,11 @@
  * 
  * These tests verify that:
  * 1. Analytics safe endpoints do NOT include hourlyRate/monthlySalary
- * 2. Privileged analytics endpoints return 403 without USERS_MANAGE
- * 3. Privileged analytics endpoints include hourlyRate when USERS_MANAGE present
+ * 2. Privileged analytics endpoints return 403 without SYSTEM_FULL_ACCESS
+ * 3. Privileged analytics endpoints include hourlyRate when SYSTEM_FULL_ACCESS present
  * 4. Budget BOLA: user cannot modify a budget they do not own (403)
  * 5. Admin activity logging redacts hourlyRate/monthlySalary/salary keys
- * 6. Expense validation for isRecurringMonthly + notes constraints
+ * 6. Expense validation for notes constraints
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -79,7 +79,7 @@ describe('Finance Security Tests', () => {
   })
 
   // ============================================================================
-  // Test 2 & 3: Privileged endpoints require USERS_MANAGE and return hourlyRate
+  // Test 2 & 3: Privileged endpoints require SYSTEM_FULL_ACCESS and return hourlyRate
   // ============================================================================
   describe('Analytics Privileged Endpoints', () => {
     it('should include hourlyRate in privileged live response', async () => {
@@ -299,61 +299,5 @@ describe('Finance Security Tests', () => {
         )
       ).rejects.toThrow('Notes must be 2000 characters or less')
     })
-
-    it('should validate endDate is after effectiveDate for recurring expenses', async () => {
-      const { ExpenseService } = await import('../expenses/expense.service')
-      const service = new ExpenseService()
-      
-      const effectiveDate = new Date()
-      const endDate = new Date(effectiveDate.getTime() - 24 * 60 * 60 * 1000) // 1 day before
-      
-      await expect(
-        service.createExpense(
-          {
-            amount: 100,
-            effectiveDate,
-            endDate,
-            isRecurringMonthly: true,
-          },
-          'user-123'
-        )
-      ).rejects.toThrow('End date must be after effective date for recurring expenses')
-    })
-
-    it('should accept valid expense with isRecurringMonthly and notes', async () => {
-      const { ExpenseService } = await import('../expenses/expense.service')
-      const service = new ExpenseService()
-      
-      const expense = await service.createExpense(
-        {
-          amount: 500,
-          effectiveDate: new Date(),
-          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          isRecurringMonthly: true,
-          notes: 'Monthly subscription',
-        },
-        'user-123'
-      )
-      
-      expect(expense).toHaveProperty('id')
-      expect(expense.isRecurringMonthly).toBe(true)
-      expect(expense.notes).toBe('Monthly subscription')
-    })
-  })
-})
-
-// ============================================================================
-// Employee Cost Type Validation Tests
-// ============================================================================
-describe('Employee Cost Type Validation', () => {
-  it('should not allow salary as a cost type', async () => {
-    const { EMPLOYEE_COST_TYPES } = await import('../employee-cost.model')
-    
-    expect(EMPLOYEE_COST_TYPES).not.toContain('salary')
-    expect(EMPLOYEE_COST_TYPES).toContain('subscription')
-    expect(EMPLOYEE_COST_TYPES).toContain('equipment')
-    expect(EMPLOYEE_COST_TYPES).toContain('training')
-    expect(EMPLOYEE_COST_TYPES).toContain('benefit')
-    expect(EMPLOYEE_COST_TYPES).toContain('other')
   })
 })

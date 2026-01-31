@@ -3,7 +3,7 @@
  * 
  * SECURITY CRITICAL:
  * - Default endpoints return SAFE (sanitized) data without monthlySalary/hourlyRate
- * - Privileged endpoints require USERS_MANAGE permission and return full data
+ * - Privileged endpoints require SYSTEM_FULL_ACCESS and return full data
  * 
  * The router layer enforces permission checks for privileged routes.
  */
@@ -193,13 +193,13 @@ export async function getPeriodComparison(req: Request, res: Response) {
 }
 
 // ============================================================================
-// PRIVILEGED ENDPOINTS - Require USERS_MANAGE permission
+// PRIVILEGED ENDPOINTS - Require SYSTEM_FULL_ACCESS
 // Include salary/rate data - router MUST enforce permission check
 // ============================================================================
 
 /**
  * Get live cost data with FULL salary/rate information
- * SECURITY: Router must verify USERS_MANAGE permission
+ * SECURITY: Router must verify SYSTEM_FULL_ACCESS
  */
 export async function getLiveCostPrivileged(_req: Request, res: Response) {
   try {
@@ -213,7 +213,7 @@ export async function getLiveCostPrivileged(_req: Request, res: Response) {
 
 /**
  * Get cost summary with FULL salary/rate information
- * SECURITY: Router must verify USERS_MANAGE permission
+ * SECURITY: Router must verify SYSTEM_FULL_ACCESS
  */
 export async function getCostSummaryPrivileged(req: Request, res: Response) {
   try {
@@ -251,7 +251,7 @@ export async function getCostSummaryPrivileged(req: Request, res: Response) {
 
 /**
  * Get project detail with FULL salary/rate information
- * SECURITY: Router must verify USERS_MANAGE permission
+ * SECURITY: Router must verify SYSTEM_FULL_ACCESS
  */
 export async function getProjectDetailPrivileged(req: Request, res: Response) {
   try {

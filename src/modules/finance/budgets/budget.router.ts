@@ -39,14 +39,7 @@ budgetRouter.use(authenticate)
  */
 budgetRouter.get(
   '/comparisons/all',
-  requirePermission(
-    PERMISSIONS.FINANCE_VIEW,
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_VIEW,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getAllBudgetComparisons
 )
 
@@ -98,12 +91,7 @@ budgetRouter.get(
  */
 budgetRouter.post(
   '/',
-  requirePermission(
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   createBudget
 )
 
@@ -127,14 +115,7 @@ budgetRouter.post(
  */
 budgetRouter.get(
   '/',
-  requirePermission(
-    PERMISSIONS.FINANCE_VIEW,
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_VIEW,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getBudgets
 )
 
@@ -160,14 +141,7 @@ budgetRouter.get(
  */
 budgetRouter.get(
   '/:id',
-  requirePermission(
-    PERMISSIONS.FINANCE_VIEW,
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_VIEW,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getBudget
 )
 
@@ -197,12 +171,7 @@ budgetRouter.get(
  */
 budgetRouter.put(
   '/:id',
-  requirePermission(
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   updateBudget
 )
 
@@ -232,12 +201,7 @@ budgetRouter.put(
  */
 budgetRouter.delete(
   '/:id',
-  requirePermission(
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   deleteBudget
 )
 
@@ -263,13 +227,6 @@ budgetRouter.delete(
  */
 budgetRouter.get(
   '/:id/comparison',
-  requirePermission(
-    PERMISSIONS.FINANCE_VIEW,
-    PERMISSIONS.FINANCE_EDIT,
-    PERMISSIONS.FINANCE_FULL_ACCESS,
-    PERMISSIONS.COST_ANALYTICS_VIEW,
-    PERMISSIONS.COST_ANALYTICS_EDIT,
-    PERMISSIONS.COST_ANALYTICS_FULL_ACCESS
-  ),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getBudgetComparison
 )

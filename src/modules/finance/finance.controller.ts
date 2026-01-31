@@ -9,13 +9,15 @@ import type { Request, Response, NextFunction } from 'express'
 import { createHttpError } from '../../utils/http-error'
 import { FinanceService } from './finance.service'
 import { EmployeeCostRepository, type EmployeeCostFilters } from './employee-cost.repository'
-import type { CreateEmployeeCostInput, UpdateEmployeeCostInput, EMPLOYEE_COST_TYPES, EmployeeCostType } from './employee-cost.model'
+import { RecurringEmployeeCostModel } from './recurring-employee-costs/recurring-employee-cost.model'
+import type { CreateEmployeeCostInput, UpdateEmployeeCostInput } from './employee-cost.model'
 
 const financeService = new FinanceService()
 const employeeCostRepo = new EmployeeCostRepository()
 
-// Valid employee cost types (salary is NOT allowed)
-const VALID_COST_TYPES: EmployeeCostType[] = ['subscription', 'equipment', 'training', 'benefit', 'other']
+function mergeUnique(values: string[]): string[] {
+  return Array.from(new Set(values.filter((value) => value && value.trim()))).sort((a, b) => a.localeCompare(b))
+}
 
 export async function getFinanceSummary(req: Request, res: Response, next: NextFunction) {
   try {
@@ -54,7 +56,7 @@ export async function getFinanceSummary(req: Request, res: Response, next: NextF
 }
 
 // Employee Cost endpoints
-// NOTE: 'salary' is NOT a valid cost type - salary comes from Users.monthlySalary
+// NOTE: Salary is not tracked here - it comes from Users.monthlySalary
 export async function getEmployeeCosts(req: Request, res: Response, next: NextFunction) {
   try {
     let startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined
@@ -67,22 +69,49 @@ export async function getEmployeeCosts(req: Request, res: Response, next: NextFu
       endDate.setHours(23, 59, 59, 999)
     }
 
-    const costType = req.query.costType as EmployeeCostType | undefined
-    
-    // Validate costType if provided
-    if (costType && !VALID_COST_TYPES.includes(costType)) {
-      return next(createHttpError(400, `Invalid cost type. Valid types: ${VALID_COST_TYPES.join(', ')}`))
-    }
-
     const filters: EmployeeCostFilters = {
       employeeId: req.query.employeeId as string | undefined,
       startDate,
       endDate,
-      costType,
+    }
+    if (req.query.search) {
+      filters.search = req.query.search as string
     }
 
-    const costs = await employeeCostRepo.listEmployeeCosts(filters)
-    res.json({ status: 'success', data: costs })
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1)
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 20))
+    const { data, total } = await employeeCostRepo.listEmployeeCostsPaginated(filters, page, limit)
+
+    res.json({
+      status: 'success',
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getEmployeeCostOptions(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const base = await employeeCostRepo.getOptions()
+    const [recurringVendors, recurringCategories] = await Promise.all([
+      RecurringEmployeeCostModel.distinct('vendor', { vendor: { $nin: [null, ''] } }),
+      RecurringEmployeeCostModel.distinct('category', { category: { $nin: [null, ''] } }),
+    ])
+
+    res.json({
+      status: 'success',
+      data: {
+        vendors: mergeUnique([...base.vendors, ...recurringVendors]),
+        categories: mergeUnique([...base.categories, ...recurringCategories]),
+      },
+    })
   } catch (error) {
     next(error)
   }
@@ -91,7 +120,14 @@ export async function getEmployeeCosts(req: Request, res: Response, next: NextFu
 export async function createEmployeeCost(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.id
-    const input: CreateEmployeeCostInput = req.body
+    const input: CreateEmployeeCostInput = {
+      employeeId: req.body.employeeId,
+      amount: req.body.amount,
+      currency: req.body.currency,
+      vendor: req.body.vendor,
+      category: req.body.category,
+      effectiveDate: req.body.effectiveDate ? new Date(req.body.effectiveDate) : new Date(),
+    }
 
     // Validate required fields
     if (!input.employeeId) {
@@ -100,16 +136,6 @@ export async function createEmployeeCost(req: Request, res: Response, next: Next
 
     if (typeof input.amount !== 'number' || input.amount < 0) {
       return next(createHttpError(400, 'Amount must be a valid positive number'))
-    }
-
-    // SECURITY: Validate that salary is NOT a cost type
-    // Salary comes EXCLUSIVELY from Users.monthlySalary
-    if (!input.costType || !VALID_COST_TYPES.includes(input.costType)) {
-      return next(createHttpError(400, `Invalid cost type. Valid types: ${VALID_COST_TYPES.join(', ')}. Note: Salary is not tracked as an employee cost - it comes from user records.`))
-    }
-
-    if (!input.effectiveDate) {
-      input.effectiveDate = new Date()
     }
 
     const cost = await employeeCostRepo.create(input, userId)
@@ -122,7 +148,14 @@ export async function createEmployeeCost(req: Request, res: Response, next: Next
 export async function updateEmployeeCost(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params
-    const input: UpdateEmployeeCostInput = req.body
+    const input: UpdateEmployeeCostInput = {}
+
+    if (req.body.employeeId !== undefined) input.employeeId = req.body.employeeId
+    if (req.body.amount !== undefined) input.amount = req.body.amount
+    if (req.body.currency !== undefined) input.currency = req.body.currency
+    if (req.body.vendor !== undefined) input.vendor = req.body.vendor
+    if (req.body.category !== undefined) input.category = req.body.category
+    if (req.body.effectiveDate !== undefined) input.effectiveDate = new Date(req.body.effectiveDate)
 
     if (input.amount !== undefined && (typeof input.amount !== 'number' || input.amount < 0)) {
       return next(createHttpError(400, 'Amount must be a valid positive number'))

@@ -8,7 +8,7 @@ import type { UserPreferences } from './user.model'
 import { activeUsersManager } from '../../lib/active-users'
 
 function canViewSalary(user?: { permissions?: Permission[] }) {
-  return !!user && hasPermission(user, PERMISSIONS.USERS_MANAGE)
+  return !!user && hasPermission(user, PERMISSIONS.SYSTEM_FULL_ACCESS)
 }
 
 export async function getUserById(req: Request, res: Response, next: NextFunction) {
@@ -235,6 +235,7 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
 
   const validStatuses = ['online', 'busy', 'away', 'offline']
   const validPermissions = new Set(Object.values(PERMISSIONS))
+  const canManageSalary = canViewSalary(req.user)
 
   try {
     const updates: {
@@ -302,6 +303,9 @@ export async function updateEmployee(req: Request, res: Response, next: NextFunc
     }
 
     if (monthlySalary !== undefined) {
+      if (!canManageSalary) {
+        return next(createHttpError(403, 'Forbidden'))
+      }
       const salary = typeof monthlySalary === 'string' ? parseFloat(monthlySalary) : monthlySalary
       if (isNaN(salary) || salary < 0) {
         return next(createHttpError(400, 'Monthly salary must be a valid positive number'))

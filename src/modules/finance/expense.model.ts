@@ -5,8 +5,6 @@ import { Schema, model, models, type Document } from 'mongoose'
  * 
  * IMPORTANT PRODUCT RULES:
  * - `notes` is the free text field (NOT description)
- * - `isRecurringMonthly` is the ONLY recurrence toggle (monthly only, no other options)
- * - `endDate` is optional; if omitted for recurring, continues indefinitely
  * - Salary is NOT tracked as an expense type. Salary comes from Users.monthlySalary ONLY.
  */
 export interface ExpenseDocument extends Document {
@@ -16,11 +14,6 @@ export interface ExpenseDocument extends Document {
   vendor?: string
   notes?: string // Free text field (renamed from description)
   effectiveDate: Date
-  endDate?: Date // Optional end date for recurring or range-based costs
-  isRecurringMonthly: boolean // Monthly recurring toggle ONLY (no dropdown)
-  projectId?: string // Scope to project if applicable
-  workspaceId?: string // Scope to workspace if applicable
-  metadata?: Record<string, unknown>
   createdBy: string
   createdAt: Date
   updatedAt: Date
@@ -60,33 +53,6 @@ const expenseSchema = new Schema<ExpenseDocument>(
       required: true,
       index: true,
     },
-    endDate: {
-      type: Date,
-      index: true,
-    },
-    isRecurringMonthly: {
-      type: Boolean,
-      default: false,
-    },
-    projectId: {
-      type: String,
-      index: true,
-    },
-    workspaceId: {
-      type: String,
-      index: true,
-    },
-    metadata: {
-      type: Schema.Types.Mixed,
-      validate: {
-        validator: function(v: unknown) {
-          // Limit metadata size to 10KB
-          if (!v) return true
-          return JSON.stringify(v).length <= 10240
-        },
-        message: 'Metadata too large (max 10KB)',
-      },
-    },
     createdBy: {
       type: String,
       required: true,
@@ -101,8 +67,6 @@ const expenseSchema = new Schema<ExpenseDocument>(
 // Compound indexes for common queries
 expenseSchema.index({ effectiveDate: 1, category: 1 })
 expenseSchema.index({ effectiveDate: 1, vendor: 1 })
-expenseSchema.index({ projectId: 1, effectiveDate: 1 })
-expenseSchema.index({ workspaceId: 1, effectiveDate: 1 })
 expenseSchema.index({ createdBy: 1, effectiveDate: 1 })
 
 export const ExpenseModel = models.Expense ?? model<ExpenseDocument>('Expense', expenseSchema)
@@ -115,11 +79,6 @@ export type Expense = {
   vendor?: string
   notes?: string
   effectiveDate: string
-  endDate?: string
-  isRecurringMonthly: boolean
-  projectId?: string
-  workspaceId?: string
-  metadata?: Record<string, unknown>
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -134,11 +93,6 @@ export function toExpense(doc: ExpenseDocument): Expense {
     vendor: doc.vendor,
     notes: doc.notes,
     effectiveDate: doc.effectiveDate.toISOString(),
-    endDate: doc.endDate?.toISOString(),
-    isRecurringMonthly: doc.isRecurringMonthly,
-    projectId: doc.projectId,
-    workspaceId: doc.workspaceId,
-    metadata: doc.metadata as Record<string, unknown> | undefined,
     createdBy: doc.createdBy,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -152,11 +106,6 @@ export type CreateExpenseInput = {
   vendor?: string
   notes?: string
   effectiveDate: Date
-  endDate?: Date
-  isRecurringMonthly?: boolean
-  projectId?: string
-  workspaceId?: string
-  metadata?: Record<string, unknown>
 }
 
 export type UpdateExpenseInput = {
@@ -166,9 +115,4 @@ export type UpdateExpenseInput = {
   vendor?: string
   notes?: string
   effectiveDate?: Date
-  endDate?: Date | null // Allow clearing endDate
-  isRecurringMonthly?: boolean
-  projectId?: string | null
-  workspaceId?: string | null
-  metadata?: Record<string, unknown>
 }

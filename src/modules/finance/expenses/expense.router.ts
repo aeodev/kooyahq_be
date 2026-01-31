@@ -9,6 +9,7 @@ import { PERMISSIONS } from '../../auth/rbac/permissions'
 import {
   createExpense,
   getExpenses,
+  getExpenseOptions,
   getExpense,
   updateExpense,
   deleteExpense,
@@ -18,6 +19,24 @@ export const expenseRouter = Router()
 
 // All routes require authentication
 expenseRouter.use(authenticate)
+
+/**
+ * @swagger
+ * /finance/expenses/options:
+ *   get:
+ *     summary: Get expense vendor/category options
+ *     tags: [Finance Expenses]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Expense options
+ */
+expenseRouter.get(
+  '/options',
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
+  getExpenseOptions
+)
 
 /**
  * @swagger
@@ -52,23 +71,13 @@ expenseRouter.use(authenticate)
  *               effectiveDate:
  *                 type: string
  *                 format: date
- *               endDate:
- *                 type: string
- *                 format: date
- *               isRecurringMonthly:
- *                 type: boolean
- *                 default: false
- *               projectId:
- *                 type: string
- *               workspaceId:
- *                 type: string
  *     responses:
  *       200:
  *         description: Expense created successfully
  */
 expenseRouter.post(
   '/',
-  requirePermission(PERMISSIONS.FINANCE_EDIT, PERMISSIONS.FINANCE_FULL_ACCESS),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   createExpense
 )
 
@@ -100,10 +109,6 @@ expenseRouter.post(
  *         schema:
  *           type: string
  *       - in: query
- *         name: projectId
- *         schema:
- *           type: string
- *       - in: query
  *         name: search
  *         schema:
  *           type: string
@@ -113,7 +118,7 @@ expenseRouter.post(
  */
 expenseRouter.get(
   '/',
-  requirePermission(PERMISSIONS.FINANCE_VIEW, PERMISSIONS.FINANCE_EDIT, PERMISSIONS.FINANCE_FULL_ACCESS),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getExpenses
 )
 
@@ -139,7 +144,7 @@ expenseRouter.get(
  */
 expenseRouter.get(
   '/:id',
-  requirePermission(PERMISSIONS.FINANCE_VIEW, PERMISSIONS.FINANCE_EDIT, PERMISSIONS.FINANCE_FULL_ACCESS),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   getExpense
 )
 
@@ -165,7 +170,7 @@ expenseRouter.get(
  */
 expenseRouter.put(
   '/:id',
-  requirePermission(PERMISSIONS.FINANCE_EDIT, PERMISSIONS.FINANCE_FULL_ACCESS),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   updateExpense
 )
 
@@ -191,6 +196,6 @@ expenseRouter.put(
  */
 expenseRouter.delete(
   '/:id',
-  requirePermission(PERMISSIONS.FINANCE_EDIT, PERMISSIONS.FINANCE_FULL_ACCESS),
+  requirePermission(PERMISSIONS.SYSTEM_FULL_ACCESS),
   deleteExpense
 )

@@ -2,7 +2,7 @@
  * Analytics Types - SAFE vs PRIVILEGED DTOs
  * 
  * SECURITY: Default analytics responses MUST NEVER return monthlySalary or hourlyRate.
- * Privileged responses may include salary/rates ONLY if user has USERS_MANAGE permission.
+ * Privileged responses may include salary/rates ONLY if user has SYSTEM_FULL_ACCESS.
  */
 
 // ============================================================================
@@ -131,12 +131,12 @@ export type PeriodComparison = {
 }
 
 // ============================================================================
-// PRIVILEGED DTOs (Requires USERS_MANAGE permission)
+// PRIVILEGED DTOs (Requires SYSTEM_FULL_ACCESS)
 // ============================================================================
 
 /**
  * PRIVILEGED ActiveDeveloper - Includes salary/rate data
- * ONLY accessible with USERS_MANAGE permission
+ * ONLY accessible with SYSTEM_FULL_ACCESS
  */
 export type PrivilegedActiveDeveloper = SafeActiveDeveloper & {
   monthlySalary: number
