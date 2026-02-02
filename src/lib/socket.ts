@@ -15,7 +15,6 @@ import { registerAINewsHandlers } from '../modules/ai-news/ai-news.socket'
 import { registerAIAssistantHandlers } from '../modules/ai-assistant/ai-assistant.socket'
 import { registerChatHandlers } from '../modules/chat/chat.socket'
 import { activeUsersManager } from './active-users'
-import { TimeEntryService } from '../modules/time-tracker/time-entry.service'
 import { presenceManager } from '../modules/presence/presence.manager'
 import { buildAuthUser, type AuthUser } from '../modules/auth/rbac/permissions'
 
@@ -26,10 +25,6 @@ export type AuthenticatedSocket = Socket & {
 }
 
 let io: SocketServer | null = null
-
-// Track pending timer stops with 15-second grace period
-// Key: userId, Value: timeout ID
-const pendingTimerStops = new Map<string, NodeJS.Timeout>()
 
 export function initializeSocket(server: HttpServer): SocketServer {
   io = new SocketServer(server, {
@@ -102,14 +97,6 @@ export function initializeSocket(server: HttpServer): SocketServer {
 
     console.log(`Socket connected: ${userId}`)
 
-    // Cancel any pending timer stop if user reconnected within grace period
-    const pendingStop = pendingTimerStops.get(userId)
-    if (pendingStop) {
-      clearTimeout(pendingStop)
-      pendingTimerStops.delete(userId)
-      console.log(`Cancelled pending timer stop for user ${userId} (reconnected within grace period)`)
-    }
-
     // Join user's personal room for targeted updates
     socket.join(userRoom(userId))
 
@@ -129,41 +116,9 @@ export function initializeSocket(server: HttpServer): SocketServer {
       // Remove the socket from active users
       activeUsersManager.removeUser(socket.id)
       
-      // If this was the last connection, schedule timer stop after 15-second grace period
+      // If this was the last connection, mark user as offline
       if (!hasOtherConnections && userId) {
         presenceManager.markUserOffline(userId)
-        
-        // Clear any existing pending stop for this user
-        const existingPending = pendingTimerStops.get(userId)
-        if (existingPending) {
-          clearTimeout(existingPending)
-        }
-        
-        // Set a 15-second timeout to stop the timer
-        const timeoutId = setTimeout(async () => {
-          try {
-            const timeEntryService = new TimeEntryService()
-            const activeTimer = await timeEntryService.getActiveTimer(userId)
-            if (activeTimer) {
-              // Double-check user still has no connections before stopping
-              if (!activeUsersManager.hasActiveConnection(userId)) {
-                console.log(`Auto-stopping timer for user ${userId} (15-second grace period expired)`)
-                await timeEntryService.stopTimer(userId)
-              } else {
-                console.log(`Cancelled timer stop for user ${userId} (reconnected during grace period)`)
-              }
-            }
-          } catch (error) {
-            // Log error but don't throw - socket disconnect shouldn't fail
-            console.error(`Error auto-stopping timer for user ${userId}:`, error)
-          } finally {
-            // Clean up the pending stop from the map
-            pendingTimerStops.delete(userId)
-          }
-        }, 15000) // 15 seconds grace period
-        
-        pendingTimerStops.set(userId, timeoutId)
-        console.log(`Scheduled timer stop for user ${userId} in 15 seconds (grace period for page refresh)`)
       }
     })
   })
