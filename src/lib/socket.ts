@@ -4,7 +4,7 @@ import { verifyAccessToken } from '../utils/token'
 import { userService } from '../modules/users/user.service'
 import { env } from '../config/env'
 import { socketHandlerRegistry } from './socket-manager'
-import { userRoom } from '../utils/socket-rooms'
+import { userRoom, chatUserRoom } from '../utils/socket-rooms'
 import { registerTimeEntryHandlers } from '../modules/time-tracker/time-entry.socket'
 import { registerGameHandlers } from '../modules/games/game.socket'
 import { registerPresenceHandlers } from '../modules/presence/presence.socket'
@@ -97,8 +97,8 @@ export function initializeSocket(server: HttpServer): SocketServer {
 
     console.log(`Socket connected: ${userId}`)
 
-    // Join user's personal room for targeted updates
     socket.join(userRoom(userId))
+    socket.join(chatUserRoom(userId))
 
     // Track active user
     activeUsersManager.addUser(userId, socket)

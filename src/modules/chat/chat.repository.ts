@@ -59,7 +59,6 @@ export type MessageQueryOptions = {
 }
 
 export const chatRepository = {
-  // Conversation operations
   async createConversation(input: CreateConversationInput): Promise<Conversation> {
     const doc = await ConversationModel.create({
       type: input.type,
@@ -77,7 +76,6 @@ export const chatRepository = {
     const doc = await ConversationModel.findById(id).exec()
     if (!doc) return undefined
 
-    // Check if user has access
     if (userId && !doc.participants.includes(userId)) {
       return undefined
     }
@@ -93,7 +91,6 @@ export const chatRepository = {
     const limit = options.limit && options.limit > 0 ? options.limit : 50
     const skip = (page - 1) * limit
 
-    // Exclude conversations archived or deleted by this user
     const filter = {
       participants: userId,
       [`archivedBy.${userId}`]: { $exists: false },
@@ -150,7 +147,6 @@ export const chatRepository = {
     const doc = await ConversationModel.findById(conversationId).exec()
     if (!doc) return undefined
 
-    // Check if user is admin (for groups) or participant (for direct)
     if (doc.type === 'group' && !doc.admins.includes(userId)) {
       return undefined
     }
@@ -173,11 +169,9 @@ export const chatRepository = {
     timestamp: Date,
     senderName?: string
   ): Promise<Conversation | undefined> {
-    // Get message and sender info for denormalization
     const message = await MessageModel.findById(messageId).exec()
     if (!message) return undefined
 
-    // Use provided sender name or default
     const resolvedSenderName = senderName || 'Unknown User'
 
     const updateData = {
@@ -199,7 +193,6 @@ export const chatRepository = {
     return doc ? toConversation(doc) : undefined
   },
 
-  // Message operations
   async createMessage(input: CreateMessageInput): Promise<Message> {
     const doc = await MessageModel.create({
       conversationId: input.conversationId,
@@ -222,7 +215,6 @@ export const chatRepository = {
 
     const filter: any = { conversationId, deletedAt: { $exists: false } }
 
-    // If before is provided, fetch messages before that message
     if (options.before) {
       const beforeMessage = await MessageModel.findById(options.before).exec()
       if (beforeMessage) {
@@ -234,14 +226,14 @@ export const chatRepository = {
       MessageModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit + 1) // Fetch one extra to check if there are more
+        .limit(limit + 1)
         .exec(),
       MessageModel.countDocuments({ conversationId, deletedAt: { $exists: false } }).exec(),
     ])
 
     const hasMore = docs.length > limit
     const messages = (hasMore ? docs.slice(0, limit) : docs)
-      .reverse() // Reverse to show oldest first
+      .reverse()
       .map(toMessage)
 
     return {
@@ -261,21 +253,18 @@ export const chatRepository = {
       deletedAt: { $exists: false }
     }
 
-    // Build query based on what sync point we have
     if (lastMessageId) {
-      // Find messages after the last known message ID
       const lastMessage = await MessageModel.findById(lastMessageId).exec()
       if (lastMessage) {
         filter.createdAt = { $gt: lastMessage.createdAt }
       }
     } else if (lastSyncTimestamp) {
-      // Find messages after the last sync timestamp
       filter.createdAt = { $gt: new Date(lastSyncTimestamp) }
     }
 
     const docs = await MessageModel.find(filter)
-      .sort({ createdAt: 1 }) // Oldest first for sync
-      .limit(100) // Limit to prevent overwhelming the client
+      .sort({ createdAt: 1 })
+      .limit(100)
       .exec()
 
     return docs.map(toMessage)
@@ -283,6 +272,11 @@ export const chatRepository = {
 
   async findMessageById(id: string): Promise<Message | undefined> {
     const doc = await MessageModel.findById(id).exec()
+    return doc ? toMessage(doc) : undefined
+  },
+
+  async findMessageByCid(cid: string): Promise<Message | undefined> {
+    const doc = await MessageModel.findOne({ cid }).exec()
     return doc ? toMessage(doc) : undefined
   },
 
@@ -322,9 +316,20 @@ export const chatRepository = {
     return result.modifiedCount || 0
   },
 
-  async updateMessage(messageId: string, senderId: string, updates: UpdateMessageInput): Promise<Message | undefined> {
-    const doc = await MessageModel.findById(messageId).exec()
-    if (!doc || doc.senderId !== senderId) return undefined
+  async updateMessage(
+    messageId: string,
+    senderId: string,
+    conversationId: string,
+    updates: UpdateMessageInput
+  ): Promise<Message | undefined> {
+    const doc = await MessageModel.findOne({
+      _id: messageId,
+      senderId,
+      conversationId,
+      deletedAt: { $exists: false },
+    }).exec()
+    
+    if (!doc) return undefined
 
     const updateData: any = {}
     if (updates.content !== undefined) {
@@ -336,9 +341,15 @@ export const chatRepository = {
     return updated ? toMessage(updated) : undefined
   },
 
-  async delete(messageId: string, senderId: string): Promise<boolean> {
-    const doc = await MessageModel.findById(messageId).exec()
-    if (!doc || doc.senderId !== senderId) return false
+  async delete(messageId: string, senderId: string, conversationId: string): Promise<boolean> {
+    const doc = await MessageModel.findOne({
+      _id: messageId,
+      senderId,
+      conversationId,
+      deletedAt: { $exists: false },
+    }).exec()
+    
+    if (!doc) return false
 
     doc.deletedAt = new Date()
     await doc.save()
@@ -389,7 +400,6 @@ export const chatRepository = {
     const limit = options.limit && options.limit > 0 ? options.limit : 50
     const skip = (page - 1) * limit
 
-    // Only get conversations archived by this user (not deleted)
     const filter = {
       participants: userId,
       [`archivedBy.${userId}`]: { $exists: true },

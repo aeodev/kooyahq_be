@@ -149,7 +149,7 @@ const messageSchema = new Schema<MessageDocument>(
     },
     cid: {
       type: String,
-      index: true,
+      unique: true,
       sparse: true, // Only index non-null values
     },
     attachments: {
@@ -193,6 +193,7 @@ conversationSchema.index({ participants: 1, type: 1 })
 conversationSchema.index({ lastMessageAt: -1 })
 messageSchema.index({ conversationId: 1, createdAt: -1 })
 messageSchema.index({ senderId: 1 })
+messageSchema.index({ cid: 1 }, { unique: true, sparse: true })
 
 export const ConversationModel =
   models.Conversation ?? model<ConversationDocument>('Conversation', conversationSchema)

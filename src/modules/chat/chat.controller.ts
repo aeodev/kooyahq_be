@@ -321,7 +321,19 @@ export async function updateMessage(req: Request, res: Response, next: NextFunct
 
   try {
     const { chatRepository } = await import('./chat.repository')
-    const updated = await chatRepository.updateMessage(id, userId, { content: content.trim() })
+
+    // First fetch the message to get conversationId
+    const message = await chatRepository.findMessageById(id)
+    if (!message) {
+      return next(createHttpError(404, 'Message not found'))
+    }
+
+    // Verify the user owns this message
+    if (message.senderId !== userId) {
+      return next(createHttpError(403, 'Unauthorized to edit this message'))
+    }
+
+    const updated = await chatRepository.updateMessage(id, userId, message.conversationId, { content: content.trim() })
     if (!updated) {
       return next(createHttpError(404, 'Message not found or unauthorized'))
     }
@@ -344,7 +356,19 @@ export async function deleteMessage(req: Request, res: Response, next: NextFunct
 
   try {
     const { chatRepository } = await import('./chat.repository')
-    const deleted = await chatRepository.delete(id, userId)
+
+    // First fetch the message to get conversationId
+    const message = await chatRepository.findMessageById(id)
+    if (!message) {
+      return next(createHttpError(404, 'Message not found'))
+    }
+
+    // Verify the user owns this message
+    if (message.senderId !== userId) {
+      return next(createHttpError(403, 'Unauthorized to delete this message'))
+    }
+
+    const deleted = await chatRepository.delete(id, userId, message.conversationId)
     if (!deleted) {
       return next(createHttpError(404, 'Message not found or unauthorized'))
     }
