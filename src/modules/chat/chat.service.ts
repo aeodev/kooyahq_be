@@ -342,6 +342,45 @@ export const chatService = {
     }
   },
 
+  async createSystemMessage(
+    conversationId: string,
+    actorId: string,
+    content: string
+  ): Promise<MessageWithSender> {
+    const conversation = await chatRepository.findConversationById(conversationId, actorId)
+    if (!conversation) {
+      throw new Error('Conversation not found or access denied')
+    }
+
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      throw new Error('System message content is required')
+    }
+
+    const sender = await userService.getPublicProfile(actorId)
+    if (!sender) {
+      throw new Error('Sender not found')
+    }
+
+    const message = await chatRepository.createMessage({
+      conversationId,
+      senderId: actorId,
+      content: content.trim(),
+      type: 'system',
+    })
+
+    await chatRepository.updateLastMessage(conversationId, message.id, new Date(message.createdAt), sender.name)
+
+    return {
+      ...message,
+      sender: {
+        id: sender.id,
+        name: sender.name,
+        email: sender.email,
+        profilePic: sender.profilePic,
+      },
+    }
+  },
+
   async getMessagesSince(
     conversationId: string,
     userId: string,

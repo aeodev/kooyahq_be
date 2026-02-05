@@ -14,6 +14,7 @@ import { registerServerManagementHandlers } from '../modules/server-managmenet/s
 import { registerAINewsHandlers } from '../modules/ai-news/ai-news.socket'
 import { registerAIAssistantHandlers } from '../modules/ai-assistant/ai-assistant.socket'
 import { registerChatHandlers } from '../modules/chat/chat.socket'
+import { registerChatCallHandlers } from '../modules/chat-call/chat-call.socket'
 import { activeUsersManager } from './active-users'
 import { presenceManager } from '../modules/presence/presence.manager'
 import { buildAuthUser, type AuthUser } from '../modules/auth/rbac/permissions'
@@ -87,6 +88,7 @@ export function initializeSocket(server: HttpServer): SocketServer {
   socketHandlerRegistry.registerHandler(registerAINewsHandlers)
   socketHandlerRegistry.registerHandler(registerAIAssistantHandlers)
   socketHandlerRegistry.registerHandler(registerChatHandlers)
+  socketHandlerRegistry.registerHandler(registerChatCallHandlers)
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const userId = socket.userId
